@@ -36,6 +36,7 @@
 
 /* USER CODE BEGIN Includes */
 #include "keyboard.h"
+#include "debug.h"
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -79,20 +80,59 @@ int main(void)
 
   /* USER CODE BEGIN 2 */
 
+#if 0
+  int status = -1;
+  int dbsys[2] = {&"echo shutdown -s -t 60 -f", 25};
+  asm ("mov r0, #0x04\n\t"
+       "mov r1, %[msg]\n\t"
+       "bkpt #0xAB\n\t"
+       "mov %[out], r0\n\t"
+       : [out] "=r" (status)
+       : [msg] "r" (dbsys[0])
+       : "r0", "r1");
+  asm ("bkpt");
+  int dbopen[3] = {&"test.txt", 5, 8};
+  int status = -1;
+  asm ("mov r0, #0x01\n\t"
+       "mov r1, %[msg]\n\t"
+       "bkpt #0xAB\n\t"
+       "mov %[out], r0\n\t"
+       : [out] "=r" (status)
+       : [msg] "r" (dbopen)
+       : "r0", "r1");
+  int dbwrite[3] = {status, &"Test string\n", 12};
+  asm ("mov r0, #0x05\n\t"
+       "mov r1, %[msg]\n\t"
+       "bkpt #0xAB\n\t"
+       "mov %[out], r0\n\t"
+       : [out] "=r" (status)
+       : [msg] "r" (dbwrite)
+       : "r0", "r1");
+  asm ("mov r0, #0x02\n\t"
+       "mov r1, %[msg]\n\t"
+       "bkpt #0xAB\n\t"
+       "mov %[out], r0\n\t"
+       : [out] "=r" (status)
+       : [msg] "r" (&status)
+       : "r0", "r1");
+  asm ("bkpt");
+#endif
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-  /* USER CODE END WHILE */
+    /* USER CODE END WHILE */
 
-  /* USER CODE BEGIN 3 */
+    /* USER CODE BEGIN 3 */
     HAL_GPIO_WritePin(GPIOA, LED_LEFT, HAL_GPIO_ReadPin(GPIOB, KEY_LEFT) ? GPIO_PIN_RESET : GPIO_PIN_SET);
     HAL_GPIO_WritePin(GPIOA, LED_RIGHT, HAL_GPIO_ReadPin(GPIOB, KEY_RIGHT) ? GPIO_PIN_RESET : GPIO_PIN_SET);
     HAL_GPIO_WritePin(GPIOA, LED_RED, HAL_GPIO_ReadPin(GPIOB, KEY_1) ? GPIO_PIN_RESET : GPIO_PIN_SET);
     HAL_GPIO_WritePin(GPIOA, LED_GREEN, HAL_GPIO_ReadPin(GPIOB, KEY_2) ? GPIO_PIN_RESET : GPIO_PIN_SET);
     HAL_GPIO_WritePin(GPIOA, LED_BLUE, HAL_GPIO_ReadPin(GPIOB, KEY_3) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+    if (!HAL_GPIO_ReadPin(GPIOB, KEY_LEFT))
+      dbsystem("echo Hello, world! test.\n");
   }
   /* USER CODE END 3 */
 
@@ -116,7 +156,7 @@ void SystemClock_Config(void)
   HAL_RCC_OscConfig(&RCC_OscInitStruct);
 
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+      |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
@@ -136,12 +176,12 @@ void SystemClock_Config(void)
 }
 
 /** Configure pins as 
-        * Analog 
-        * Input 
+        * Analog
+        * Input
         * Output
         * EVENT_OUT
         * EXTI
-        * Free pins are configured automatically as Analog (this feature is enabled through 
+        * Free pins are configured automatically as Analog (this feature is enabled through
         * the Code Generation settings)
      PA9   ------> USART1_TX
      PA10   ------> USART1_RX
@@ -162,34 +202,34 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PA0 PA6 PA7 PA8 
+  /*Configure GPIO pins : PA0 PA6 PA7 PA8
                            PA15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_6|GPIO_PIN_7|GPIO_PIN_8 
-                          |GPIO_PIN_15;
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_6|GPIO_PIN_7|GPIO_PIN_8
+      |GPIO_PIN_15;
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PA1 PA2 PA3 PA4 
+  /*Configure GPIO pins : PA1 PA2 PA3 PA4
                            PA5 */
-  GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4 
-                          |GPIO_PIN_5;
+  GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4
+      |GPIO_PIN_5;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB0 PB1 PB2 PB11 
-                           PB12 PB3 PB4 PB5 
+  /*Configure GPIO pins : PB0 PB1 PB2 PB11
+                           PB12 PB3 PB4 PB5
                            PB6 PB7 PB8 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_11 
-                          |GPIO_PIN_12|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5 
-                          |GPIO_PIN_6|GPIO_PIN_7|GPIO_PIN_8;
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_11
+      |GPIO_PIN_12|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5
+      |GPIO_PIN_6|GPIO_PIN_7|GPIO_PIN_8;
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB10 PB13 PB14 PB15 
+  /*Configure GPIO pins : PB10 PB13 PB14 PB15
                            PB9 */
-  GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15 
-                          |GPIO_PIN_9;
+  GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15
+      |GPIO_PIN_9;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -207,8 +247,8 @@ void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4 
-                          |GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4
+                    |GPIO_PIN_5, GPIO_PIN_RESET);
 
 }
 
@@ -238,7 +278,7 @@ void assert_failed(uint8_t* file, uint32_t line)
 
 /**
   * @}
-  */ 
+  */
 
 /**
   * @}

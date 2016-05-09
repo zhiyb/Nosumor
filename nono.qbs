@@ -39,10 +39,12 @@ Project {
         cpp.includePaths: ["Inc"]
 
         files: [
+            "Inc/debug.h",
             "Inc/keyboard.h",
             "Inc/mxconstants.h",
             "Inc/stm32f1xx_it.h",
             "STM32F103C8_FLASH.ld",
+            "Src/debug.c",
             "Src/main.c",
             "Src/stm32f1xx_hal_msp.c",
             "Src/stm32f1xx_it.c",
@@ -51,10 +53,10 @@ Project {
         Group {
             name: "USB"
             condition: true
-            cpp.commonCompilerFlags: [
+            cpp.commonCompilerFlags: outer.concat([
                 "-Wno-unused-parameter",
                 "-Wno-pointer-sign",
-            ]
+            ])
             files: [
                 "Inc/usb_device.h",
                 "Inc/usbd_conf.h",
