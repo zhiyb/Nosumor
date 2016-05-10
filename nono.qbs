@@ -53,6 +53,7 @@ Project {
         Group {
             name: "USB"
             condition: true
+            cpp.optimization: "small"
             cpp.commonCompilerFlags: outer.concat([
                 "-Wno-unused-parameter",
                 "-Wno-pointer-sign",
