@@ -1,10 +1,8 @@
 /**
   ******************************************************************************
-  * @file           : USB_DEVICE  
-  * @version        : v1.0_Cube
-  * @brief          : This file implements the USB Device 
+  * @file           : usbd_custom_hid_if_if.h
+  * @brief          : header file for the usbd_custom_hid_if.c file
   ******************************************************************************
-  *
   * COPYRIGHT(c) 2016 STMicroelectronics
   *
   * Redistribution and use in source and binary forms, with or without modification,
@@ -32,36 +30,96 @@
   ******************************************************************************
 */
 
+/* Define to prevent recursive inclusion -------------------------------------*/
+
+#ifndef __USBD_CUSTOM_HID_IF_H_
+#define __USBD_CUSTOM_HID_IF_H_
+
+#ifdef __cplusplus
+ extern "C" {
+#endif
 /* Includes ------------------------------------------------------------------*/
-
-#include "usb_device.h"
-#include "usbd_core.h"
-#include "usbd_desc.h"
 #include "usbd_customhid.h"
-#include "usbd_custom_hid_if.h"
+/* USER CODE BEGIN INCLUDE */
+/* USER CODE END INCLUDE */
 
-/* USB Device Core handle declaration */
-USBD_HandleTypeDef hUsbDeviceFS;
+/** @addtogroup STM32_USB_OTG_DEVICE_LIBRARY
+  * @{
+  */
+  
+/** @defgroup USBD_CUSTOM_HID
+  * @brief header 
+  * @{
+  */ 
 
-/* init function */				        
-void MX_USB_DEVICE_Init(void)
-{
-  /* Init Device Library,Add Supported Class and Start the library*/
-  USBD_Init(&hUsbDeviceFS, &FS_Desc, DEVICE_FS);
+/** @defgroup USBD_CUSTOM_HID_Exported_Defines
+  * @{
+  */ 
+/* USER CODE BEGIN EXPORTED_DEFINES */
+#define REPORT_KEYBOARD 1
+#define REPORT_MOUSE    2
+#define REPORT_CUSTOM   3
+/* USER CODE END EXPORTED_DEFINES */
 
-  USBD_RegisterClass(&hUsbDeviceFS, &USBD_CUSTOM_HID);
+/**
+  * @}
+  */ 
 
-  USBD_CUSTOM_HID_RegisterInterface(&hUsbDeviceFS, &USBD_CustomHID_fops_FS);
+/** @defgroup USBD_CUSTOM_HID_Exported_Types
+  * @{
+  */  
+/* USER CODE BEGIN EXPORTED_TYPES */
+/* USER CODE END EXPORTED_TYPES */
 
-  USBD_Start(&hUsbDeviceFS);
+/**
+  * @}
+  */ 
 
+/** @defgroup USBD_CUSTOM_HID_Exported_Macros
+  * @{
+  */ 
+/* USER CODE BEGIN EXPORTED_MACRO */
+/* USER CODE END EXPORTED_MACRO */
+
+/**
+  * @}
+  */ 
+
+/** @defgroup USBD_CUSTOM_HID_Exported_Variables
+  * @{
+  */ 
+  extern USBD_CUSTOM_HID_ItfTypeDef  USBD_CustomHID_fops_FS;
+
+/* USER CODE BEGIN EXPORTED_VARIABLES */
+/* USER CODE END EXPORTED_VARIABLES */
+
+/**
+  * @}
+  */ 
+
+/** @defgroup USBD_CUSTOM_HID_Exported_FunctionsPrototype
+  * @{
+  */ 
+
+/* USER CODE BEGIN EXPORTED_FUNCTIONS */
+  int8_t USBD_CUSTOM_HID_SendReport_FS(uint8_t *report, uint16_t len);
+/* USER CODE END EXPORTED_FUNCTIONS */
+/**
+  * @}
+  */
+   
+/**
+  * @}
+  */ 
+
+/**
+* @}
+*/
+ 
+#ifdef __cplusplus
 }
-/**
-  * @}
-  */
+#endif
 
-/**
-  * @}
-  */
+#endif /* __USBD_CUSTOM_HID_IF_H_ */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

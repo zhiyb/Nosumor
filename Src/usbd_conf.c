@@ -36,7 +36,7 @@
 #include "stm32f1xx_hal.h"
 #include "usbd_def.h"
 #include "usbd_core.h"
-#include "usbd_hid.h"
+#include "usbd_customhid.h"
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
@@ -277,7 +277,8 @@ USBD_StatusTypeDef  USBD_LL_Init (USBD_HandleTypeDef *pdev)
 
   HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x00 , PCD_SNG_BUF, 0x18);
   HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x80 , PCD_SNG_BUF, 0x58);
-  HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x81 , PCD_SNG_BUF, 0x100);  
+  HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , CUSTOM_HID_EPIN_ADDR , PCD_SNG_BUF, 0x98);  
+  HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , CUSTOM_HID_EPOUT_ADDR , PCD_SNG_BUF, 0xD8);  
   return USBD_OK;
 }
 
@@ -476,7 +477,7 @@ void  USBD_LL_Delay (uint32_t Delay)
   */
 void *USBD_static_malloc(uint32_t size)
 {
-  static uint32_t mem[(sizeof(USBD_HID_HandleTypeDef)/4)+1];//On 32-bit boundary
+  static uint32_t mem[(sizeof(USBD_CUSTOM_HID_HandleTypeDef)/4+1)];//On 32-bit boundary
   return mem;
 }
 

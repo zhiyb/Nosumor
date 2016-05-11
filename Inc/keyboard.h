@@ -2,6 +2,7 @@
 #define KEYBOARD_H
 
 // Port A
+#define LED_GPIO  GPIOA
 #define LED_LEFT  GPIO_PIN_1
 #define LED_RIGHT GPIO_PIN_2
 #define LED_BLUE  GPIO_PIN_3
@@ -9,6 +10,7 @@
 #define LED_RED   GPIO_PIN_5
 
 // Port B
+#define KEY_GPIO  GPIOB
 #define KEY_LEFT  GPIO_PIN_9
 #define KEY_RIGHT GPIO_PIN_10
 #define KEY_1     GPIO_PIN_13

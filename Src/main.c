@@ -35,6 +35,7 @@
 #include "usb_device.h"
 
 /* USER CODE BEGIN Includes */
+#include "usbd_custom_hid_if.h"
 #include "usbd_hid.h"
 #include "keyboard.h"
 #include "debug.h"
@@ -80,13 +81,6 @@ int main(void)
   MX_USB_DEVICE_Init();
 
   /* USER CODE BEGIN 2 */
-  USBD_Stop(&hUsbDeviceFS);
-#if 0
-  GPIO_InitTypeDef pa12out = {
-  };
-  HAL_GPIO_Init(GPIOA, );
-#endif
-  HAL_Delay(250);
 
   /* USER CODE END 2 */
 
@@ -97,15 +91,29 @@ int main(void)
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
-    HAL_GPIO_WritePin(GPIOA, LED_LEFT, HAL_GPIO_ReadPin(GPIOB, KEY_LEFT) ? GPIO_PIN_RESET : GPIO_PIN_SET);
-    HAL_GPIO_WritePin(GPIOA, LED_RIGHT, HAL_GPIO_ReadPin(GPIOB, KEY_RIGHT) ? GPIO_PIN_RESET : GPIO_PIN_SET);
-    HAL_GPIO_WritePin(GPIOA, LED_RED, HAL_GPIO_ReadPin(GPIOB, KEY_1) ? GPIO_PIN_RESET : GPIO_PIN_SET);
-    HAL_GPIO_WritePin(GPIOA, LED_GREEN, HAL_GPIO_ReadPin(GPIOB, KEY_2) ? GPIO_PIN_RESET : GPIO_PIN_SET);
-    HAL_GPIO_WritePin(GPIOA, LED_BLUE, HAL_GPIO_ReadPin(GPIOB, KEY_3) ? GPIO_PIN_RESET : GPIO_PIN_SET);
-    if (!HAL_GPIO_ReadPin(GPIOB, KEY_LEFT))
-      dbsystem("echo \e[3mHello, world! test.\n");
-    if (!HAL_GPIO_ReadPin(GPIOB, KEY_RIGHT))
+    HAL_GPIO_WritePin(LED_GPIO, LED_LEFT, HAL_GPIO_ReadPin(KEY_GPIO, KEY_LEFT) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LED_GPIO, LED_RIGHT, HAL_GPIO_ReadPin(KEY_GPIO, KEY_RIGHT) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LED_GPIO, LED_RED, HAL_GPIO_ReadPin(KEY_GPIO, KEY_1) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LED_GPIO, LED_GREEN, HAL_GPIO_ReadPin(KEY_GPIO, KEY_2) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LED_GPIO, LED_BLUE, HAL_GPIO_ReadPin(KEY_GPIO, KEY_3) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+    if (!HAL_GPIO_ReadPin(KEY_GPIO, KEY_LEFT)) {
+      uint8_t report[] = {REPORT_MOUSE, 0, -10, -10, 0};
+      USBD_CUSTOM_HID_SendReport_FS(report, sizeof(report));
+    }
+    if (!HAL_GPIO_ReadPin(KEY_GPIO, KEY_RIGHT)) {
+      uint8_t report[] = {REPORT_MOUSE, 0, 10, 10, 0};
+      USBD_CUSTOM_HID_SendReport_FS(report, sizeof(report));
+    }
+    if (!HAL_GPIO_ReadPin(KEY_GPIO, KEY_1))
       dbbkpt();
+    if (!HAL_GPIO_ReadPin(KEY_GPIO, KEY_2))
+      dbsystem("echo Hello, world! test.");
+#if 0
+    if (!HAL_GPIO_ReadPin(KEY_GPIO, KEY_RIGHT)) {
+      uint8_t report[4] = {0, 1, 1, 0};
+      //USBD_HID_SendReport(&hUsbDeviceFS, report, 4);
+    }
+#endif
   }
   /* USER CODE END 3 */
 

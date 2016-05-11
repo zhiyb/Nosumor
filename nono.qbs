@@ -3,8 +3,9 @@ import qbs
 Project {
     property string driversDir: "../Drivers"
     property string device: "STM32F103C8T6"
-    property string usb_device_class: "HID"
+    property string usb_device_class: "CustomHID"
     property bool build_CMSIS_DSP: false
+    property bool sram_only: true
 
     references: [
         driversDir + "/CMSIS/cmsis.qbs",
@@ -35,7 +36,7 @@ Project {
         Depends {name: "STM32-HAL"}
         Depends {name: "STM32-USB-DEVICE"}
         Depends {name: "configurations"}
-        cpp.linkerScripts: ["STM32F103C8_FLASH.ld"]
+        cpp.linkerScripts: ["STM32F103C8_SRAM.ld"]
         cpp.includePaths: ["Inc"]
 
         files: [
@@ -43,7 +44,7 @@ Project {
             "Inc/keyboard.h",
             "Inc/mxconstants.h",
             "Inc/stm32f1xx_it.h",
-            "STM32F103C8_FLASH.ld",
+            "*.ld",
             "Src/debug.c",
             "Src/main.c",
             "Src/stm32f1xx_hal_msp.c",
@@ -61,9 +62,11 @@ Project {
             files: [
                 "Inc/usb_device.h",
                 "Inc/usbd_conf.h",
+                "Inc/usbd_custom_hid_if.h",
                 "Inc/usbd_desc.h",
                 "Src/usb_device.c",
                 "Src/usbd_conf.c",
+                "Src/usbd_custom_hid_if.c",
                 "Src/usbd_desc.c",
             ]
         }
