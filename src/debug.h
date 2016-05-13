@@ -1,7 +1,7 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
-static inline void dbbkpt() {asm ("bkpt #0");}
+#define dbbkpt()	asm ("bkpt #0")
 
 int dbcmd(int cmd, void *data);
 

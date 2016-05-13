@@ -101,7 +101,7 @@ __ALIGN_BEGIN static uint8_t CUSTOM_HID_ReportDesc_FS[USBD_CUSTOM_HID_REPORT_DES
   0x95, 0x01,             //     Report count (1)
   0x75, 0x05,             //     Report size (5)
   0x81, 0x01,             //     Input (Constant)
-  0x95, 0x02,             //     Report count (2)
+  0x95, 0x03,             //     Report count (3)
   0x75, 0x08,             //     Report size (8)
   0x05, 0x01,             //     Usage page (Generic desktop)
   0x09, 0x30,             //     Usage (X)

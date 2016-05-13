@@ -5,7 +5,6 @@ Project {
     property string device: "STM32F103C8T6"
     property string usb_device_class: "CustomHID"
     property bool build_CMSIS_DSP: false
-    property bool sram_only: true
 
     references: [
         driversDir + "/CMSIS/cmsis.qbs",
@@ -18,7 +17,7 @@ Project {
 
         Export {
             Depends {name: "cpp"}
-            cpp.includePaths: ["Inc"]
+            cpp.includePaths: ["src"]
 
             Properties {
                 condition: qbs.buildVariant == "release"
@@ -27,7 +26,7 @@ Project {
         }
 
         files: [
-            "Inc/stm32f1xx_hal_conf.h",
+            "src/stm32f1xx_hal_conf.h",
         ]
     }
 
@@ -37,18 +36,20 @@ Project {
         Depends {name: "STM32-USB-DEVICE"}
         Depends {name: "configurations"}
         cpp.linkerScripts: ["STM32F103C8_SRAM.ld"]
-        cpp.includePaths: ["Inc"]
+        cpp.includePaths: ["src"]
 
         files: [
-            "Inc/debug.h",
-            "Inc/keyboard.h",
-            "Inc/mxconstants.h",
-            "Inc/stm32f1xx_it.h",
+            "src/keyboard.c",
+            "src/keyboard.h",
+            "src/mxconstants.h",
+            "src/stm32f1xx_it.h",
             "*.ld",
-            "Src/debug.c",
-            "Src/main.c",
-            "Src/stm32f1xx_hal_msp.c",
-            "Src/stm32f1xx_it.c",
+            "src/debug.c",
+            "src/main.c",
+            "src/stm32f1xx_hal_msp.c",
+            "src/stm32f1xx_it.c",
+            "src/startup_stm32f103xb.s",
+            "src/system_stm32f1xx.c",
         ]
 
         Group {
@@ -60,14 +61,14 @@ Project {
                 "-Wno-pointer-sign",
             ])
             files: [
-                "Inc/usb_device.h",
-                "Inc/usbd_conf.h",
-                "Inc/usbd_custom_hid_if.h",
-                "Inc/usbd_desc.h",
-                "Src/usb_device.c",
-                "Src/usbd_conf.c",
-                "Src/usbd_custom_hid_if.c",
-                "Src/usbd_desc.c",
+                "src/usb_device.h",
+                "src/usbd_conf.h",
+                "src/usbd_custom_hid_if.h",
+                "src/usbd_desc.h",
+                "src/usb_device.c",
+                "src/usbd_conf.c",
+                "src/usbd_custom_hid_if.c",
+                "src/usbd_desc.c",
             ]
         }
     }

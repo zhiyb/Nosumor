@@ -62,15 +62,17 @@ void HAL_PCD_MspInit(PCD_HandleTypeDef* hpcd)
   if(hpcd->Instance==USB)
   {
   /* USER CODE BEGIN USB_MspInit 0 */
+#if 0 // No it doesn't work
     // Disconnect USB device by pull down PA12
     GPIO_InitTypeDef init;
     init.Pin = GPIO_PIN_11 | GPIO_PIN_12;
     init.Mode = GPIO_MODE_OUTPUT_PP;
     HAL_GPIO_Init(GPIOA, &init);
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11 | GPIO_PIN_12, GPIO_PIN_RESET);
-    HAL_Delay(10);
+    HAL_Delay(250);
     init.Mode = GPIO_MODE_INPUT;
     HAL_GPIO_Init(GPIOA, &init);
+#endif
   /* USER CODE END USB_MspInit 0 */
     /* Peripheral clock enable */
     __HAL_RCC_USB_CLK_ENABLE();
