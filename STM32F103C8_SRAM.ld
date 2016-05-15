@@ -1,32 +1,4 @@
-/*
-*****************************************************************************
-**
-
-**  File        : stm32_flash.ld
-**
-**  Abstract    : Linker script for STM32F103C8 Device with
-**                64KByte FLASH, 20KByte RAM
-**
-**                Set heap size, stack size and stack location according
-**                to application requirements.
-**
-**                Set memory bank area and size if external memory is used.
-**
-**  Target      : STMicroelectronics STM32
-**
-**  Environment : Atollic TrueSTUDIO(R)
-**
-**  Distribution: The file is distributed as is, without any warranty
-**                of any kind.
-**
-**  (c)Copyright Atollic AB.
-**  You may use this file as-is or modify it according to the needs of your
-**  project. This file may only be built (assembled or compiled and linked)
-**  using the Atollic TrueSTUDIO(R) product. The use of this file together
-**  with other tools than Atollic TrueSTUDIO(R) is not permitted.
-**
-*****************************************************************************
-*/
+/* Linker script for STM32F103C8 Device with 64KByte FLASH, 20KByte RAM */
 
 /* Entry Point */
 ENTRY(Reset_Handler)
@@ -40,7 +12,9 @@ _Min_Stack_Size = 0x100; /* required amount of stack */
 /* Specify the memory areas */
 MEMORY
 {
-  RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 20K
+  RAM (xrw)	: ORIGIN = 0x20000000, LENGTH = 20k
+  /* 16-bit memory locations mapped to 32-bit bus */
+  USBRAM (xrw)	: ORIGIN = 0x40006000, LENGTH = 1k
 }
 
 /* Define output sections */
@@ -153,7 +127,19 @@ SECTIONS
     . = ALIGN(4);
   } >RAM
 
-  
+  .usbtable :
+  {
+    _susbram = .;
+    . = ALIGN(16);
+    *(.usbtable)
+
+    . = ALIGN(4);
+    *(.usbram)
+    *(.usbram*)
+
+    . = ALIGN(4);
+    _eusbram = .;
+  } >USBRAM
 
   /* Remove information from the standard libraries */
   /DISCARD/ :

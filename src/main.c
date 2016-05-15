@@ -1,5 +1,6 @@
 #include "stm32f1xx.h"
 #include "keyboard.h"
+#include "usb.h"
 #include "debug.h"
 
 void initRCC()
@@ -21,18 +22,15 @@ void initRCC()
 	while (!(RCC->CR & RCC_CR_PLLRDY));
 	RCC->CFGR |= RCC_CFGR_SW_PLL;
 	while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL);
-}
-
-void initGPIO()
-{
-	initKeyboard();
+	SystemCoreClockUpdate();
 }
 
 void init()
 {
+	NVIC_SetPriorityGrouping(0x03);
 	initRCC();
-	SystemCoreClockUpdate();
-	initGPIO();
+	initKeyboard();
+	initUSB();
 }
 
 int main()
@@ -45,5 +43,10 @@ int main()
 		setLED(LED_RED, readKey(KEY_1));
 		setLED(LED_GREEN, readKey(KEY_2));
 		setLED(LED_BLUE, readKey(KEY_3));
+
+		if (readKey(KEY_3)) {
+			USB_TypeDef *usb = USB;
+			dbbkpt();
+		}
 	}
 }

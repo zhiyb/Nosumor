@@ -1,7 +1,7 @@
 import qbs
 
 Project {
-    property string driversDir: "../Drivers"
+    property string driversDir: "../embedded-drivers"
     property string device: "STM32F103C8T6"
     property string usb_device_class: "CustomHID"
     property bool build_CMSIS_DSP: false
@@ -39,22 +39,20 @@ Project {
         cpp.includePaths: ["src"]
 
         files: [
-            "src/keyboard.c",
-            "src/keyboard.h",
-            "src/mxconstants.h",
-            "src/stm32f1xx_it.h",
             "*.ld",
-            "src/debug.c",
+            "src/keyboard.*",
+            "src/usb.*",
+            "src/usb_def.*",
+            "src/usb_setup.*",
+            "src/debug.*",
             "src/main.c",
-            "src/stm32f1xx_hal_msp.c",
-            "src/stm32f1xx_it.c",
             "src/startup_stm32f103xb.s",
             "src/system_stm32f1xx.c",
         ]
 
         Group {
             name: "USB"
-            condition: true
+            condition: false
             cpp.optimization: "small"
             cpp.commonCompilerFlags: outer.concat([
                 "-Wno-unused-parameter",

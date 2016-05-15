@@ -31,6 +31,11 @@ static inline void setLED(uint32_t led, uint32_t val)
 		LED_GPIO->BRR = BV(led);
 }
 
+static inline void toggleLED(uint32_t led)
+{
+	LED_GPIO->ODR ^= BV(led);
+}
+
 static inline uint32_t readKey(uint32_t key)
 {
 	return !(KEY_GPIO->IDR & BV(key));
