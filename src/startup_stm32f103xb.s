@@ -114,12 +114,14 @@ LoopFillZerobss:
 	bl SystemInit
 	bl __libc_init_array
 	bl main
-	b #0
+	bkpt #0
+	b Reset_Handler
 	.size Reset_Handler, .-Reset_Handler
 
 	.section .text.Default_Handler,"ax",%progbits
 Default_Handler:
 Infinite_Loop:
+	bkpt #0
 	b Infinite_Loop
 	.size Default_Handler, .-Default_Handler
 

@@ -1,6 +1,7 @@
 #include "stm32f1xx.h"
 #include "keyboard.h"
 #include "usb.h"
+#include "dma.h"
 #include "debug.h"
 
 void initRCC()
@@ -29,6 +30,7 @@ void init()
 {
 	NVIC_SetPriorityGrouping(0x03);
 	initRCC();
+	initDMA();
 	initKeyboard();
 	initUSB();
 }
