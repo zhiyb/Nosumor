@@ -3,7 +3,7 @@ import qbs
 Project {
     property string driversDir: "../embedded-drivers"
     property string device: "STM32F103C8T6"
-    property string usb_device_class: "CustomHID"
+    property string usb_device_class: "" //"CustomHID"
     property bool build_CMSIS_DSP: false
 
     references: [
@@ -14,6 +14,7 @@ Project {
 
     Product {
         name: "configurations"
+        //condition: false
 
         Export {
             Depends {name: "cpp"}
@@ -30,16 +31,15 @@ Project {
         ]
     }
 
-    CppApplication {
+    Product {
+        Depends {name: "cpp"}
         Depends {name: "CMSIS"}
-        Depends {name: "STM32-HAL"}
-        Depends {name: "STM32-USB-DEVICE"}
-        Depends {name: "configurations"}
+        type: "application"
+        //Depends {name: "configurations"}
         cpp.linkerScripts: ["STM32F103C8_SRAM.ld"]
         cpp.includePaths: ["src"]
 
         files: [
-            "*.ld",
             "src/keyboard.*",
             "src/usb.*",
             "src/dma.*",

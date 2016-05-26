@@ -8,10 +8,11 @@
 
 extern uint32_t _susbram;
 
-static void usbGetDescriptor(uint32_t epid, uint16_t value)
+static void usbGetDescriptor(uint16_t epid, uint16_t value)
 {
 	uint8_t type = value >> 8, index = value & 0xff;
 	struct ep_t *ep = &eptable[epid][EP_TX];
+	struct setup_t *setup = (struct setup_t *)USB_SYS_ADDR(ep->addr);
 	const void *desc = 0;
 	uint32_t size = 0;
 	switch (type) {
@@ -23,6 +24,10 @@ static void usbGetDescriptor(uint32_t epid, uint16_t value)
 		desc = descriptors.config[index].data;
 		size = descriptors.config[index].size;
 		break;
+	case DESC_TYPE_DEV_QUALIFIER:
+		// Full speed only device
+		usbStall(epid, EP_TX);
+		return;
 	}
 	if (desc)
 		usbTransfer(epid, EP_TX, desc, ep->addr, size);
@@ -30,11 +35,11 @@ static void usbGetDescriptor(uint32_t epid, uint16_t value)
 		dbbkpt();
 }
 
-void usbSetup(uint32_t epid)
+void usbSetup(uint16_t epid)
 {
 	uint32_t bkpt = 1;
 	struct ep_t *ep = &eptable[epid][EP_RX];
-	struct setup_t *setup = USB_SYS_ADDR(ep->addr);
+	struct setup_t *setup = (struct setup_t *)USB_SYS_ADDR(ep->addr);
 	if (setup->type & TYPE_DIRECTION) {
 		switch (setup->type & TYPE_TYPE_MASK) {
 		case TYPE_TYPE_STANDARD:
@@ -56,7 +61,7 @@ void usbSetup(uint32_t epid)
 				switch (setup->request) {
 				case REQ_SET_ADDRESS:
 					usbTransfer(epid, EP_TX, 0, ep->addr, 0);
-					usbStatus.addr = setup->value;
+					usbStatus.addr = setup->value & 0x7f;
 					bkpt = 0;
 					break;
 				}

@@ -37,6 +37,7 @@
 #define DESC_TYPE_CONFIG	0x02
 #define DESC_TYPE_INTERFACE	0x04
 #define DESC_TYPE_ENDPOINT	0x05
+#define DESC_TYPE_DEV_QUALIFIER	0x06
 #define DESC_TYPE_HID		0x21
 #define DESC_TYPE_REPORT	0x22
 #define DESC_TYPE_PHYSICAL	0x23
@@ -62,8 +63,8 @@
 #define DESC_EP_ISO_FEEDBACK	0x10
 #define DESC_EP_ISO_EXPLICIT	0x20
 
-#define USB_LOCAL_ADDR(addr)	(((void *)(addr) - (void *)&_susbram) >> 1)
-#define USB_SYS_ADDR(addr)	((void *)&_susbram + ((uint16_t)(addr) << 1))
+#define USB_LOCAL_ADDR(addr)	((uint16_t)(((uint32_t)(addr) - (uint32_t)&_susbram) >> 1))
+#define USB_SYS_ADDR(addr)	((void *)((uint32_t)&_susbram + ((uint32_t)(addr) << 1)))
 #define USB_NUM_BLOCK(bl, size)	((bl) ? (size) / 32 : (size) / 2)
 #define USB_RX_COUNT(n)		((((n) > 62) << 15) | (USB_NUM_BLOCK(((n) > 62), (n)) << 10))
 #define USB_RX_COUNT_MASK	0x03ff
@@ -119,7 +120,10 @@ extern uint32_t ep0tx[MAX_EP0_SIZE / 2] __attribute__((section(".usbram")));
 extern const struct descriptor_t descriptors;
 extern struct status_t usbStatus;
 
-void usbSetup(uint32_t epid);
+void usbSetup(uint16_t epid);
 void usbTransfer(uint16_t epid, uint16_t dir, const void *src, uint16_t dst, uint32_t size);
+void usbHandshake(uint16_t epid, uint16_t dir, uint16_t type);
+static inline void usbValid(uint16_t epid, uint16_t dir) {usbHandshake(epid, dir, USB_EP_TX_VALID);}
+static inline void usbStall(uint16_t epid, uint16_t dir) {usbHandshake(epid, dir, USB_EP_TX_STALL);}
 
 #endif // USB_DEF_H

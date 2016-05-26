@@ -11,6 +11,7 @@ extern uint32_t _susbram;
 struct ep_t eptable[8][2] __attribute__((section(".usbtable")));
 
 __IO uint32_t ep0rx[MAX_EP0_SIZE / 2] __attribute__((section(".usbram")));
+__IO uint32_t ep1rx[MAX_EP0_SIZE / 2] __attribute__((section(".usbram")));
 uint32_t ep0tx[MAX_EP0_SIZE / 2] __attribute__((section(".usbram")));
 
 struct status_t usbStatus;
@@ -45,26 +46,30 @@ void initUSB()
 	eptable[0][EP_TX].count = 0;
 	eptable[0][EP_RX].addr = USB_LOCAL_ADDR(&ep0rx);
 	eptable[0][EP_RX].count = USB_RX_COUNT(sizeof(ep0rx) / 2);
+	eptable[1][EP_RX].addr = USB_LOCAL_ADDR(&ep1rx);
+	eptable[1][EP_RX].count = USB_RX_COUNT(sizeof(ep1rx) / 2);
 }
 
 static void usbReset()
 {
 	usbStatus.addr = 0;
 	// Configure endpoint 0
-	USB->EP0R = USB_EP_CONTROL | USB_EP_RX_VALID | USB_EP_TX_VALID;
+	USB->EP0R = USB_EP_CONTROL | USB_EP_RX_VALID | USB_EP_TX_VALID | 0;
+	// Configure endpoint 1
+	USB->EP1R = USB_EP_INTERRUPT | USB_EP_RX_VALID | 1;
 	// Start USB device
 	USB->DADDR = USB_DADDR_EF;
 }
 
 static void usbCTR()
 {
-	uint32_t epid = USB->ISTR & USB_ISTR_EP_ID;
+	uint16_t epid = USB->ISTR & USB_ISTR_EP_ID;
 	uint32_t dir = USB->ISTR & USB_ISTR_DIR ? 1 : 0;
 	struct ep_t *ep = &eptable[epid][dir];
 
 	volatile uint16_t *epr = &USB->EP0R + epid;
-	uint32_t eprv = *epr;
-	uint32_t epmasked = (eprv & (USB_EP_TYPE_MASK | USB_EP_KIND | USB_EPADDR_FIELD))
+	uint16_t eprv = *epr;
+	uint16_t epmasked = (eprv & (USB_EP_TYPE_MASK | USB_EP_KIND | USB_EPADDR_FIELD))
 			| USB_EP_CTR_RX | USB_EP_CTR_TX;
 
 	uint32_t bkpt = 1;
@@ -78,7 +83,7 @@ static void usbCTR()
 		if (bkpt)
 			dbbkpt();
 		bkpt = 0;
-		*epr = (epmasked & ~USB_EP_CTR_RX) | (USB_EP0R_STAT_RX ^ (eprv & USB_EP0R_STAT_RX));
+		*epr = (epmasked & ~USB_EP_CTR_RX) | (USB_EP_RX_VALID ^ (eprv & USB_EPRX_STAT));
 	}
 	if (eprv & USB_EP_CTR_TX) {
 		if (usbStatus.addr) {
@@ -155,14 +160,7 @@ void usbTransfer(uint16_t epid, uint16_t dir, const void *src, uint16_t dst, uin
 	ep->count = size;
 
 	if (size == 0) {
-		volatile uint16_t *epr = &USB->EP0R + epid;
-		uint32_t eprv = *epr;
-		uint32_t epmasked = (eprv & (USB_EP_TYPE_MASK | USB_EP_KIND | USB_EPADDR_FIELD))
-				| USB_EP_CTR_RX | USB_EP_CTR_TX;
-		uint32_t mask = USB_EP0R_STAT_TX;
-		if (dir == EP_RX)
-			mask <<= 8;
-		*epr = epmasked | (mask ^ (eprv & mask));
+		usbValid(epid, dir);
 		return;
 	}
 
@@ -185,20 +183,26 @@ void usbTransfer(uint16_t epid, uint16_t dir, const void *src, uint16_t dst, uin
 	DMA1_Channel1->CCR |= DMA_CCR_EN;
 }
 
+void usbHandshake(uint16_t epid, uint16_t dir, uint16_t type)
+{
+	volatile uint16_t *epr = &USB->EP0R + epid;
+	uint16_t eprv = *epr;
+	uint16_t epmasked = (eprv & (USB_EP_TYPE_MASK | USB_EP_KIND | USB_EPADDR_FIELD))
+			| USB_EP_CTR_RX | USB_EP_CTR_TX;
+	uint16_t mask = USB_EPTX_STAT;
+	if (dir == EP_RX) {
+		mask <<= 8;
+		type <<= 8;
+	}
+	*epr = epmasked | (type ^ (eprv & mask));
+}
+
 void DMA1_Channel1_IRQHandler()
 {
-	uint32_t epid = usbStatus.dma.epid;
-	uint32_t dir = usbStatus.dma.dir;
+	uint16_t epid = usbStatus.dma.epid;
+	uint16_t dir = usbStatus.dma.dir;
+	usbValid(epid, dir);
 
-	volatile uint16_t *epr = &USB->EP0R + epid;
-	uint32_t eprv = *epr;
-	uint32_t epmasked = (eprv & (USB_EP_TYPE_MASK | USB_EP_KIND | USB_EPADDR_FIELD))
-			| USB_EP_CTR_RX | USB_EP_CTR_TX;
-
-	uint32_t mask = USB_EP0R_STAT_TX;
-	if (dir == EP_RX)
-		mask <<= 8;
-	*epr = epmasked | (mask ^ (eprv & mask));
 	usbStatus.dma.active = 0;
 	DMA1_Channel1->CCR &= ~DMA_CCR_EN;
 	DMA1->IFCR = DMA_IFCR_CTCIF1;

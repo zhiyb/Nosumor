@@ -15,9 +15,9 @@
 #define STRINGIFY(x)	#x
 #define TOSTRING(x)	STRINGIFY(x)
 
-#define H8(i)		(((i) >> 8) & 0xff)
+#define H8(i)		(((i) >> 8U) & 0xff)
 #define L8(i)		((i) & 0xff)
-#define DIV8(i)		((i) >> 3)
+#define DIV8(i)		((i) >> 3U)
 #define MOD8(i)		((i) & 0x07)
 #define HL(reg, i)	(*((uint32_t *)&(reg) + DIV8(i)))
 #define BV(i)		(1UL << (i))
