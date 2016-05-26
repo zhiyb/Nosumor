@@ -1,7 +1,8 @@
 #include "stm32f1xx.h"
 #include "keyboard.h"
-#include "usb.h"
 #include "dma.h"
+#include "usb.h"
+#include "uart.h"
 #include "debug.h"
 
 void initRCC()
@@ -32,6 +33,7 @@ void init()
 	initRCC();
 	initDMA();
 	initKeyboard();
+	initUART();
 	initUSB();
 }
 
