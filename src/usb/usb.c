@@ -67,7 +67,7 @@ static void usbReset()
 
 static void usbCTR()
 {
-	usart1WriteString("[CTR]");
+	usart1WriteString("#");
 	uint16_t epid = USB->ISTR & USB_ISTR_EP_ID;
 	uint32_t dir = USB->ISTR & USB_ISTR_DIR ? 1 : 0;
 	struct ep_t *ep = &eptable[epid][dir];
@@ -113,7 +113,7 @@ void USB_HP_CAN1_TX_IRQHandler()
 
 void USB_LP_CAN1_RX0_IRQHandler()
 {
-	usart1WriteString("\n[IRQ]");
+	usart1WriteString("\n?");
 	toggleLED(LED_RIGHT);
 	uint16_t istr;
 
@@ -198,7 +198,7 @@ void usbTransfer(uint16_t epid, uint16_t dir, const void *src, uint16_t dst, uin
 
 void usbHandshake(uint16_t epid, uint16_t dir, uint16_t type)
 {
-	usart1WriteString("[HS]");
+	usart1WriteString("!");
 	usart1DumpHex(type);
 	volatile uint16_t *epr = &USB->EP0R + epid;
 	uint16_t eprv = *epr;

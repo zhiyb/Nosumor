@@ -19,7 +19,7 @@ static void setConfiguration(uint8_t config)
 static void usbGetDescriptor(uint16_t epid, struct setup_t *setup)
 {
 	usart1WriteString("[DESC]");
-	uint8_t type = setup->value >> 8, index = setup->value & 0xff;
+	uint8_t type = setup->descriptor.type, index = setup->descriptor.index;
 	struct ep_t *ep = &eptable[epid][EP_TX];
 	const void *desc = 0;
 	uint32_t size = 0;

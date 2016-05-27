@@ -84,7 +84,13 @@ struct ep_t {
 struct setup_t {
 	uint8_t type, request;
 	uint16_t RESERVED0;
-	uint16_t value;
+	union {
+		uint16_t value;
+		struct {
+			uint8_t index;
+			uint8_t type;
+		} descriptor;
+	};
 	uint16_t RESERVED1;
 	uint16_t index;
 	uint16_t RESERVED2;
