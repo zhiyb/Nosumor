@@ -4,7 +4,7 @@ Project {
     property string driversDir: "../../embedded-drivers"
     property string device: "STM32F103C8T6"
     property string usb_device_class: "" //"CustomHID"
-    property bool build_CMSIS_DSP: false
+    property bool cmsis_dsp: false
 
     references: [
         driversDir + "/CMSIS/cmsis.qbs",

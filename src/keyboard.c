@@ -4,6 +4,8 @@
 void initKeyboard()
 {
 	RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN;
+
+	// 00, 01, 0: General purpose output push-pull, 10MHz, reset
 	HL(LED_GPIO->CRL, LED_LEFT) &= ~(0x0c << (MOD8(LED_LEFT) << 2) |
 					 0x0c << (MOD8(LED_RIGHT) << 2) |
 					 0x0c << (MOD8(LED_RED) << 2) |
@@ -16,6 +18,8 @@ void initKeyboard()
 					0x01 << (MOD8(LED_BLUE) << 2));
 	LED_GPIO->BRR = (BV(LED_LEFT) | BV(LED_RIGHT) |
 			 BV(LED_RED) | BV(LED_GREEN) | BV(LED_BLUE));
+
+	// 10, 00, 1: Input with pull-up
 	HL(KEY_GPIO->CRL, KEY_LEFT) &= ~(0x07 << (MOD8(KEY_LEFT) << 2) |
 					 0x07 << (MOD8(KEY_RIGHT) << 2) |
 					 0x07 << (MOD8(KEY_1) << 2) |

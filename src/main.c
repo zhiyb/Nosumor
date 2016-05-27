@@ -2,7 +2,7 @@
 #include "keyboard.h"
 #include "dma.h"
 #include "usb.h"
-#include "uart.h"
+#include "usart1.h"
 #include "debug.h"
 
 void initRCC()
@@ -33,8 +33,10 @@ void init()
 	initRCC();
 	initDMA();
 	initKeyboard();
-	initUART();
+	initUSART1();
 	initUSB();
+	// Enable SWJ only
+	AFIO->MAPR |= AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
 }
 
 int main()
@@ -48,8 +50,14 @@ int main()
 		setLED(LED_GREEN, readKey(KEY_2));
 		setLED(LED_BLUE, readKey(KEY_3));
 
+		if (readKey(KEY_RIGHT)) {
+			usart1WriteString("Hello, world!\n");
+			while (readKey(KEY_RIGHT));
+		}
+
 		if (readKey(KEY_3)) {
 			USB_TypeDef *usb = USB;
+			USART_TypeDef *usart1 = USART1;
 			dbbkpt();
 		}
 	}

@@ -111,7 +111,7 @@ struct status_t {
 		uint8_t epid;
 		uint8_t dir;
 	} dma;
-	uint8_t addr;
+	uint8_t addr, config;
 };
 
 extern struct ep_t eptable[8][2] __attribute__((section(".usbtable")));
