@@ -60,8 +60,6 @@ void usart1WriteString(const char *str)
 
 void usart1DumpHex(uint32_t v)
 {
-	writeChar('0');
-	writeChar('x');
 	uint32_t zero = 1;
 	for (uint32_t i = 8; i != 0; i--) {
 		uint8_t c = v >> 28;

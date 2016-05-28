@@ -28,9 +28,9 @@ void usbClassReset()
 void usbClassHalt(uint16_t epaddr, uint16_t e)
 {
 	if (e)
-		writeString("[VALID_");
-	else
 		writeString("[HALT_");
+	else
+		writeString("[VALID_");
 	dumpHex(epaddr);
 	writeChar(']');
 
@@ -38,9 +38,9 @@ void usbClassHalt(uint16_t epaddr, uint16_t e)
 	switch (epid) {
 	case 1:
 		if (e)
-			usbValid(epid, EP_RX);
-		else
 			usbStall(epid, EP_RX);
+		else
+			usbValid(epid, EP_RX);
 		return;
 	default:
 		dbbkpt();
