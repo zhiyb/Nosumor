@@ -86,7 +86,6 @@ error:
 
 static void getDescriptor(struct setup_t *setup)
 {
-	writeString("[DESC_");
 	uint8_t type = setup->descriptor.type, index = setup->descriptor.index;
 	struct ep_t *ep = &eptable[0][EP_TX];
 	const void *desc = 0;
@@ -94,7 +93,7 @@ static void getDescriptor(struct setup_t *setup)
 
 	switch (type) {
 	case DESC_TYPE_REPORT:
-		writeString("REPORT]");
+		writeString("[REPORT]");
 		if (index < descriptors.report.num) {
 			desc = descriptors.report.list[index].data;
 			size = descriptors.report.list[index].size;
@@ -120,9 +119,11 @@ void usbClassSetupInterface(struct setup_t *setup)
 			dbbkpt();
 			break;
 		}
+		writeString("[G_DESC]");
 		getDescriptor(setup);
 		break;
 	default:
+		// Not implemented
 		usbStall(0, EP_TX);
 		dbbkpt();
 	}

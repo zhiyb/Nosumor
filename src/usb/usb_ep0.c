@@ -86,7 +86,6 @@ error:
 
 static void getDescriptor(struct setup_t *setup)
 {
-	writeString("{DESC_");
 	uint8_t type = setup->descriptor.type, index = setup->descriptor.index;
 	struct ep_t *ep = &eptable[0][EP_TX];
 	const void *desc = 0;
@@ -94,21 +93,21 @@ static void getDescriptor(struct setup_t *setup)
 
 	switch (type) {
 	case DESC_TYPE_DEVICE:
-		writeString("DEV}");
+		writeString("{DEV}");
 		if (index < descriptors.device.num) {
 			desc = descriptors.device.list[index].data;
 			size = descriptors.device.list[index].size;
 		}
 		break;
 	case DESC_TYPE_CONFIG:
-		writeString("CFG}");
+		writeString("{CFG}");
 		if (index < descriptors.config.num) {
 			desc = descriptors.config.list[index].data;
 			size = descriptors.config.list[index].size;
 		}
 		break;
 	case DESC_TYPE_DEV_QUALIFIER:
-		writeString("QUALIFIER}");
+		writeString("{QUALIFIER}");
 		// Full speed only device
 		usbStall(0, EP_TX);
 		return;
@@ -136,19 +135,20 @@ static void standardSetup(struct setup_t *setup)
 		case REQ_GET_DESCRIPTOR:
 			if (!(setup->type & TYPE_DIRECTION))
 				goto error;
+			writeString("{G_DESC}");
 			getDescriptor(setup);
 			return;
 		case REQ_SET_ADDRESS:
 			if (setup->type & TYPE_DIRECTION)
 				goto error;
-			writeString("{ADDR}");
+			writeString("{S_ADDR}");
 			usbTransferEmpty(0, EP_TX);
 			usbStatus.addr = setup->value & 0x7f;
 			return;
 		case REQ_SET_CONFIGURATION:
 			if (setup->type & TYPE_DIRECTION)
 				goto error;
-			writeString("{CONF}");
+			writeString("{S_CONF}");
 			setConfiguration(setup->value);
 			return;
 		default:
