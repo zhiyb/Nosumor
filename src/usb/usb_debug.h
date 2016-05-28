@@ -1,7 +1,7 @@
 #ifndef USB_DEBUG_H
 #define USB_DEBUG_H
 
-#undef DEBUG
+//#undef DEBUG
 
 #ifdef DEBUG
 

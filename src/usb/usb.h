@@ -56,6 +56,7 @@ extern uint32_t _susbram;
 extern struct ep_t eptable[8][2];
 
 void initUSB();
+uint32_t usbConfigured();
 
 void usbTransfer(uint16_t epid, uint16_t dir, const void *ptr, uint32_t size);
 void usbTransferEmpty(uint16_t epid, uint16_t dir);

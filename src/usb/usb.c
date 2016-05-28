@@ -42,6 +42,11 @@ void initUSB()
 	usbClassInit();
 }
 
+uint32_t usbConfigured()
+{
+	return usbStatus.config;
+}
+
 static void usbReset()
 {
 	usbStatus.addr = 0;
@@ -100,7 +105,7 @@ void USB_HP_CAN1_TX_IRQHandler()
 void USB_LP_CAN1_RX0_IRQHandler()
 {
 	uint16_t istr;
-	writeChar('*');
+	//writeChar('*');
 
 	// Correct transfer
 	while ((istr = USB->ISTR) & USB_ISTR_CTR)
@@ -121,15 +126,23 @@ void USB_LP_CAN1_RX0_IRQHandler()
 #endif
 	if (istr & USB_ISTR_WKUP) {
 		// Wakeup request
+		switch (USB->FNR & (USB_FNR_RXDP | USB_FNR_RXDM)) {
+		case USB_FNR_RXDP:
+		case USB_FNR_RXDP | USB_FNR_RXDM:
+			// Possibly noise, go back to suspend
+			USB->CNTR |= USB_CNTR_FSUSP | USB_CNTR_LP_MODE;
+			writeString("\n<W-SUSP>");
+			break;
+		default:
+			USB->CNTR &= ~USB_CNTR_FSUSP;
+			writeString("\n<WKUP>");
+		}
 		USB->ISTR = (uint16_t)~USB_ISTR_WKUP;
-		USB->CNTR &= ~USB_CNTR_FSUSP;
-		writeString("\n<WKUP>");
 	}
 	if (istr & USB_ISTR_SUSP) {
 		// Suspend request
 		USB->ISTR = (uint16_t)~USB_ISTR_SUSP;
-		USB->CNTR |= USB_CNTR_FSUSP;
-		USB->CNTR |= USB_CNTR_LP_MODE;
+		USB->CNTR |= USB_CNTR_FSUSP | USB_CNTR_LP_MODE;
 		writeString("\n<SUSP>");
 	}
 	if (istr & USB_ISTR_RESET) {
@@ -140,10 +153,13 @@ void USB_LP_CAN1_RX0_IRQHandler()
 	}
 #if 0
 	if (istr & USB_ISTR_SOF) {
+		writeChar('S');
 		// Start of frame
 		USB->ISTR = (uint16_t)~USB_ISTR_SOF;
 	}
 	if (istr & USB_ISTR_ESOF) {
+		writeChar('E');
+		dumpHex((USB->FNR & USB_FNR_LSOF) >> 11);
 		// Expected start of frame
 		USB->ISTR = (uint16_t)~USB_ISTR_ESOF;
 	}
@@ -163,7 +179,11 @@ static inline uint32_t isBusy(uint16_t epid, uint16_t dir)
 
 void usbTransfer(uint16_t epid, uint16_t dir, const void *ptr, uint32_t size)
 {
+	do
+		if (USB->CNTR & USB_CNTR_FSUSP)
+			return;
 	while (isBusy(epid, dir));
+
 	struct ep_t *ep = &eptable[epid][dir];
 	ep->count = size;
 
@@ -194,6 +214,9 @@ void usbTransfer(uint16_t epid, uint16_t dir, const void *ptr, uint32_t size)
 
 void usbTransferEmpty(uint16_t epid, uint16_t dir)
 {
+	do
+		if (USB->CNTR & USB_CNTR_FSUSP)
+			return;
 	while (isBusy(epid, dir));
 	struct ep_t *ep = &eptable[epid][dir];
 	ep->count = 0;
@@ -214,7 +237,7 @@ void usbHandshake(uint16_t epid, uint16_t dir, uint16_t type)
 	}
 	*epr = epmasked | (type ^ (eprv & mask));
 
-#if 1
+#if 0
 	writeChar('<');
 	if (dir != EP_TX) {
 		writeString("RX>");
