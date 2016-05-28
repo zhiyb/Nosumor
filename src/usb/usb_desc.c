@@ -2,33 +2,34 @@
 #include "macros.h"
 #include "usb_def.h"
 #include "usb_ep0.h"
+#include "usb_class.h"
 #include "usb_desc.h"
 
 #define USB_VID		0x0483
 #define USB_PID		0x5750
 
 static const unsigned char hidReport[] = {
-	0x05, 0x01,	// Usage page (Generic desktop)
-	0x09, 0x02,	// Usage (Mouse)
-	0xa1, 0x01,	// Collection (Application)
-	0x85, 0x01,	//   Report ID (1)
-	0x09, 0x01,	//   Usage (Pointer)
-	0xa1, 0x00,	//   Collection (Physical)
-	0x95, 0x02,	//     Report count (2)
-	0x75, 0x08,	//     Report size (8)
-	0x05, 0x01,	//     Usage page (Generic desktop)
-	0x09, 0x30,	//     Usage (X)
-	0x09, 0x31,	//     Usage (Y)
-	0x15, 0x81,	//     Logical minimum (-127)
-	0x25, 0x7f,	//     Logical maximum (127)
-	0x81, 0x06,	//     Input (Data, Var, Rel)
-	0xc0,		//   End collection
-	0xc0,		// End collection
+	0x05, 0x01,		// Usage page (Generic desktop)
+	0x09, 0x02,		// Usage (Mouse)
+	0xa1, 0x01,		// Collection (Application)
+	0x85, HID_MOUSE,	//   Report ID (1)
+	0x09, 0x01,		//   Usage (Pointer)
+	0xa1, 0x00,		//   Collection (Physical)
+	0x95, 0x02,		//     Report count (2)
+	0x75, 0x08,		//     Report size (8)
+	0x05, 0x01,		//     Usage page (Generic desktop)
+	0x09, 0x30,		//     Usage (X)
+	0x09, 0x31,		//     Usage (Y)
+	0x15, 0x81,		//     Logical minimum (-127)
+	0x25, 0x7f,		//     Logical maximum (127)
+	0x81, 0x06,		//     Input (Data, Var, Rel)
+	0xc0,			//   End collection
+	0xc0,			// End collection
 
 	0x06, 0x39, 0xff,	// Usage page (Vendor defined)
 	0x09, 0x39,		// Usage (Vendor usage)
 	0xa1, 0x01,		// Collection (Application)
-	0x85, 0x02,		//   Report ID (2)
+	0x85, HID_VENDOR,		//   Report ID (2)
 	0xc0,			// End collection
 };
 

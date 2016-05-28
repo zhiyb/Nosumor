@@ -1,6 +1,8 @@
 #ifndef USB_DEBUG_H
 #define USB_DEBUG_H
 
+#undef DEBUG
+
 #ifdef DEBUG
 
 #include "usart1.h"

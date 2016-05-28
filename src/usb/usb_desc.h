@@ -15,7 +15,8 @@
 #define DESC_TYPE_REPORT	0x22
 #define DESC_TYPE_PHYSICAL	0x23
 
-#define EP1_SIZE	32
+#define HID_MOUSE	1
+#define HID_VENDOR	2
 
 struct desc_t {
 	const void *data;

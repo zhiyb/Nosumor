@@ -28,23 +28,23 @@
 #define FS_DEVICE_REMOTE_WAKEUP	1
 #define FS_TEST_MODE		2
 
-#define MAX_EP0_SIZE	64
+#define EP0_SIZE	64
 
-__IO uint32_t ep0rx[MAX_EP0_SIZE / 2] __attribute__((section(".usbram")));
-uint32_t ep0tx[MAX_EP0_SIZE / 2] __attribute__((section(".usbram")));
+__IO uint32_t ep0rx[EP0_SIZE / 2] USBRAM;
+uint32_t ep0tx[EP0_SIZE / 2] USBRAM;
 
 void usbEP0Init()
 {
 	eptable[0][EP_TX].addr = USB_LOCAL_ADDR(ep0tx);
 	eptable[0][EP_TX].count = 0;
 	eptable[0][EP_RX].addr = USB_LOCAL_ADDR(&ep0rx);
-	eptable[0][EP_RX].count = USB_RX_COUNT_REG(sizeof(ep0rx) / 2);
+	eptable[0][EP_RX].count = USB_RX_COUNT_REG(EP0_SIZE);
 }
 
 void usbEP0Reset()
 {
 	// Configure endpoint 0
-	USB->EP0R = USB_EP_CONTROL | USB_EP_RX_VALID | USB_EP_TX_VALID | 0;
+	USB->EP0R = USB_EP_CONTROL | USB_EP_RX_VALID | USB_EP_TX_NAK | 0;
 }
 
 static void setConfiguration(uint8_t config)
@@ -71,6 +71,7 @@ static void clearFeature(struct setup_t *setup)
 		if ((setup->index & EP_ADDR_MASK) == 0)
 			goto error;
 		usbClassHalt(setup->index, 0);
+		usbTransferEmpty(0, EP_TX);
 		return;
 	default:
 		// Not implemented
@@ -87,7 +88,6 @@ error:
 static void getDescriptor(struct setup_t *setup)
 {
 	uint8_t type = setup->descriptor.type, index = setup->descriptor.index;
-	struct ep_t *ep = &eptable[0][EP_TX];
 	const void *desc = 0;
 	uint32_t size = 0;
 
@@ -115,7 +115,7 @@ static void getDescriptor(struct setup_t *setup)
 
 	size = size < setup->length ? size : setup->length;
 	if (desc)
-		usbTransfer(0, EP_TX, desc, ep->addr, size);
+		usbTransfer(0, EP_TX, desc, size);
 	else {
 		usbStall(0, EP_TX);
 		dbbkpt();

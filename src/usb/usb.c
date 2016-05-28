@@ -2,13 +2,14 @@
 #include "stm32f1xx.h"
 #include "keyboard.h"
 #include "macros.h"
+#include "escape.h"
 #include "usb.h"
 #include "usb_def.h"
 #include "usb_ep0.h"
 #include "usb_debug.h"
 
 struct status_t usbStatus;
-struct ep_t eptable[8][2] __attribute__((section(".usbtable")));
+struct ep_t eptable[8][2] USBTABLE;
 
 void initUSB()
 {
@@ -53,10 +54,10 @@ static void usbReset()
 static void usbCTR()
 {
 	uint16_t epid = USB->ISTR & USB_ISTR_EP_ID;
-	uint32_t dir = USB->ISTR & USB_ISTR_DIR ? 1 : 0;
+	uint16_t dir = USB->ISTR & USB_ISTR_DIR;
 	struct ep_t *ep = &eptable[epid][dir];
 
-	volatile uint16_t *epr = &USB->EP0R + epid;
+	volatile uint16_t *epr = &USB->EP0R + epid * (&USB->EP1R - &USB->EP0R);
 	uint16_t eprv = *epr;
 	uint16_t epmasked = (eprv & (USB_EP_TYPE_MASK | USB_EP_KIND | USB_EPADDR_FIELD))
 			| USB_EP_CTR_RX | USB_EP_CTR_TX;
@@ -76,10 +77,11 @@ static void usbCTR()
 		usbValid(epid, dir);
 	}
 	if (eprv & USB_EP_CTR_TX) {
+		//writeString("\n<CTX>");
 		if (usbStatus.addr) {
 			USB->DADDR = usbStatus.addr | USB_DADDR_EF;
 			usbStatus.addr = 0;
-			writeString("\n<ADDR>");
+			writeString("<ADDR>");
 		}
 		*epr = epmasked & ~USB_EP_CTR_TX;
 	}
@@ -91,14 +93,13 @@ static void usbCTR()
 void USB_HP_CAN1_TX_IRQHandler()
 {
 	USB_TypeDef *usb = USB;
-	toggleLED(LED_LEFT);
-	dbputc('H');
 	dbbkpt();
 }
 
 void USB_LP_CAN1_RX0_IRQHandler()
 {
 	uint16_t istr;
+	writeChar('*');
 
 	// Correct transfer
 	while ((istr = USB->ISTR) & USB_ISTR_CTR)
@@ -134,7 +135,7 @@ void USB_LP_CAN1_RX0_IRQHandler()
 		// Reset request
 		USB->ISTR = (uint16_t)~USB_ISTR_RESET;
 		usbReset();
-		writeString("\n<RESET>");
+		writeString("\n" ESC_GREY "<RESET>" ESC_DEFAULT);
 	}
 #if 0
 	if (istr & USB_ISTR_SOF) {
@@ -148,13 +149,12 @@ void USB_LP_CAN1_RX0_IRQHandler()
 #endif
 }
 
-void usbTransfer(uint16_t epid, uint16_t dir, const void *src, uint16_t dst, uint32_t size)
+void usbTransfer(uint16_t epid, uint16_t dir, const void *ptr, uint32_t size)
 {
-	if (usbStatus.dma.active)
-		return;
+	if (usbStatus.dma.epid == epid)
+		while (usbStatus.dma.active);
 
 	struct ep_t *ep = &eptable[epid][dir];
-	ep->addr = dst;
 	ep->count = size;
 
 	if (size == 0) {
@@ -170,8 +170,8 @@ void usbTransfer(uint16_t epid, uint16_t dir, const void *src, uint16_t dst, uin
 			DMA_CCR_MINC | DMA_CCR_PINC |
 			DMA_CCR_DIR | DMA_CCR_TCIE;
 	DMA1_Channel1->CNDTR = size;
-	DMA1_Channel1->CPAR = (uint32_t)USB_SYS_ADDR(dst);
-	DMA1_Channel1->CMAR = (uint32_t)src;
+	DMA1_Channel1->CPAR = (uint32_t)USB_SYS_ADDR(ep->addr);
+	DMA1_Channel1->CMAR = (uint32_t)ptr;
 
 	usbStatus.dma.epid = epid;
 	usbStatus.dma.dir = dir;
@@ -194,37 +194,39 @@ void usbTransferEmpty(uint16_t epid, uint16_t dir)
 
 void usbHandshake(uint16_t epid, uint16_t dir, uint16_t type)
 {
-	volatile uint16_t *epr = &USB->EP0R + epid;
+	volatile uint16_t *epr = &USB->EP0R + epid * (&USB->EP1R - &USB->EP0R);
 	uint16_t eprv = *epr;
 	uint16_t epmasked = (eprv & (USB_EP_TYPE_MASK | USB_EP_KIND | USB_EPADDR_FIELD))
 			| USB_EP_CTR_RX | USB_EP_CTR_TX;
 	uint16_t mask = USB_EPTX_STAT;
-	if (dir == EP_RX) {
+	if (dir != EP_TX) {
 		mask <<= 8;
 		type <<= 8;
 		epmasked &= ~USB_EP_CTR_RX;
 	}
 	*epr = epmasked | (type ^ (eprv & mask));
 
-#ifdef DEBUG
-	usart1WriteChar('<');
-	if (dir == EP_RX) {
-		usart1WriteString("RX>");
+#if 1
+	writeChar('<');
+	if (dir != EP_TX) {
+		writeString("RX>");
 		return;
-	} else
-		usart1WriteString("TX_");
+	} else {
+		writeString("TX");
+		dumpHex(epid);
+	}
 	switch (type) {
 	case USB_EP_TX_DIS:
-		usart1WriteString("DIS>");
+		writeString("D>");
 		break;
 	case USB_EP_TX_STALL:
-		usart1WriteString("STALL>");
+		writeString("S>");
 		break;
 	case USB_EP_TX_NAK:
-		usart1WriteString("NAK>");
+		writeString("N>");
 		break;
 	case USB_EP_TX_VALID:
-		usart1WriteString("VALID>");
+		writeString("V>");
 	}
 #endif
 }

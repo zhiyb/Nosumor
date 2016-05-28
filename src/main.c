@@ -2,6 +2,7 @@
 #include "keyboard.h"
 #include "dma.h"
 #include "usb.h"
+#include "usb_desc.h"
 #include "usart1.h"
 #include "escape.h"
 #include "debug.h"
@@ -58,14 +59,24 @@ int main()
 		setLED(LED_GREEN, readKey(KEY_2));
 		setLED(LED_BLUE, readKey(KEY_3));
 
-		if (readKey(KEY_RIGHT)) {
-			usart1WriteString("Hello, world!\n");
-			while (readKey(KEY_RIGHT));
+		if (readKey(KEY_LEFT)) {
+			const int8_t data[] = {HID_MOUSE, -1, -1};
+			usbTransfer(1, EP_TX, data, sizeof(data));
+			//while (readKey(KEY_LEFT));
 		}
 
-		if (readKey(KEY_3)) {
-			USB_TypeDef *usb = USB;
-			dbbkpt();
+		if (readKey(KEY_RIGHT)) {
+			const int8_t data[] = {HID_MOUSE, 1, 1};
+			usbTransfer(1, EP_TX, data, sizeof(data));
+			//while (readKey(KEY_RIGHT));
 		}
+
+		if (readKey(KEY_1)) {
+			usart1WriteString("Hello, world!\n");
+			while (readKey(KEY_1));
+		}
+
+		if (readKey(KEY_3))
+			dbbkpt();
 	}
 }

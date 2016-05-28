@@ -10,6 +10,8 @@ union setup_value_class_t {
 
 #include "usb_def.h"
 
+#define EP1_SIZE	8
+
 void usbClassInit();
 void usbClassReset();
 void usbClassHalt(uint16_t epaddr, uint16_t e);
