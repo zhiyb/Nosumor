@@ -1,6 +1,10 @@
 #include <stdint.h>
 #include "macros.h"
-#include "usb_def.h"
+#include "usb_desc.h"
+#include "usb_ep0.h"
+
+#define USB_VID		0x0483
+#define USB_PID		0x5750
 
 static const unsigned char device[] = {
 	18,			// bLength
@@ -67,14 +71,24 @@ static const unsigned char config[] = {
 	1,			// bInterval		Polling interval
 };
 
+static const unsigned char report[] = {
+	0,
+};
+
 static const struct desc_t desc_device[] = {
-	{sizeof(device), device},
+	{device, sizeof(device)},
 };
 
 static const struct desc_t desc_config[] = {
-	{sizeof(config), config},
+	{config, sizeof(config)},
+};
+
+static const struct desc_t desc_report[] = {
+	{report, sizeof(report)},
 };
 
 const struct descriptor_t descriptors = {
-	desc_device, desc_config,
+	{desc_device, ARRAY_SIZE(desc_device)},
+	{desc_config, ARRAY_SIZE(desc_config)},
+	{desc_report, ARRAY_SIZE(desc_report)},
 };

@@ -1,11 +1,13 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
+#include <string.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <string.h>
+#ifdef DEBUG
 
 #define dbbkpt()	asm ("bkpt #0")
 
@@ -29,9 +31,18 @@ static inline void dbputc(char c) {dbcmd(0x03, &c);}
 
 static inline void dbsystem(char *cmd)
 {
-	int data[2] = {(int)cmd, strlen(cmd)};
+	int data[2] = {(int)cmd, (int)strlen(cmd)};
 	dbcmd(0x12, data);  // SYS_SYSTEM
 }
+
+#else	// DEBUG
+
+#define dbbkpt()	((void)0)
+#define dbputs(str)	((void)0)
+#define dbputc(str)	((void)0)
+#define dbsystem(str)	((void)0)
+
+#endif	// DEBUG
 
 #ifdef __cplusplus
 }

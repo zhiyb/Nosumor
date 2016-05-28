@@ -4,16 +4,16 @@
 #include "macros.h"
 #include "usb.h"
 #include "usb_def.h"
-#include "usart1.h"
-#include "debug.h"
+#include "usb_ep0.h"
+#include "usb_debug.h"
+
+#define EP1_SIZE	32
 
 extern uint32_t _susbram;
 
 struct ep_t eptable[8][2] __attribute__((section(".usbtable")));
 
-__IO uint32_t ep0rx[MAX_EP0_SIZE / 2] __attribute__((section(".usbram")));
-__IO uint32_t ep1rx[MAX_EP0_SIZE / 2] __attribute__((section(".usbram")));
-uint32_t ep0tx[MAX_EP0_SIZE / 2] __attribute__((section(".usbram")));
+__IO uint32_t ep1rx[EP1_SIZE] __attribute__((section(".usbram")));
 
 struct status_t usbStatus;
 
@@ -43,31 +43,24 @@ void initUSB()
 	USB->CNTR = USB_CNTR_CTRM | USB_CNTR_PMAOVRM | /*USB_CNTR_ERRM |*/
 			USB_CNTR_WKUPM | USB_CNTR_SUSPM | USB_CNTR_RESETM /*|
 			USB_CNTR_SOFM | USB_CNTR_ESOFM*/;
-	eptable[0][EP_TX].addr = USB_LOCAL_ADDR(ep0tx);
-	eptable[0][EP_TX].count = 0;
-	eptable[0][EP_RX].addr = USB_LOCAL_ADDR(&ep0rx);
-	eptable[0][EP_RX].count = USB_RX_COUNT(sizeof(ep0rx) / 2);
+	usbInitEP0();
 	eptable[1][EP_RX].addr = USB_LOCAL_ADDR(&ep1rx);
-	eptable[1][EP_RX].count = USB_RX_COUNT(sizeof(ep1rx) / 2);
-	usart1WriteString("[INIT]");
+	eptable[1][EP_RX].count = USB_RX_COUNT_REG(sizeof(ep1rx) / 2);
 }
 
 static void usbReset()
 {
 	usbStatus.addr = 0;
 	usbStatus.config = 0;
-	// Configure endpoint 0
-	USB->EP0R = USB_EP_CONTROL | USB_EP_RX_VALID | USB_EP_TX_VALID | 0;
+	usbResetEP0();
 	// Configure endpoint 1
 	USB->EP1R = USB_EP_INTERRUPT | USB_EP_RX_VALID | 1;
 	// Start USB device
 	USB->DADDR = USB_DADDR_EF;
-	usart1WriteString("[RESET]");
 }
 
 static void usbCTR()
 {
-	usart1WriteString("#");
 	uint16_t epid = USB->ISTR & USB_ISTR_EP_ID;
 	uint32_t dir = USB->ISTR & USB_ISTR_DIR ? 1 : 0;
 	struct ep_t *ep = &eptable[epid][dir];
@@ -77,28 +70,29 @@ static void usbCTR()
 	uint16_t epmasked = (eprv & (USB_EP_TYPE_MASK | USB_EP_KIND | USB_EPADDR_FIELD))
 			| USB_EP_CTR_RX | USB_EP_CTR_TX;
 
-	uint32_t bkpt = 1;
 	if (eprv & USB_EP_CTR_RX) {
 		if (eprv & USB_EP_SETUP) {
-			usbSetup(epid);
-			bkpt = 0;
-		}
-		if ((ep->count & USB_RX_COUNT_MASK) == 0)
-			bkpt = 0;
-		if (bkpt)
+			writeString("\n<SETUP>");
+			if (epid == 0)
+				usbSetupEP0();
+			else {
+				// Unimplemented
+				usbStall(epid, EP_TX);
+				dbbkpt();
+			}
+		} else if ((ep->count & USB_RX_COUNT_MASK) != 0)
 			dbbkpt();
-		bkpt = 0;
-		*epr = (epmasked & ~USB_EP_CTR_RX) | (USB_EP_RX_VALID ^ (eprv & USB_EPRX_STAT));
+		usbValid(epid, dir);
 	}
 	if (eprv & USB_EP_CTR_TX) {
 		if (usbStatus.addr) {
 			USB->DADDR = usbStatus.addr | USB_DADDR_EF;
 			usbStatus.addr = 0;
+			writeString("\n<ADDR>");
 		}
-		bkpt = 0;
 		*epr = epmasked & ~USB_EP_CTR_TX;
 	}
-	if (bkpt)
+	if (!(eprv & (USB_EP_CTR_RX | USB_EP_CTR_TX)))
 		dbbkpt();
 	USB->ISTR = (uint16_t)~USB_ISTR_CTR;
 }
@@ -113,8 +107,6 @@ void USB_HP_CAN1_TX_IRQHandler()
 
 void USB_LP_CAN1_RX0_IRQHandler()
 {
-	usart1WriteString("\n?");
-	toggleLED(LED_RIGHT);
 	uint16_t istr;
 
 	// Correct transfer
@@ -122,42 +114,40 @@ void USB_LP_CAN1_RX0_IRQHandler()
 		usbCTR();
 
 	if (istr & USB_ISTR_PMAOVR) {
-		usart1WriteString("[PMA]");
 		// Packet memory overrun / underrun
+		writeString("\n<PMA>");
 		dbbkpt();
 		USB->ISTR = (uint16_t)~USB_ISTR_PMAOVR;
 	}
 	if (istr & USB_ISTR_ERR) {
-		usart1WriteString("[ERR]");
 		// Error
 		USB->ISTR = (uint16_t)~USB_ISTR_ERR;
+		writeString("\n<ERR>");
 	}
 	if (istr & USB_ISTR_WKUP) {
-		usart1WriteString("[WKUP]");
 		// Wakeup request
 		USB->ISTR = (uint16_t)~USB_ISTR_WKUP;
 		USB->CNTR &= ~USB_CNTR_FSUSP;
+		writeString("\n<WKUP>");
 	}
 	if (istr & USB_ISTR_SUSP) {
-		usart1WriteString("[SUSP]");
 		// Suspend request
 		USB->ISTR = (uint16_t)~USB_ISTR_SUSP;
 		USB->CNTR |= USB_CNTR_FSUSP;
 		USB->CNTR |= USB_CNTR_LP_MODE;
+		writeString("\n<SUSP>");
 	}
 	if (istr & USB_ISTR_RESET) {
-		usart1WriteString("[RESET]");
 		// Reset request
 		USB->ISTR = (uint16_t)~USB_ISTR_RESET;
 		usbReset();
+		writeString("\n<RESET>");
 	}
 	if (istr & USB_ISTR_SOF) {
-		//usart1WriteString("[SOF]");
 		// Start of frame
 		USB->ISTR = (uint16_t)~USB_ISTR_SOF;
 	}
 	if (istr & USB_ISTR_ESOF) {
-		//usart1WriteString("[EOF]");
 		// Expected start of frame
 		USB->ISTR = (uint16_t)~USB_ISTR_ESOF;
 	}
@@ -196,10 +186,19 @@ void usbTransfer(uint16_t epid, uint16_t dir, const void *src, uint16_t dst, uin
 	DMA1_Channel1->CCR |= DMA_CCR_EN;
 }
 
+void usbTransferEmpty(uint16_t epid, uint16_t dir)
+{
+	if (usbStatus.dma.active)
+		return;
+
+	struct ep_t *ep = &eptable[epid][dir];
+	ep->count = 0;
+
+	usbValid(epid, dir);
+}
+
 void usbHandshake(uint16_t epid, uint16_t dir, uint16_t type)
 {
-	usart1WriteString("!");
-	usart1DumpHex(type);
 	volatile uint16_t *epr = &USB->EP0R + epid;
 	uint16_t eprv = *epr;
 	uint16_t epmasked = (eprv & (USB_EP_TYPE_MASK | USB_EP_KIND | USB_EPADDR_FIELD))
@@ -208,8 +207,31 @@ void usbHandshake(uint16_t epid, uint16_t dir, uint16_t type)
 	if (dir == EP_RX) {
 		mask <<= 8;
 		type <<= 8;
+		epmasked &= ~USB_EP_CTR_RX;
 	}
 	*epr = epmasked | (type ^ (eprv & mask));
+
+#ifdef DEBUG
+	usart1WriteChar('<');
+	if (dir == EP_RX) {
+		usart1WriteString("RX>");
+		return;
+	} else
+		usart1WriteString("TX_");
+	switch (type) {
+	case USB_EP_TX_DIS:
+		usart1WriteString("DIS>");
+		break;
+	case USB_EP_TX_STALL:
+		usart1WriteString("STALL>");
+		break;
+	case USB_EP_TX_NAK:
+		usart1WriteString("NAK>");
+		break;
+	case USB_EP_TX_VALID:
+		usart1WriteString("VALID>");
+	}
+#endif
 }
 
 void DMA1_Channel1_IRQHandler()

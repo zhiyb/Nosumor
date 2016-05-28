@@ -49,7 +49,7 @@ void usart1WriteChar(char c)
 	writeChar(c);
 }
 
-void usart1WriteString(char *str)
+void usart1WriteString(const char *str)
 {
 	while (*str != '\0') {
 		if (*str == '\n')

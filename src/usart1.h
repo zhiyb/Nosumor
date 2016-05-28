@@ -4,9 +4,17 @@
 #include <stdint.h>
 #include "stm32f1xx.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void initUSART1();
 void usart1WriteChar(char c);
-void usart1WriteString(char *str);
+void usart1WriteString(const char *str);
 void usart1DumpHex(uint32_t v);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // USART1_H

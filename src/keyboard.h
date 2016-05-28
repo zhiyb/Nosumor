@@ -21,6 +21,10 @@
 #define KEY_2     14
 #define KEY_3     15
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void initKeyboard();
 
 static inline void setLED(uint32_t led, uint32_t val)
@@ -40,5 +44,9 @@ static inline uint32_t readKey(uint32_t key)
 {
 	return !(KEY_GPIO->IDR & BV(key));
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // KEYBOARD_H

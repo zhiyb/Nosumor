@@ -3,7 +3,14 @@
 #include "dma.h"
 #include "usb.h"
 #include "usart1.h"
+#include "escape.h"
 #include "debug.h"
+
+#ifdef DEBUG
+#define VARIANT	"DEBUG"
+#else
+#define VARIANT	"RELEASE"
+#endif
 
 void initRCC()
 {
@@ -32,8 +39,9 @@ void init()
 	NVIC_SetPriorityGrouping(0x03);
 	initRCC();
 	initDMA();
-	initKeyboard();
 	initUSART1();
+	usart1WriteString("\n" ESC_CYAN VARIANT " build @ " __DATE__ " " __TIME__ ESC_DEFAULT "\n");
+	initKeyboard();
 	initUSB();
 	// Enable SWJ only
 	AFIO->MAPR |= AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
@@ -57,7 +65,6 @@ int main()
 
 		if (readKey(KEY_3)) {
 			USB_TypeDef *usb = USB;
-			USART_TypeDef *usart1 = USART1;
 			dbbkpt();
 		}
 	}

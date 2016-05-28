@@ -15,6 +15,8 @@
 #define STRINGIFY(x)	#x
 #define TOSTRING(x)	STRINGIFY(x)
 
+#define ARRAY_SIZE(a)	(sizeof((a)) / sizeof((a)[0]))
+
 #define H8(i)		(((i) >> 8U) & 0xff)
 #define L8(i)		((i) & 0xff)
 #define DIV8(i)		((i) >> 3U)
