@@ -7,15 +7,8 @@
 #include "usb_ep0.h"
 #include "usb_debug.h"
 
-#define EP1_SIZE	32
-
-extern uint32_t _susbram;
-
-struct ep_t eptable[8][2] __attribute__((section(".usbtable")));
-
-__IO uint32_t ep1rx[EP1_SIZE] __attribute__((section(".usbram")));
-
 struct status_t usbStatus;
+struct ep_t eptable[8][2] __attribute__((section(".usbtable")));
 
 void initUSB()
 {
@@ -43,18 +36,16 @@ void initUSB()
 	USB->CNTR = USB_CNTR_CTRM | USB_CNTR_PMAOVRM | /*USB_CNTR_ERRM |*/
 			USB_CNTR_WKUPM | USB_CNTR_SUSPM | USB_CNTR_RESETM /*|
 			USB_CNTR_SOFM | USB_CNTR_ESOFM*/;
-	usbInitEP0();
-	eptable[1][EP_RX].addr = USB_LOCAL_ADDR(&ep1rx);
-	eptable[1][EP_RX].count = USB_RX_COUNT_REG(sizeof(ep1rx) / 2);
+	usbEP0Init();
+	usbClassInit();
 }
 
 static void usbReset()
 {
 	usbStatus.addr = 0;
 	usbStatus.config = 0;
-	usbResetEP0();
-	// Configure endpoint 1
-	USB->EP1R = USB_EP_INTERRUPT | USB_EP_RX_VALID | 1;
+	usbEP0Reset();
+	usbClassReset();
 	// Start USB device
 	USB->DADDR = USB_DADDR_EF;
 }
@@ -74,7 +65,7 @@ static void usbCTR()
 		if (eprv & USB_EP_SETUP) {
 			writeString("\n<SETUP>");
 			if (epid == 0)
-				usbSetupEP0();
+				usbEP0Setup();
 			else {
 				// Unimplemented
 				usbStall(epid, EP_TX);
@@ -119,11 +110,13 @@ void USB_LP_CAN1_RX0_IRQHandler()
 		dbbkpt();
 		USB->ISTR = (uint16_t)~USB_ISTR_PMAOVR;
 	}
+#if 0
 	if (istr & USB_ISTR_ERR) {
 		// Error
 		USB->ISTR = (uint16_t)~USB_ISTR_ERR;
 		writeString("\n<ERR>");
 	}
+#endif
 	if (istr & USB_ISTR_WKUP) {
 		// Wakeup request
 		USB->ISTR = (uint16_t)~USB_ISTR_WKUP;
@@ -143,6 +136,7 @@ void USB_LP_CAN1_RX0_IRQHandler()
 		usbReset();
 		writeString("\n<RESET>");
 	}
+#if 0
 	if (istr & USB_ISTR_SOF) {
 		// Start of frame
 		USB->ISTR = (uint16_t)~USB_ISTR_SOF;
@@ -151,6 +145,7 @@ void USB_LP_CAN1_RX0_IRQHandler()
 		// Expected start of frame
 		USB->ISTR = (uint16_t)~USB_ISTR_ESOF;
 	}
+#endif
 }
 
 void usbTransfer(uint16_t epid, uint16_t dir, const void *src, uint16_t dst, uint32_t size)

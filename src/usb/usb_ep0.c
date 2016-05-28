@@ -24,10 +24,16 @@
 #define REQ_SET_INTERFACE	11
 #define REQ_SYNCH_FRAME		12
 
+#define FS_ENDPOINT_HALT	0
+#define FS_DEVICE_REMOTE_WAKEUP	1
+#define FS_TEST_MODE		2
+
+#define MAX_EP0_SIZE	64
+
 __IO uint32_t ep0rx[MAX_EP0_SIZE / 2] __attribute__((section(".usbram")));
 uint32_t ep0tx[MAX_EP0_SIZE / 2] __attribute__((section(".usbram")));
 
-void usbInitEP0()
+void usbEP0Init()
 {
 	eptable[0][EP_TX].addr = USB_LOCAL_ADDR(ep0tx);
 	eptable[0][EP_TX].count = 0;
@@ -35,7 +41,7 @@ void usbInitEP0()
 	eptable[0][EP_RX].count = USB_RX_COUNT_REG(sizeof(ep0rx) / 2);
 }
 
-void usbResetEP0()
+void usbEP0Reset()
 {
 	// Configure endpoint 0
 	USB->EP0R = USB_EP_CONTROL | USB_EP_RX_VALID | USB_EP_TX_VALID | 0;
@@ -50,6 +56,32 @@ static void setConfiguration(uint8_t config)
 		usbStatus.config = config;
 		usbTransferEmpty(0, EP_TX);
 	}
+}
+
+static void clearFeature(struct setup_t *setup)
+{
+	if (!usbStatus.config)
+		goto error;
+
+	switch (setup->value) {
+	case FS_ENDPOINT_HALT:
+		writeString("{C_HALT}");
+		if ((setup->type & TYPE_RCPT_MASK) != TYPE_RCPT_ENDPOINT)
+			goto error;
+		if ((setup->index & EP_ADDR_MASK) == 0)
+			goto error;
+		usbClassHalt(setup->index, 0);
+		return;
+	default:
+		// Not implemented
+		usbStall(0, EP_TX);
+		dbbkpt();
+		return;
+	}
+
+error:
+	usbStall(0, EP_TX);
+	dbbkpt();
 }
 
 static void getDescriptor(struct setup_t *setup)
@@ -96,50 +128,87 @@ static void standardSetup(struct setup_t *setup)
 	switch (setup->type & TYPE_RCPT_MASK) {
 	case TYPE_RCPT_DEVICE:
 		switch (setup->request) {
+		case REQ_CLEAR_FEATURE:
+			if (setup->type & TYPE_DIRECTION)
+				goto error;
+			clearFeature(setup);
+			return;
 		case REQ_GET_DESCRIPTOR:
-			if (!(setup->type & TYPE_DIRECTION)) {
-				usbStall(0, EP_TX);
-				dbbkpt();
-				break;
-			}
+			if (!(setup->type & TYPE_DIRECTION))
+				goto error;
 			getDescriptor(setup);
-			break;
+			return;
 		case REQ_SET_ADDRESS:
-			if (setup->type & TYPE_DIRECTION) {
-				usbStall(0, EP_TX);
-				dbbkpt();
-				break;
-			}
+			if (setup->type & TYPE_DIRECTION)
+				goto error;
 			writeString("{ADDR}");
 			usbTransferEmpty(0, EP_TX);
 			usbStatus.addr = setup->value & 0x7f;
-			break;
+			return;
 		case REQ_SET_CONFIGURATION:
-			if (setup->type & TYPE_DIRECTION) {
-				usbStall(0, EP_TX);
-				dbbkpt();
-				break;
-			}
+			if (setup->type & TYPE_DIRECTION)
+				goto error;
+			writeString("{CONF}");
 			setConfiguration(setup->value);
-			break;
+			return;
 		default:
+			// Not implemented
 			usbStall(0, EP_TX);
 			dbbkpt();
+			return;
 		}
-		break;
 	case TYPE_RCPT_INTERFACE:
 		switch (setup->request) {
+		case REQ_CLEAR_FEATURE:
+			if (setup->type & TYPE_DIRECTION)
+				goto error;
+			clearFeature(setup);
+			return;
+		case REQ_GET_INTERFACE:
+		case REQ_GET_STATUS:
+		case REQ_SET_FEATURE:
+		case REQ_SET_INTERFACE:
+			// Not implemented
+			usbStall(0, EP_TX);
+			dbbkpt();
+			return;
 		default:
 			usbClassSetupInterface(setup);
+			return;
 		}
-		break;
+	case TYPE_RCPT_ENDPOINT:
+		switch (setup->request) {
+		case REQ_CLEAR_FEATURE:
+			if (setup->type & TYPE_DIRECTION)
+				goto error;
+			clearFeature(setup);
+			return;
+		case REQ_GET_STATUS:
+		case REQ_SET_FEATURE:
+		case REQ_SYNCH_FRAME:
+			// Not implemented
+			usbStall(0, EP_TX);
+			dbbkpt();
+			return;
+		default:
+			// Not implemented
+			usbStall(0, EP_TX);
+			dbbkpt();
+			return;
+		}
 	default:
+		// Not implemented
 		usbStall(0, EP_TX);
 		dbbkpt();
+		return;
 	}
+
+error:
+	usbStall(0, EP_TX);
+	dbbkpt();
 }
 
-void usbSetupEP0()
+void usbEP0Setup()
 {
 	struct ep_t *ep = &eptable[0][EP_RX];
 	struct setup_t *setup = (struct setup_t *)USB_SYS_ADDR(ep->addr);

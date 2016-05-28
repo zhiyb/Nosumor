@@ -10,6 +10,9 @@ union setup_value_class_t {
 
 #include "usb_def.h"
 
+void usbClassInit();
+void usbClassReset();
+void usbClassHalt(uint16_t epaddr, uint16_t e);
 void usbClassSetup(struct setup_t *setup);
 void usbClassSetupInterface(struct setup_t *setup);
 

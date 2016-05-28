@@ -15,26 +15,7 @@
 #define DESC_TYPE_REPORT	0x22
 #define DESC_TYPE_PHYSICAL	0x23
 
-// Endpoint direction
-#define DESC_EP_IN		0x80
-#define DESC_EP_OUT		0x00
-
-// Transfer type
-#define DESC_EP_CONTROL		0x00
-#define DESC_EP_ISOCHRONOUS	0x01
-#define DESC_EP_BULK		0x02
-#define DESC_EP_INTERRUPT	0x03
-
-// Iso mode synchronisation type
-#define DESC_EP_ISO_NONE	0x00
-#define DESC_EP_ISO_ASYNC	0x04
-#define DESC_EP_ISO_ADAPTIVE	0x08
-#define DESC_EP_ISO_SYNC	0x0c
-
-// Iso mode usage type
-#define DESC_EP_ISO_DATA	0x00
-#define DESC_EP_ISO_FEEDBACK	0x10
-#define DESC_EP_ISO_EXPLICIT	0x20
+#define EP1_SIZE	32
 
 struct desc_t {
 	const void *data;
