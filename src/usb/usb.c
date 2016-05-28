@@ -6,6 +6,7 @@
 #include "usb.h"
 #include "usb_def.h"
 #include "usb_ep0.h"
+#include "usb_class.h"
 #include "usb_debug.h"
 
 struct status_t usbStatus;
@@ -149,11 +150,20 @@ void USB_LP_CAN1_RX0_IRQHandler()
 #endif
 }
 
+static inline uint32_t isBusy(uint16_t epid, uint16_t dir)
+{
+	volatile uint16_t *epr = &USB_EPnR(epid);
+	uint16_t mask = dir != EP_TX ? USB_EPRX_STAT : USB_EPTX_STAT;
+	uint16_t valid = dir != EP_TX ? USB_EP_RX_VALID : USB_EP_TX_VALID;
+	if (usbStatus.dma.epid == epid)
+		if (usbStatus.dma.active)
+			return 1;
+	return (*epr & mask) == valid;
+}
+
 void usbTransfer(uint16_t epid, uint16_t dir, const void *ptr, uint32_t size)
 {
-	if (usbStatus.dma.epid == epid)
-		while (usbStatus.dma.active);
-
+	while (isBusy(epid, dir));
 	struct ep_t *ep = &eptable[epid][dir];
 	ep->count = size;
 
@@ -162,6 +172,7 @@ void usbTransfer(uint16_t epid, uint16_t dir, const void *ptr, uint32_t size)
 		return;
 	}
 
+	while (usbStatus.dma.active);
 	// Memory to memory, highest priority, increment mode
 	// Memory size 16, peripheral size 32
 	// Transfer complete interrupt enable
@@ -183,12 +194,9 @@ void usbTransfer(uint16_t epid, uint16_t dir, const void *ptr, uint32_t size)
 
 void usbTransferEmpty(uint16_t epid, uint16_t dir)
 {
-	if (usbStatus.dma.active)
-		return;
-
+	while (isBusy(epid, dir));
 	struct ep_t *ep = &eptable[epid][dir];
 	ep->count = 0;
-
 	usbValid(epid, dir);
 }
 

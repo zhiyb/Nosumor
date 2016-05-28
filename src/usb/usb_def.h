@@ -5,9 +5,7 @@
 #include "stm32f1xx.h"
 #include "usb.h"
 
-struct setup_t;
-
-#include "usb_class.h"
+#define USB_EPnR(id)	(*(&USB->EP0R + (id) * (&USB->EP1R - &USB->EP0R)))
 
 struct setup_value_descriptor_t {
 	uint8_t index;
@@ -20,7 +18,6 @@ struct setup_t {
 	union {
 		uint16_t value;
 		struct setup_value_descriptor_t descriptor;
-		union setup_value_class_t classValue;
 	};
 	uint16_t RESERVED1;
 	uint16_t index;
