@@ -19,11 +19,15 @@ void initUSB()
 	// Enable clock and NVIC
 	RCC->APB1ENR |= RCC_APB1ENR_USBEN;
 	uint32_t prioritygroup = NVIC_GetPriorityGrouping();
-	NVIC_SetPriority(USB_HP_CAN1_TX_IRQn, NVIC_EncodePriority(prioritygroup, 2, 0));
+	NVIC_SetPriority(USB_HP_CAN1_TX_IRQn, NVIC_EncodePriority(prioritygroup, 2, 1));
 	NVIC_SetPriority(USB_LP_CAN1_RX0_IRQn, NVIC_EncodePriority(prioritygroup, 2, 1));
 	NVIC_EnableIRQ(USB_HP_CAN1_TX_IRQn);
 	NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
 
+	// Enable DMA
+	RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+	NVIC_SetPriority(DMA1_Channel1_IRQn, NVIC_EncodePriority(prioritygroup, 2, 0));
+	NVIC_EnableIRQ(DMA1_Channel1_IRQn);
 	// Memory to memory, highest priority, increment mode
 	// Memory size 16, peripheral size 32
 	// Transfer complete interrupt enable

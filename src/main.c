@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include "stm32f1xx.h"
 #include "keyboard.h"
-#include "dma.h"
 #include "usb.h"
 #include "usb_desc.h"
 #include "usart1.h"
@@ -40,7 +39,6 @@ void init()
 {
 	NVIC_SetPriorityGrouping(4);	// 3+1 bits pripority
 	initRCC();
-	initDMA();
 	initUSART1();
 	initUSB();
 	initKeyboard();
@@ -54,8 +52,8 @@ int main()
 	init();
 
 	for (;;) {
-		setLED(LED_LEFT, readKey(KEY_LEFT));
-		setLED(LED_RIGHT, readKey(KEY_RIGHT));
+		//setLED(LED_LEFT, readKey(KEY_LEFT));
+		//setLED(LED_RIGHT, readKey(KEY_RIGHT));
 		setLED(LED_RED, readKey(KEY_1));
 		setLED(LED_GREEN, readKey(KEY_2));
 		setLED(LED_BLUE, readKey(KEY_3));
