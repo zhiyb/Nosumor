@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include "keyboard.h"
+#include "usart1.h"
 
 void initKeyboard()
 {
@@ -32,4 +33,23 @@ void initKeyboard()
 					0x08 << (MOD8(KEY_3) << 2));
 	KEY_GPIO->BSRR = (BV(KEY_LEFT) | BV(KEY_RIGHT) |
 			  BV(KEY_1) | BV(KEY_2) | BV(KEY_3));
+
+	// Setup external interrupts
+	uint32_t prioritygroup = NVIC_GetPriorityGrouping();
+	NVIC_SetPriority(EXTI3_IRQn, NVIC_EncodePriority(prioritygroup, 1, 0));
+	NVIC_SetPriority(EXTI4_IRQn, NVIC_EncodePriority(prioritygroup, 1, 1));
+	NVIC_EnableIRQ(EXTI3_IRQn);
+	NVIC_EnableIRQ(EXTI4_IRQn);
+}
+
+void EXTI3_IRQHandler()
+{
+	usart1WriteChar('E');
+	usart1WriteChar('3');
+}
+
+void EXTI4_IRQHandler()
+{
+	usart1WriteChar('E');
+	usart1WriteChar('4');
 }

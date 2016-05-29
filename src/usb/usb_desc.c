@@ -10,16 +10,34 @@
 
 static const unsigned char hidReport[] = {
 	0x05, 0x01,		// Usage page (Generic desktop)
+	0x09, 0x06,		// Usage (Keyboard)
+	0xa1, 0x01,		// Collection (Application)
+	0x85, HID_KEYBOARD,	//   Report ID (HID_KEYBOARD)
+	0xc0,			// End collection
+
+	0x05, 0x01,		// Usage page (Generic desktop)
 	0x09, 0x02,		// Usage (Mouse)
 	0xa1, 0x01,		// Collection (Application)
-	0x85, HID_MOUSE,	//   Report ID (1)
+	0x85, HID_MOUSE,	//   Report ID (HID_MOUSE)
 	0x09, 0x01,		//   Usage (Pointer)
 	0xa1, 0x00,		//   Collection (Physical)
-	0x95, 0x02,		//     Report count (2)
+	0x95, 0x05,		//     Report count (5)
+	0x75, 0x01,		//     Report size (1)
+	0x05, 0x09,		//     Usage page (Button)
+	0x19, 0x01,		//     Usage minimum (Button 1)
+	0x29, 0x05,		//     Usage maximum (Button 5)
+	0x15, 0x00,		//     Logical minimum (0)
+	0x25, 0x01,		//     Logical maximum (1)
+	0x81, 0x02,		//     Input (Data, Var, Abs)
+	0x95, 0x01,		//     Report count (1)
+	0x75, 0x03,		//     Report size (3)
+	0x81, 0x01,		//     Input (Cnst)
+	0x95, 0x03,		//     Report count (3)
 	0x75, 0x08,		//     Report size (8)
 	0x05, 0x01,		//     Usage page (Generic desktop)
 	0x09, 0x30,		//     Usage (X)
 	0x09, 0x31,		//     Usage (Y)
+	0x09, 0x38,		//     Usage (Wheel)
 	0x15, 0x81,		//     Logical minimum (-127)
 	0x25, 0x7f,		//     Logical maximum (127)
 	0x81, 0x06,		//     Input (Data, Var, Rel)
@@ -29,9 +47,11 @@ static const unsigned char hidReport[] = {
 	0x06, 0x39, 0xff,	// Usage page (Vendor defined)
 	0x09, 0x39,		// Usage (Vendor usage)
 	0xa1, 0x01,		// Collection (Application)
-	0x85, HID_VENDOR,		//   Report ID (2)
+	0x85, HID_VENDOR,	//   Report ID (HID_VENDOR)
 	0xc0,			// End collection
 };
+
+//STATIC_ASSERT(sizeof(hidReport) <= 64, "sizeof(hidReport) <= 64");
 
 static const unsigned char device[] = {
 	18,			// bLength
@@ -115,3 +135,8 @@ const struct descriptor_t descriptors = {
 	{desc_config, ARRAY_SIZE(desc_config)},
 	{desc_report, ARRAY_SIZE(desc_report)},
 };
+
+void usbHIDReport(const void *ptr, uint8_t size)
+{
+	usbTransfer(1, EP_TX, EP1_SIZE, size, ptr);
+}

@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "stm32f1xx.h"
 #include "keyboard.h"
 #include "dma.h"
@@ -37,15 +38,15 @@ void initRCC()
 
 void init()
 {
-	NVIC_SetPriorityGrouping(0x03);
+	NVIC_SetPriorityGrouping(4);	// 3+1 bits pripority
 	initRCC();
 	initDMA();
 	initUSART1();
-	usart1WriteString("\n" ESC_CYAN VARIANT " build @ " __DATE__ " " __TIME__ ESC_DEFAULT "\n");
-	initKeyboard();
 	initUSB();
+	initKeyboard();
 	// Enable SWJ only
 	AFIO->MAPR |= AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
+	usart1WriteString("\n" ESC_CYAN VARIANT " build @ " __DATE__ " " __TIME__ ESC_DEFAULT "\n");
 }
 
 int main()
@@ -60,14 +61,14 @@ int main()
 		setLED(LED_BLUE, readKey(KEY_3));
 
 		if (readKey(KEY_LEFT)) {
-			const int8_t data[] = {HID_MOUSE, -1, -1};
-			usbTransfer(1, EP_TX, data, sizeof(data));
+			struct mouse_t mouse = {HID_MOUSE, 0x00, -1, -1, 0};
+			usbHIDReport(&mouse, sizeof(mouse));
 			//while (readKey(KEY_LEFT));
 		}
 
 		if (readKey(KEY_RIGHT)) {
-			const int8_t data[] = {HID_MOUSE, 1, 1};
-			usbTransfer(1, EP_TX, data, sizeof(data));
+			struct mouse_t mouse = {HID_MOUSE, 0x00, 1, 1, 0};
+			usbHIDReport(&mouse, sizeof(mouse));
 			//while (readKey(KEY_RIGHT));
 		}
 

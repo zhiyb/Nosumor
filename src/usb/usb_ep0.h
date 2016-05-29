@@ -13,6 +13,8 @@
 #define TYPE_RCPT_ENDPOINT	0x02
 #define TYPE_RCPT_OTHER		0x03
 
+#define EP0_SIZE	64
+
 void usbEP0Init();
 void usbEP0Reset();
 void usbEP0Setup();

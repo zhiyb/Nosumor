@@ -31,6 +31,9 @@ struct status_t {
 		volatile uint8_t active;
 		uint8_t epid;
 		uint8_t dir;
+		uint8_t size;
+		uint8_t buffSize;
+		const void *ptr;
 	} dma;
 	uint8_t addr, config;
 };

@@ -15,8 +15,15 @@
 #define DESC_TYPE_REPORT	0x22
 #define DESC_TYPE_PHYSICAL	0x23
 
-#define HID_MOUSE	1
-#define HID_VENDOR	2
+#define HID_KEYBOARD	1
+#define HID_MOUSE	2
+#define HID_VENDOR	3
+
+struct mouse_t {
+	uint8_t reportID;
+	uint8_t buttons;
+	int8_t x, y, wheel;
+};
 
 struct desc_t {
 	const void *data;
@@ -31,5 +38,7 @@ struct descriptor_t {
 };
 
 extern const struct descriptor_t descriptors;
+
+void usbHIDReport(const void *ptr, uint8_t size);
 
 #endif // USB_DESC_H

@@ -28,8 +28,6 @@
 #define FS_DEVICE_REMOTE_WAKEUP	1
 #define FS_TEST_MODE		2
 
-#define EP0_SIZE	64
-
 __IO uint32_t ep0rx[EP0_SIZE / 2] USBRAM;
 uint32_t ep0tx[EP0_SIZE / 2] USBRAM;
 
@@ -115,7 +113,7 @@ static void getDescriptor(struct setup_t *setup)
 
 	size = size < setup->length ? size : setup->length;
 	if (desc)
-		usbTransfer(0, EP_TX, desc, size);
+		usbTransfer(0, EP_TX, EP0_SIZE, size, desc);
 	else {
 		usbStall(0, EP_TX);
 		dbbkpt();
@@ -223,6 +221,6 @@ void usbEP0Setup()
 		break;
 	default:
 		usbStall(0, EP_TX);
-		dbbkpt();
+		//dbbkpt();
 	}
 }

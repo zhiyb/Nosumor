@@ -17,7 +17,7 @@ uint32_t ep1tx[EP1_SIZE / 2] USBRAM;
 void usbClassInit()
 {
 	eptable[1][EP_TX].addr = USB_LOCAL_ADDR(&ep1tx);
-	eptable[1][EP_TX].count = EP1_SIZE;
+	eptable[1][EP_TX].count = 0;
 	eptable[1][EP_RX].addr = USB_LOCAL_ADDR(&ep1rx);
 	eptable[1][EP_RX].count = USB_RX_COUNT_REG(EP1_SIZE);
 }
@@ -106,7 +106,7 @@ static void getDescriptor(struct setup_t *setup)
 
 	size = size < setup->length ? size : setup->length;
 	if (desc)
-		usbTransfer(0, EP_TX, desc, size);
+		usbTransfer(0, EP_TX, EP0_SIZE, size, desc);
 	else {
 		usbStall(0, EP_TX);
 		dbbkpt();
