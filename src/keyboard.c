@@ -4,10 +4,13 @@
 #include "usart1.h"
 #include "debug.h"
 
-#define EXTIx(gp, pin)	(((gp) - GPIOA) / (GPIOB - GPIOA)) << (((pin) & 3) << 2)
-#define KEYS		(BV(KEY_LEFT) | BV(KEY_RIGHT) | BV(KEY_1) | BV(KEY_2) | BV(KEY_3))
 #define TIM_PSC		22
 #define TIM_CLK		(APB1_TIM_CLK / TIM_PSC)
+
+#define KEY_ITVL	5
+
+#define EXTIx(gp, pin)	(((gp) - GPIOA) / (GPIOB - GPIOA)) << (((pin) & 3) << 2)
+#define KEYS		(BV(KEY_LEFT) | BV(KEY_RIGHT) | BV(KEY_1) | BV(KEY_2) | BV(KEY_3))
 
 static const uint16_t keysBV[] = {BV(KEY_LEFT), BV(KEY_RIGHT),
 				  BV(KEY_1), BV(KEY_2), BV(KEY_3)};
@@ -19,7 +22,7 @@ static struct {
 	volatile uint16_t valid;
 	uint16_t compare[5];
 	uint16_t compareDMA[5];
-	uint16_t *ptrDMA;
+	volatile uint16_t *ptrDMA;
 } status;
 
 static inline void initTimer()
@@ -28,7 +31,7 @@ static inline void initTimer()
 	RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
 	// Continuous, counting up until overflow
 	memset(TIM2, 0, sizeof(*TIM2));
-	TIM2->PSC = TIM_PSC;
+	TIM2->PSC = TIM_PSC - 1;
 	TIM2->ARR = 0xffff;
 
 	// Using DMA to transfer TIM2 CCR4
@@ -111,7 +114,7 @@ static inline void initGPIO()
 void initKeyboard()
 {
 	// Initialise status variables
-	status.itvl = TIM_CLK * 10 / 1000;
+	status.itvl = TIM_CLK * KEY_ITVL / 1000;
 
 	initTimer();
 	initGPIO();
@@ -126,46 +129,53 @@ static void keyboardIRQ()
 {
 	NVIC_DisableIRQ(EXTI9_5_IRQn);
 	NVIC_DisableIRQ(EXTI15_10_IRQn);
+	uint16_t keys = KEY_GPIO->IDR;
 	uint16_t pr = EXTI->PR;
 	EXTI->PR = pr;
-	uint16_t compare = TIM2->CNT + status.itvl;
-	if (pr & KEYS) {
-		uint16_t keys = KEY_GPIO->IDR & KEYS;
-		uint16_t changed = (keys ^ status.keysIRQ) & status.valid;
-		status.keys ^= (status.keys ^ keys) & status.valid;
-		if (changed) {
-			// Add to debouncing timer, trigger update
-			typeof(&keysBV[0]) key = keysBV;
-			uint32_t i = 0;
-			for (i = 0; i != ARRAY_SIZE(keysBV); key++, i++)
-				if (changed & *key)
-					status.compare[i] = compare;
-			if (status.valid == KEYS) {
+
+	keys &= KEYS;
+	pr &= status.valid;
+
+	if (pr) {
+		uint16_t compare = TIM2->CNT + status.itvl;
+		status.keys ^= pr;
+		// Add to debouncing timer, trigger update
+		typeof(&keysBV[0]) key = keysBV;
+		uint32_t i = 0;
+		for (i = 0; i != ARRAY_SIZE(keysBV); key++, i++)
+			if (pr & *key)
+				status.compare[i] = compare;
+		if (status.valid == KEYS) {
+			TIM2->CCR4 = compare;
+			uint16_t cnt = DMA1_Channel7->CNDTR;
+			cnt = cnt == ARRAY_SIZE(status.compareDMA) ? 1 : cnt + 1;
+			status.ptrDMA = status.compareDMA +
+					ARRAY_SIZE(status.compareDMA) - cnt;
+			*status.ptrDMA = compare;
+		} else if (compare != TIM2->CCR4 && compare != *status.ptrDMA) {
+			status.ptrDMA++;
+			if (status.ptrDMA == status.compareDMA +
+					ARRAY_SIZE(status.compareDMA))
+				status.ptrDMA = status.compareDMA;
+			*status.ptrDMA = compare;
+
+			uint16_t cnt = DMA1_Channel7->CNDTR;
+			cnt = cnt == ARRAY_SIZE(status.compareDMA) ? 1 : cnt + 1;
+			uint16_t *ptr = status.compareDMA +
+					ARRAY_SIZE(status.compareDMA) - cnt;
+			if (ptr == status.ptrDMA)
 				TIM2->CCR4 = compare;
-				status.ptrDMA = status.compareDMA +
-						ARRAY_SIZE(status.compareDMA) -
-						DMA1_Channel7->CNDTR;
-			} else {
-				*status.ptrDMA++ = compare;
-				if (status.ptrDMA == status.compareDMA +
-						ARRAY_SIZE(status.compareDMA))
-					status.ptrDMA = status.compareDMA;
-				uint16_t *ptr = status.compareDMA +
-						ARRAY_SIZE(status.compareDMA) -
-						DMA1_Channel7->CNDTR;
-				if (ptr == status.ptrDMA)
-					TIM2->CCR4 = compare;
-			}
-			status.valid ^= changed;
-#ifdef DEBUG
-			key = keysBV;
-			for (i = 0; i != ARRAY_SIZE(keysBV); key++, i++)
-				if (changed & *key)
-					usart1WriteChar(i + (*key & keys ? '0' : 'a'));
-#endif
 		}
-		status.keysIRQ = keys;
+		status.valid &= ~pr;
+#ifdef DEBUG
+		key = keysBV;
+		for (i = 0; i != ARRAY_SIZE(keysBV); key++, i++)
+			if (pr & *key)
+				usart1WriteChar(i + (*key & status.keys ? 'a' : 'A'));
+#endif
 	}
+
+	status.keysIRQ = keys;
 	NVIC_EnableIRQ(EXTI9_5_IRQn);
 	NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
@@ -186,11 +196,22 @@ void TIM2_IRQHandler()
 	for (i = 0; i != ARRAY_SIZE(status.compare); key++, i++) {
 		if (!(status.valid & *key)) {
 			uint16_t diff = cnt - status.compare[i];
-			if (!(diff & 0xff00))	// diff < 256
+			if (!(diff & 0xff00)) {	// diff < 256
 				valid |= *key;
+#ifdef DEBUG
+				if (diff & 0xfffe) {
+					usart1WriteString("\n");
+					usart1DumpHex(diff);
+				}
+#endif
+			}
 		}
 	}
+#ifdef DEBUG
+	if (!valid)
+		usart1WriteString("\n");
+#endif
 	status.valid |= valid;
 	uint16_t keys = KEY_GPIO->IDR & KEYS;
-	status.keys ^= (status.keys ^ keys) & status.valid;
+	EXTI->SWIER = keys ^ status.keys;
 }
