@@ -27,7 +27,7 @@ extern "C" {
 
 void initKeyboard();
 
-static inline void setLED(uint32_t led, uint32_t val)
+static inline void setLED(uint16_t led, uint16_t val)
 {
 	if (val)
 		LED_GPIO->BSRR = BV(led);
@@ -35,15 +35,19 @@ static inline void setLED(uint32_t led, uint32_t val)
 		LED_GPIO->BRR = BV(led);
 }
 
-static inline void toggleLED(uint32_t led)
+static inline void toggleLED(uint16_t led)
 {
 	LED_GPIO->ODR ^= BV(led);
 }
 
-static inline uint32_t readKey(uint32_t key)
+#if 0
+static inline uint32_t readKey(uint16_t key)
 {
 	return !(KEY_GPIO->IDR & BV(key));
 }
+#else
+uint32_t readKey(uint16_t key);
+#endif
 
 #ifdef __cplusplus
 }

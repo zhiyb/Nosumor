@@ -3,7 +3,6 @@
 #include "keyboard.h"
 #include "macros.h"
 #include "usb.h"
-#include "usb_def.h"
 #include "usb_desc.h"
 #include "usb_class.h"
 #include "usb_ep0.h"

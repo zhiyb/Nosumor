@@ -3,6 +3,7 @@
 #include "keyboard.h"
 #include "usb.h"
 #include "usb_desc.h"
+#include "usb_class.h"
 #include "usart1.h"
 #include "escape.h"
 #include "debug.h"
@@ -37,8 +38,11 @@ void initRCC()
 
 void init()
 {
-	NVIC_SetPriorityGrouping(4);	// 3+1 bits pripority
 	initRCC();
+	NVIC_SetPriorityGrouping(4);	// 3+1 bits pripority
+	// Enable DMA
+	RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+
 	initUSART1();
 	initUSB();
 	initKeyboard();
@@ -52,8 +56,8 @@ int main()
 	init();
 
 	for (;;) {
-		//setLED(LED_LEFT, readKey(KEY_LEFT));
-		//setLED(LED_RIGHT, readKey(KEY_RIGHT));
+		setLED(LED_LEFT, readKey(KEY_LEFT));
+		setLED(LED_RIGHT, readKey(KEY_RIGHT));
 		setLED(LED_RED, readKey(KEY_1));
 		setLED(LED_GREEN, readKey(KEY_2));
 		setLED(LED_BLUE, readKey(KEY_3));
@@ -70,12 +74,8 @@ int main()
 			//while (readKey(KEY_RIGHT));
 		}
 
-		if (readKey(KEY_1)) {
-			usart1WriteString("Hello, world!\n");
-			while (readKey(KEY_1));
+		if (readKey(KEY_3)) {
+			//dbbkpt();
 		}
-
-		if (readKey(KEY_3))
-			dbbkpt();
 	}
 }

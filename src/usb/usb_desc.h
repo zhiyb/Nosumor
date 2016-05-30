@@ -39,6 +39,4 @@ struct descriptor_t {
 
 extern const struct descriptor_t descriptors;
 
-void usbHIDReport(const void *ptr, uint8_t size);
-
 #endif // USB_DESC_H

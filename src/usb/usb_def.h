@@ -3,9 +3,12 @@
 
 #include <stdint.h>
 #include "stm32f1xx.h"
-#include "usb.h"
 
 #define USB_EPnR(id)	(*(&USB->EP0R + (id) * (&USB->EP1R - &USB->EP0R)))
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct setup_value_descriptor_t {
 	uint8_t index;
@@ -39,5 +42,9 @@ struct status_t {
 };
 
 extern struct status_t usbStatus;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // USB_DEF_H

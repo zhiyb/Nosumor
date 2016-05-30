@@ -1,6 +1,7 @@
 #include <stdint.h>
-#include "usart1.h"
 #include "macros.h"
+#include "clocks.h"
+#include "usart1.h"
 #include "debug.h"
 
 // Port A, lower byte
@@ -8,7 +9,7 @@
 #define UART_TX		9
 #define UART_RX		10
 
-#define UART_CLK	72000000UL
+#define UART_CLK	APB2_CLK
 #define UART_BAUD	4000000UL
 
 // baud = fck / (16 * USARTDIV)

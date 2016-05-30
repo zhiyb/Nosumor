@@ -1,4 +1,4 @@
-#include "usb_def.h"
+#include "usb.h"
 #include "usb_desc.h"
 #include "usb_ep0.h"
 #include "usb_class.h"
@@ -130,4 +130,9 @@ void usbClassSetupInterface(struct setup_t *setup)
 		usbStall(0, EP_TX);
 		dbbkpt();
 	}
+}
+
+void usbHIDReport(const void *ptr, uint8_t size)
+{
+	usbTransfer(1, EP_TX, EP1_SIZE, size, ptr);
 }

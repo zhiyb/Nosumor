@@ -1,13 +1,61 @@
 #include <stdint.h>
+#include "clocks.h"
 #include "keyboard.h"
 #include "usart1.h"
 #include "debug.h"
 
 #define EXTIx(gp, pin)	(((gp) - GPIOA) / (GPIOB - GPIOA)) << (((pin) & 3) << 2)
 #define KEYS		(BV(KEY_LEFT) | BV(KEY_RIGHT) | BV(KEY_1) | BV(KEY_2) | BV(KEY_3))
+#define TIM_PSC		22
+#define TIM_CLK		(APB1_TIM_CLK / TIM_PSC)
 
-void initKeyboard()
+static const uint16_t keysBV[] = {BV(KEY_LEFT), BV(KEY_RIGHT),
+				  BV(KEY_1), BV(KEY_2), BV(KEY_3)};
+
+static struct {
+	volatile uint16_t keys;
+	uint16_t itvl;	// Debouncing interval
+	uint16_t keysIRQ;
+	volatile uint16_t valid;
+	uint16_t compare[5];
+	uint16_t compareDMA[5];
+	uint16_t *ptrDMA;
+} status;
+
+static inline void initTimer()
 {
+	// Setup debouncing timer (TIM2)
+	RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
+	// Continuous, counting up until overflow
+	memset(TIM2, 0, sizeof(*TIM2));
+	TIM2->PSC = TIM_PSC;
+	TIM2->ARR = 0xffff;
+
+	// Using DMA to transfer TIM2 CCR4
+	TIM2->DCR = ((uint32_t)&TIM2->CCR4 - (uint32_t)TIM2) >> 2;
+	// Using DMA1 channel 7 (trigger on TIM2 CH4)
+	// 16 bits, circular mode, high priority
+	DMA1_Channel7->CCR = DMA_CCR_MSIZE_0 | DMA_CCR_PSIZE_0 | DMA_CCR_PL_1 |
+			DMA_CCR_MINC | DMA_CCR_CIRC | DMA_CCR_DIR;
+	DMA1_Channel7->CNDTR = ARRAY_SIZE(status.compareDMA);
+	DMA1_Channel7->CPAR = (uint32_t)&TIM2->DMAR;
+	DMA1_Channel7->CMAR = (uint32_t)status.compareDMA;
+	DMA1_Channel7->CCR |= DMA_CCR_EN;
+
+	// Enable timer interrupt
+	TIM2->CCER = TIM_CCER_CC4E;
+	TIM2->DIER = TIM_DIER_CC4DE | TIM_DIER_CC4IE;
+	uint32_t prioritygroup = NVIC_GetPriorityGrouping();
+	NVIC_SetPriority(TIM2_IRQn, NVIC_EncodePriority(prioritygroup, 1, 1));
+	NVIC_EnableIRQ(TIM2_IRQn);
+
+	// Enable timer
+	TIM2->CR1 |= TIM_CR1_CEN;
+}
+
+static inline void initGPIO()
+{
+	// Setup GPIOs
 	RCC->APB2ENR |= RCC_APB2ENR_AFIOEN;
 	RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN;
 
@@ -38,6 +86,7 @@ void initKeyboard()
 					0x08 << (MOD8(KEY_3) << 2));
 	KEY_GPIO->BSRR = KEYS;
 
+	// Setup external interrupts
 	AFIO->EXTICR[KEY_LEFT / 4] |= EXTIx(KEY_GPIO, KEY_LEFT);
 	AFIO->EXTICR[KEY_RIGHT / 4] |= EXTIx(KEY_GPIO, KEY_RIGHT);
 	AFIO->EXTICR[KEY_1 / 4] |= EXTIx(KEY_GPIO, KEY_1);
@@ -49,7 +98,9 @@ void initKeyboard()
 	EXTI->PR = KEYS;
 	EXTI->IMR |= KEYS;
 
-	// Setup external interrupts
+	// Enable external interrupts
+	status.keys = status.keysIRQ = KEY_GPIO->IDR & KEYS;
+	status.valid = KEYS;
 	uint32_t prioritygroup = NVIC_GetPriorityGrouping();
 	NVIC_SetPriority(EXTI9_5_IRQn, NVIC_EncodePriority(prioritygroup, 1, 0));
 	NVIC_SetPriority(EXTI15_10_IRQn, NVIC_EncodePriority(prioritygroup, 1, 0));
@@ -57,14 +108,89 @@ void initKeyboard()
 	NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
+void initKeyboard()
+{
+	// Initialise status variables
+	status.itvl = TIM_CLK * 10 / 1000;
+
+	initTimer();
+	initGPIO();
+}
+
+uint32_t readKey(uint16_t key)
+{
+	return !(status.keys & BV(key));
+}
+
 static void keyboardIRQ()
 {
-	toggleLED(LED_LEFT);
+	NVIC_DisableIRQ(EXTI9_5_IRQn);
+	NVIC_DisableIRQ(EXTI15_10_IRQn);
 	uint16_t pr = EXTI->PR;
-	if (pr & KEYS)
-		usart1WriteChar('E');
 	EXTI->PR = pr;
+	uint16_t compare = TIM2->CNT + status.itvl;
+	if (pr & KEYS) {
+		uint16_t keys = KEY_GPIO->IDR & KEYS;
+		uint16_t changed = (keys ^ status.keysIRQ) & status.valid;
+		status.keys ^= (status.keys ^ keys) & status.valid;
+		if (changed) {
+			// Add to debouncing timer, trigger update
+			typeof(&keysBV[0]) key = keysBV;
+			uint32_t i = 0;
+			for (i = 0; i != ARRAY_SIZE(keysBV); key++, i++)
+				if (changed & *key)
+					status.compare[i] = compare;
+			if (status.valid == KEYS) {
+				TIM2->CCR4 = compare;
+				status.ptrDMA = status.compareDMA +
+						ARRAY_SIZE(status.compareDMA) -
+						DMA1_Channel7->CNDTR;
+			} else {
+				*status.ptrDMA++ = compare;
+				if (status.ptrDMA == status.compareDMA +
+						ARRAY_SIZE(status.compareDMA))
+					status.ptrDMA = status.compareDMA;
+				uint16_t *ptr = status.compareDMA +
+						ARRAY_SIZE(status.compareDMA) -
+						DMA1_Channel7->CNDTR;
+				if (ptr == status.ptrDMA)
+					TIM2->CCR4 = compare;
+			}
+			status.valid ^= changed;
+#ifdef DEBUG
+			key = keysBV;
+			for (i = 0; i != ARRAY_SIZE(keysBV); key++, i++)
+				if (changed & *key)
+					usart1WriteChar(i + (*key & keys ? '0' : 'a'));
+#endif
+		}
+		status.keysIRQ = keys;
+	}
+	NVIC_EnableIRQ(EXTI9_5_IRQn);
+	NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
 void EXTI9_5_IRQHandler() __attribute__((weak, alias("keyboardIRQ")));
 void EXTI15_10_IRQHandler() __attribute__((weak, alias("keyboardIRQ")));
+
+void TIM2_IRQHandler()
+{
+	TIM2->SR = 0;
+	uint16_t cnt = TIM2->CNT;
+	if (status.valid == KEYS)
+		return;
+
+	typeof(&keysBV[0]) key = keysBV;
+	uint16_t valid = 0;
+	uint32_t i;
+	for (i = 0; i != ARRAY_SIZE(status.compare); key++, i++) {
+		if (!(status.valid & *key)) {
+			uint16_t diff = cnt - status.compare[i];
+			if (!(diff & 0xff00))	// diff < 256
+				valid |= *key;
+		}
+	}
+	status.valid |= valid;
+	uint16_t keys = KEY_GPIO->IDR & KEYS;
+	status.keys ^= (status.keys ^ keys) & status.valid;
+}

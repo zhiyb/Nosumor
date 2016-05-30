@@ -1,12 +1,28 @@
 #include <stdint.h>
 #include "macros.h"
-#include "usb_def.h"
-#include "usb_ep0.h"
+#include "usb.h"
 #include "usb_class.h"
 #include "usb_desc.h"
 
 #define USB_VID		0x0483
 #define USB_PID		0x5750
+
+// Transfer type
+#define EP_CONTROL	0x00
+#define EP_ISOCHRONOUS	0x01
+#define EP_BULK		0x02
+#define EP_INTERRUPT	0x03
+
+// Iso mode synchronisation type
+#define EP_ISO_NONE	0x00
+#define EP_ISO_ASYNC	0x04
+#define EP_ISO_ADAPTIVE	0x08
+#define EP_ISO_SYNC	0x0c
+
+// Iso mode usage type
+#define EP_ISO_DATA	0x00
+#define EP_ISO_FEEDBACK	0x10
+#define EP_ISO_EXPLICIT	0x20
 
 static const unsigned char hidReport[] = {
 	0x05, 0x01,		// Usage page (Generic desktop)
@@ -135,8 +151,3 @@ const struct descriptor_t descriptors = {
 	{desc_config, ARRAY_SIZE(desc_config)},
 	{desc_report, ARRAY_SIZE(desc_report)},
 };
-
-void usbHIDReport(const void *ptr, uint8_t size)
-{
-	usbTransfer(1, EP_TX, EP1_SIZE, size, ptr);
-}

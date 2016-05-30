@@ -15,26 +15,25 @@ struct ep_t eptable[8][2] USBTABLE;
 void initUSB()
 {
 	usbStatus.dma.active = 0;
+	uint32_t prioritygroup = NVIC_GetPriorityGrouping();
 
 	// Enable clock and NVIC
 	RCC->APB1ENR |= RCC_APB1ENR_USBEN;
-	uint32_t prioritygroup = NVIC_GetPriorityGrouping();
 	NVIC_SetPriority(USB_HP_CAN1_TX_IRQn, NVIC_EncodePriority(prioritygroup, 2, 1));
 	NVIC_SetPriority(USB_LP_CAN1_RX0_IRQn, NVIC_EncodePriority(prioritygroup, 2, 1));
 	NVIC_EnableIRQ(USB_HP_CAN1_TX_IRQn);
 	NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
 
-	// Enable DMA
-	RCC->AHBENR |= RCC_AHBENR_DMA1EN;
-	NVIC_SetPriority(DMA1_Channel1_IRQn, NVIC_EncodePriority(prioritygroup, 2, 0));
-	NVIC_EnableIRQ(DMA1_Channel1_IRQn);
-	// Memory to memory, highest priority, increment mode
+	// Using DMA to transfer data between SRAM and USBSRAM
+	// Memory to memory, medium priority, increment mode
 	// Memory size 16, peripheral size 32
 	// Transfer complete interrupt enable
-	DMA1_Channel1->CCR = DMA_CCR_MEM2MEM | DMA_CCR_PL |
+	DMA1_Channel1->CCR = DMA_CCR_MEM2MEM | DMA_CCR_PL_0 |
 			DMA_CCR_MSIZE_0 | DMA_CCR_PSIZE_1 |
 			DMA_CCR_MINC | DMA_CCR_PINC |
 			DMA_CCR_DIR | DMA_CCR_TCIE;
+	NVIC_SetPriority(DMA1_Channel1_IRQn, NVIC_EncodePriority(prioritygroup, 2, 0));
+	NVIC_EnableIRQ(DMA1_Channel1_IRQn);
 
 	// Enable USB peripheral
 	USB->CNTR = USB_CNTR_FRES;
@@ -121,7 +120,7 @@ static void usbCTR()
 
 void USB_HP_CAN1_TX_IRQHandler()
 {
-	USB_TypeDef *usb = USB;
+	//USB_TypeDef *usb = USB;
 	dbbkpt();
 }
 
@@ -189,7 +188,7 @@ void USB_LP_CAN1_RX0_IRQHandler()
 #endif
 }
 
-static inline uint32_t isBusy(uint16_t epid, uint16_t dir)
+static inline uint32_t usbIsBusy(uint16_t epid, uint16_t dir)
 {
 	volatile uint16_t *epr = &USB_EPnR(epid);
 	uint16_t mask = dir != EP_TX ? USB_EPRX_STAT : USB_EPTX_STAT;
@@ -209,7 +208,7 @@ void usbTransfer(uint8_t epid, uint8_t dir, uint8_t buffSize, uint8_t size, cons
 	do
 		if (USB->CNTR & USB_CNTR_FSUSP)
 			return;
-	while (isBusy(epid, dir));
+	while (usbIsBusy(epid, dir));
 
 	while (usbStatus.dma.active);
 	usbStatus.dma.epid = epid;
@@ -232,7 +231,7 @@ void usbTransferEmpty(uint16_t epid, uint16_t dir)
 	do
 		if (USB->CNTR & USB_CNTR_FSUSP)
 			return;
-	while (isBusy(epid, dir));
+	while (usbIsBusy(epid, dir));
 	ep->count = 0;
 	usbValid(epid, dir);
 }
