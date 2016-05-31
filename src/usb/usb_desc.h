@@ -19,6 +19,10 @@
 #define HID_MOUSE	2
 #define HID_VENDOR	3
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct keyboard_t {
 	uint8_t reportID;
 	uint8_t modifiers;
@@ -50,5 +54,9 @@ struct descriptor_t {
 };
 
 extern const struct descriptor_t descriptors;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // USB_DESC_H

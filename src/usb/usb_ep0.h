@@ -15,8 +15,16 @@
 
 #define EP0_SIZE	64
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void usbEP0Init();
 void usbEP0Reset();
 void usbEP0Setup();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // USB_EP0_H
