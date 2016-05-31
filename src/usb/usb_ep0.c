@@ -34,7 +34,7 @@ void usbEP0Init()
 {
 	eptable[0][EP_TX].addr = USB_LOCAL_ADDR(ep0tx);
 	eptable[0][EP_TX].count = 0;
-	eptable[0][EP_RX].addr = USB_LOCAL_ADDR(&ep0rx);
+	eptable[0][EP_RX].addr = USB_LOCAL_ADDR(ep0rx);
 	eptable[0][EP_RX].count = USB_RX_COUNT_REG(EP0_SIZE);
 }
 

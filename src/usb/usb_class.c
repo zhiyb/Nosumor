@@ -12,13 +12,10 @@
 #define HID_REQ_SET_PROTOCOL	0x0b
 
 __IO uint32_t ep1rx[EP1_SIZE / 2] USBRAM;
-uint32_t ep1tx[EP1_SIZE / 2] USBRAM;
 
 void usbClassInit()
 {
-	eptable[1][EP_TX].addr = USB_LOCAL_ADDR(&ep1tx);
-	eptable[1][EP_TX].count = 0;
-	eptable[1][EP_RX].addr = USB_LOCAL_ADDR(&ep1rx);
+	eptable[1][EP_RX].addr = USB_LOCAL_ADDR(ep1rx);
 	eptable[1][EP_RX].count = USB_RX_COUNT_REG(EP1_SIZE);
 }
 
@@ -26,7 +23,6 @@ void usbClassReset()
 {
 	// Configure endpoint 1
 	USB->EP1R = USB_EP_INTERRUPT | USB_EP_RX_DIS | USB_EP_TX_NAK | 1;
-	memset(ep1tx, 0, sizeof(ep1tx));
 }
 
 void usbClassHalt(uint16_t epaddr, uint16_t e)

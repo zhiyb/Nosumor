@@ -5,7 +5,7 @@
 
 #include "usb_def.h"
 
-#define EP1_SIZE	8
+#define EP1_SIZE	10
 
 #ifdef __cplusplus
 extern "C" {

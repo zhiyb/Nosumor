@@ -1,8 +1,14 @@
 #include <stdint.h>
 #include "clocks.h"
 #include "keyboard.h"
+#include "usb.h"
+#include "usb_desc.h"
+#include "usb_class.h"
 #include "usart1.h"
 #include "debug.h"
+
+#define KEYCODE_LEFT	0x1d
+#define KEYCODE_RIGHT	0x1b
 
 #define TIM_PSC		32
 #define TIM_CLK		(APB1_TIM_CLK / TIM_PSC)
@@ -11,6 +17,12 @@
 
 #define EXTIx(gp, pin)	(((gp) - GPIOA) / (GPIOB - GPIOA)) << (((pin) & 3) << 2)
 #define KEYS		(BV(KEY_LEFT) | BV(KEY_RIGHT) | BV(KEY_1) | BV(KEY_2) | BV(KEY_3))
+
+static union {
+	uint32_t mem[5];
+} hid USBRAM;
+
+STATIC_ASSERT(sizeof(hid) / 2 <= EP1_SIZE, "EP1_SIZE too small");
 
 static const uint16_t keysBV[] = {BV(KEY_LEFT), BV(KEY_RIGHT), BV(KEY_1), BV(KEY_2), BV(KEY_3)};
 
@@ -25,6 +37,13 @@ static struct {
 } status;
 
 STATIC_ASSERT(ARRAY_SIZE(status.compareDMA) == 8, "Need to be 8");
+
+static void updateReport()
+{
+	uint16_t keys = status.keys;
+	hid.mem[1] = !(keys & BV(KEY_LEFT)) ? KEYCODE_LEFT << 8 : 0;
+	hid.mem[2] = !(keys & BV(KEY_RIGHT)) ? KEYCODE_RIGHT : 0;
+}
 
 static inline void initTimer()
 {
@@ -105,6 +124,7 @@ static inline void initGPIO()
 	// Enable external interrupts
 	status.keys = status.keysIRQ = KEY_GPIO->IDR & KEYS;
 	status.valid = KEYS;
+	updateReport();
 	uint32_t prioritygroup = NVIC_GetPriorityGrouping();
 	NVIC_SetPriority(EXTI9_5_IRQn, NVIC_EncodePriority(prioritygroup, 1, 0));
 	NVIC_SetPriority(EXTI15_10_IRQn, NVIC_EncodePriority(prioritygroup, 1, 0));
@@ -116,6 +136,10 @@ void initKeyboard()
 {
 	// Initialise status variables
 	status.itvl = TIM_CLK * KEY_ITVL / 1000;
+	memset(&hid, 0, sizeof(hid));
+	hid.mem[0] = HID_KEYBOARD;
+	eptable[1][EP_TX].addr = USB_LOCAL_ADDR(&hid);
+	eptable[1][EP_TX].count = 9;
 
 	initTimer();
 	initGPIO();
@@ -141,7 +165,10 @@ static void keyboardIRQ()
 	if (pr) {
 		compare += status.itvl;
 		status.keys ^= pr;
-		// Add to debouncing timer, trigger update
+		// Update and send HID report
+		updateReport();
+		usbValid(1, EP_TX);
+		// Add to debouncing timer
 		typeof(&keysBV[0]) key = keysBV;
 		uint32_t i;
 		for (i = 0; i != ARRAY_SIZE(keysBV); key++, i++)
@@ -189,7 +216,7 @@ void TIM2_IRQHandler()
 	typeof(&keysBV[0]) key = keysBV;
 	uint16_t valid = 0;
 	uint32_t i;
-	for (i = 0; i != ARRAY_SIZE(status.compare); key++, i++) {
+	for (i = 0; i != ARRAY_SIZE(status.compare); key++, i++)
 		if (!(status.valid & *key)) {
 			uint16_t diff = cnt - status.compare[i];
 			if (!(diff & 0x8000)) {	// diff > 0
@@ -203,7 +230,6 @@ void TIM2_IRQHandler()
 #endif
 			}
 		}
-	}
 #ifdef DEBUG
 	if (!valid)
 		usart1WriteChar('-');
