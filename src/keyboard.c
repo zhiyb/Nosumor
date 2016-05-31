@@ -4,7 +4,7 @@
 #include "usart1.h"
 #include "debug.h"
 
-#define TIM_PSC		22
+#define TIM_PSC		32
 #define TIM_CLK		(APB1_TIM_CLK / TIM_PSC)
 
 #define KEY_ITVL	5
@@ -12,18 +12,19 @@
 #define EXTIx(gp, pin)	(((gp) - GPIOA) / (GPIOB - GPIOA)) << (((pin) & 3) << 2)
 #define KEYS		(BV(KEY_LEFT) | BV(KEY_RIGHT) | BV(KEY_1) | BV(KEY_2) | BV(KEY_3))
 
-static const uint16_t keysBV[] = {BV(KEY_LEFT), BV(KEY_RIGHT),
-				  BV(KEY_1), BV(KEY_2), BV(KEY_3)};
+static const uint16_t keysBV[] = {BV(KEY_LEFT), BV(KEY_RIGHT), BV(KEY_1), BV(KEY_2), BV(KEY_3)};
 
 static struct {
 	volatile uint16_t keys;
-	uint16_t itvl;	// Debouncing interval
-	uint16_t keysIRQ;
 	volatile uint16_t valid;
+	uint16_t keysIRQ;
+	uint16_t itvl;	// Debouncing interval
 	uint16_t compare[5];
-	uint16_t compareDMA[5];
-	volatile uint16_t *ptrDMA;
+	uint16_t compareDMA[8];
+	uint16_t *ptrDMA;
 } status;
+
+STATIC_ASSERT(ARRAY_SIZE(status.compareDMA) == 8, "Need to be 8");
 
 static inline void initTimer()
 {
@@ -47,7 +48,7 @@ static inline void initTimer()
 
 	// Enable timer interrupt
 	TIM2->CCER = TIM_CCER_CC4E;
-	TIM2->DIER = TIM_DIER_CC4DE | TIM_DIER_CC4IE;
+	TIM2->DIER = TIM_DIER_CC4IE;
 	uint32_t prioritygroup = NVIC_GetPriorityGrouping();
 	NVIC_SetPriority(TIM2_IRQn, NVIC_EncodePriority(prioritygroup, 1, 1));
 	NVIC_EnableIRQ(TIM2_IRQn);
@@ -129,40 +130,36 @@ static void keyboardIRQ()
 {
 	NVIC_DisableIRQ(EXTI9_5_IRQn);
 	NVIC_DisableIRQ(EXTI15_10_IRQn);
-	uint16_t keys = KEY_GPIO->IDR;
+	status.keysIRQ = KEY_GPIO->IDR;
 	uint16_t pr = EXTI->PR;
 	EXTI->PR = pr;
+	uint16_t compare = TIM2->CNT;
 
-	keys &= KEYS;
+	status.keysIRQ &= KEYS;
 	pr &= status.valid;
 
 	if (pr) {
-		uint16_t compare = TIM2->CNT + status.itvl;
+		compare += status.itvl;
 		status.keys ^= pr;
 		// Add to debouncing timer, trigger update
 		typeof(&keysBV[0]) key = keysBV;
-		uint32_t i = 0;
+		uint32_t i;
 		for (i = 0; i != ARRAY_SIZE(keysBV); key++, i++)
 			if (pr & *key)
 				status.compare[i] = compare;
 		if (status.valid == KEYS) {
 			TIM2->CCR4 = compare;
-			uint16_t cnt = DMA1_Channel7->CNDTR;
-			cnt = cnt == ARRAY_SIZE(status.compareDMA) ? 1 : cnt + 1;
-			status.ptrDMA = status.compareDMA +
-					ARRAY_SIZE(status.compareDMA) - cnt;
+			uint32_t cnt = (ARRAY_SIZE(status.compareDMA) - DMA1_Channel7->CNDTR - 1) & 7;
+			status.ptrDMA = status.compareDMA + cnt;
 			*status.ptrDMA = compare;
+			TIM2->DIER |= TIM_DIER_CC4DE;
 		} else if (compare != TIM2->CCR4 && compare != *status.ptrDMA) {
-			status.ptrDMA++;
-			if (status.ptrDMA == status.compareDMA +
-					ARRAY_SIZE(status.compareDMA))
-				status.ptrDMA = status.compareDMA;
+			uint32_t offset = status.ptrDMA - status.compareDMA;
+			status.ptrDMA = status.compareDMA + ((offset + 1) & 7);
 			*status.ptrDMA = compare;
 
-			uint16_t cnt = DMA1_Channel7->CNDTR;
-			cnt = cnt == ARRAY_SIZE(status.compareDMA) ? 1 : cnt + 1;
-			uint16_t *ptr = status.compareDMA +
-					ARRAY_SIZE(status.compareDMA) - cnt;
+			uint32_t cnt = (ARRAY_SIZE(status.compareDMA) - DMA1_Channel7->CNDTR - 1) & 7;
+			uint16_t *ptr = status.compareDMA + cnt;
 			if (ptr == status.ptrDMA)
 				TIM2->CCR4 = compare;
 		}
@@ -175,7 +172,6 @@ static void keyboardIRQ()
 #endif
 	}
 
-	status.keysIRQ = keys;
 	NVIC_EnableIRQ(EXTI9_5_IRQn);
 	NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
@@ -196,12 +192,13 @@ void TIM2_IRQHandler()
 	for (i = 0; i != ARRAY_SIZE(status.compare); key++, i++) {
 		if (!(status.valid & *key)) {
 			uint16_t diff = cnt - status.compare[i];
-			if (!(diff & 0xff00)) {	// diff < 256
+			if (!(diff & 0x8000)) {	// diff > 0
 				valid |= *key;
 #ifdef DEBUG
-				if (diff & 0xfffe) {
-					usart1WriteString("\n");
+				if (diff & 0xfffe) {	// diff > 1
+					usart1WriteChar('<');
 					usart1DumpHex(diff);
+					usart1WriteChar('>');
 				}
 #endif
 			}
@@ -209,9 +206,15 @@ void TIM2_IRQHandler()
 	}
 #ifdef DEBUG
 	if (!valid)
-		usart1WriteString("\n");
+		usart1WriteChar('-');
 #endif
+	NVIC_DisableIRQ(EXTI9_5_IRQn);
+	NVIC_DisableIRQ(EXTI15_10_IRQn);
 	status.valid |= valid;
 	uint16_t keys = KEY_GPIO->IDR & KEYS;
 	EXTI->SWIER = keys ^ status.keys;
+	if (status.valid == KEYS)
+		TIM2->DIER &= ~TIM_DIER_CC4DE;
+	NVIC_EnableIRQ(EXTI9_5_IRQn);
+	NVIC_EnableIRQ(EXTI15_10_IRQn);
 }

@@ -52,6 +52,24 @@ void init()
 	usart1WriteString("\n" ESC_CYAN VARIANT " build @ " __DATE__ " " __TIME__ ESC_DEFAULT "\n");
 }
 
+#if 0
+union {
+	struct mouse_t data;
+	uint8_t mem[6];
+} hid[2] = {
+	{{HID_MOUSE, 0x00, -1, -1, 0,}},
+	{{HID_MOUSE, 0x00, 1, 1, 0,}},
+};
+#else
+union {
+	struct keyboard_t data;
+	uint8_t mem[10];
+} hid[2] = {
+	{{HID_KEYBOARD, 0x00, 0x00, {0x00, 0x00, 0x00, 0x00, 0x00, 0x1d,}}},
+	{{HID_KEYBOARD, 0x00, 0x00, {0x00, 0x1b, 0x00, 0x00, 0x00, 0x00,}}},
+};
+#endif
+
 int main()
 {
 	init();
@@ -64,14 +82,12 @@ int main()
 		setLED(LED_BLUE, readKey(KEY_3));
 
 		if (readKey(KEY_LEFT)) {
-			struct mouse_t mouse = {HID_MOUSE, 0x00, -1, -1, 0};
-			usbHIDReport(&mouse, sizeof(mouse));
+			usbHIDReport(&hid[0].data, sizeof(hid[0].data));
 			//while (readKey(KEY_LEFT));
 		}
 
 		if (readKey(KEY_RIGHT)) {
-			struct mouse_t mouse = {HID_MOUSE, 0x00, 1, 1, 0};
-			usbHIDReport(&mouse, sizeof(mouse));
+			usbHIDReport(&hid[1].data, sizeof(hid[1].data));
 			//while (readKey(KEY_RIGHT));
 		}
 

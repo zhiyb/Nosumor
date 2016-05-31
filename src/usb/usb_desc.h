@@ -19,6 +19,18 @@
 #define HID_MOUSE	2
 #define HID_VENDOR	3
 
+struct keyboard_t {
+	uint8_t reportID;
+	uint8_t modifiers;
+	uint8_t reserved;
+	uint8_t keycode[6];
+};
+
+struct keyboard_led_t {
+	uint8_t reportID;
+	uint8_t leds;
+};
+
 struct mouse_t {
 	uint8_t reportID;
 	uint8_t buttons;
