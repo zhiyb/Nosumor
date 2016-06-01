@@ -3,6 +3,13 @@
 
 #include <stdint.h>
 
+#define USB_VID		0x0483
+#define USB_PID		0x5750
+
+#define HID_KEYBOARD	1
+#define HID_MOUSE	2
+#define HID_VENDOR	3
+
 #define REQ_GET_DESCRIPTOR	6
 #define REQ_SET_DESCRIPTOR	7
 
@@ -14,10 +21,6 @@
 #define DESC_TYPE_HID		0x21
 #define DESC_TYPE_REPORT	0x22
 #define DESC_TYPE_PHYSICAL	0x23
-
-#define HID_KEYBOARD	1
-#define HID_MOUSE	2
-#define HID_VENDOR	3
 
 #ifdef __cplusplus
 extern "C" {

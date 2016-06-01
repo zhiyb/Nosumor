@@ -1,10 +1,13 @@
 #include "devicewidget.h"
 
-DeviceWidget::DeviceWidget(const char *path, QWidget *parent) : QGroupBox(parent)
+DeviceWidget::DeviceWidget(const char *path, QWidget *parent)
+	: QGroupBox(parent), device(path, this)
 {
-	device = new Device(path, this);
-	if (!device->valid())
+	if (!device.valid()) {
+		// Prevent possible dead loop
+		//emit update();
 		return;
+	}
 
 	setObjectName(path);
 	setTitle(QString(path).replace('&', "&&"));
@@ -12,17 +15,18 @@ DeviceWidget::DeviceWidget(const char *path, QWidget *parent) : QGroupBox(parent
 	QVBoxLayout *vLayout = new QVBoxLayout(this);
 	vLayout->addWidget(lwEvents = new QListWidget);
 
-	connect(device, &Device::dataReceived, this, &DeviceWidget::dataReceived);
-	connect(device, &QThread::finished, this, &QObject::deleteLater);
-	device->start();
+	connect(&device, &Device::dataReceived, this, &DeviceWidget::dataReceived);
+	connect(&device, &Device::update, this, &DeviceWidget::update);
+	connect(&device, &QThread::finished, this, &QObject::deleteLater);
+	device.start();
 }
 
 DeviceWidget::~DeviceWidget()
 {
-	if (device->isRunning()) {
-		device->stop();
-		device->quit();
-		device->wait();
+	if (device.isRunning()) {
+		device.stop();
+		device.quit();
+		device.wait();
 	}
 }
 

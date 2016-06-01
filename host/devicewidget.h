@@ -10,14 +10,17 @@ class DeviceWidget : public QGroupBox
 public:
 	explicit DeviceWidget(const char *path, QWidget *parent = 0);
 	~DeviceWidget();
-	QString path() {return objectName();}
+	QString path() const {return objectName();}
+
+signals:
+	void update();
 
 private slots:
 	void dataReceived(vendor_in_t data);
 
 private:
+	Device device;
 	QListWidget *lwEvents;
-	Device *device;
 };
 
 #endif // DEVICEWIDGET_H

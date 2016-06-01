@@ -1,10 +1,8 @@
 #include "mainwindow.h"
 #include "hidapi.h"
+#include "usb_desc.h"
 
 #define REFRESH_RATE	1000
-
-#define USB_VID		0x0483
-#define USB_PID		0x5750
 
 #define USB_USAGE_PAGE	0xff39	// Vendor
 #define USB_USAGE	0xff	// Vendor
@@ -37,7 +35,7 @@ void MainWindow::refreshDeviceList()
 			continue;
 		if (!findChild<DeviceWidget *>(dev->path)) {
 			DeviceWidget *device = new DeviceWidget(dev->path);
-			connect(device, &QObject::destroyed, this, &MainWindow::refreshDeviceList);
+			connect(device, &DeviceWidget::update, this, &MainWindow::refreshDeviceList);
 			devLayout->addWidget(device);
 		}
 		num++;

@@ -1,21 +1,23 @@
 #include <QDebug>
 #include "device.h"
 
-Device::Device(const char *path, QObject *parent) : QThread(parent)
+// http://www.signal11.us/oss/hidapi/hidapi/doxygen/html/group__API.html
+
+Device::Device(const char *path, QObject *parent)
+	: QThread(parent), devPath(path), stopReq(false)
 {
-	stopReq = false;
-	devpath = path;
 	if (!(dev = hid_open_path(path)))
-		qDebug() << devpath << "hid_open_path failed:" << path;
+		qDebug() << devPath << "hid_open_path failed";
 }
 
 void Device::run()
 {
-	if (!dev)
+	if (!valid())
 		return;
 
+	vendor_in_t data;
 loop:
-	int err = hid_read_timeout(dev, (unsigned char *)&data, HID_REPORT_VENDOR_IN_SIZE, 10);
+	int err = hid_read_timeout(dev, (unsigned char *)&data, HID_REPORT_VENDOR_IN_SIZE, 100);
 	switch (err) {
 	case HID_REPORT_VENDOR_IN_SIZE:
 		emit dataReceived(data);
@@ -26,7 +28,8 @@ loop:
 		else
 			goto loop;
 	case -1:
-		qDebug() << devpath << QString::fromWCharArray(hid_error(dev));
+		qDebug() << devPath << QString::fromWCharArray(hid_error(dev));
+		emit update();
 		break;
 	}
 	hid_close(dev);

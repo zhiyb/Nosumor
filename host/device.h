@@ -13,16 +13,16 @@ public:
 	bool valid() {return dev != 0;}
 	void stop() {stopReq = true;}
 
+signals:
+	void update();
+	void dataReceived(vendor_in_t data);
+
 protected:
 	void run();
 
-signals:
-	void dataReceived(vendor_in_t data);
-
 private:
-	QString devpath;
+	QString devPath;
 	hid_device *dev;
-	vendor_in_t data;
 	volatile bool stopReq;
 };
 

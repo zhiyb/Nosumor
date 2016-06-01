@@ -4,9 +4,6 @@
 #include "usb_class.h"
 #include "usb_desc.h"
 
-#define USB_VID		0x0483
-#define USB_PID		0x5750
-
 // Transfer type
 #define EP_CONTROL	0x00
 #define EP_ISOCHRONOUS	0x01
