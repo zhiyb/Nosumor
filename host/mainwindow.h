@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QtWidgets>
+#include "devicewidget.h"
 #include "hidapi.h"
 
 class MainWindow : public QMainWindow
@@ -14,12 +15,12 @@ public:
 protected:
 	void timerEvent(QTimerEvent *);
 
-private:
+private slots:
 	void refreshDeviceList();
 
+private:
+	QVBoxLayout *devLayout;
 	QLabel *lDevices;
-	hid_device *device;
-	struct hid_device_info *devices;
 };
 
 #endif // MAINWINDOW_H

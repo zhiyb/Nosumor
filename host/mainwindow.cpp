@@ -1,23 +1,26 @@
 #include "mainwindow.h"
 #include "hidapi.h"
 
+#define REFRESH_RATE	1000
+
 #define USB_VID		0x0483
 #define USB_PID		0x5750
-#define USB_USAGE	0x06	// Keyboard
 
-MainWindow::MainWindow(QWidget *parent)
-	: QMainWindow(parent)
+#define USB_USAGE_PAGE	0xff39	// Vendor
+#define USB_USAGE	0xff	// Vendor
+
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
-	devices = 0;
+	qRegisterMetaType<vendor_in_t>("vendor_in_t");
 
-	QWidget *w = new QWidget;
+	QWidget *w = new QWidget(this);
 	setCentralWidget(w);
 
-	QVBoxLayout *vLayout = new QVBoxLayout(w);
-	vLayout->addWidget(lDevices = new QLabel());
+	devLayout = new QVBoxLayout(w);
+	devLayout->addWidget(lDevices = new QLabel());
 
 	refreshDeviceList();
-	startTimer(1000);
+	startTimer(REFRESH_RATE);
 }
 
 void MainWindow::timerEvent(QTimerEvent *)
@@ -27,23 +30,18 @@ void MainWindow::timerEvent(QTimerEvent *)
 
 void MainWindow::refreshDeviceList()
 {
-	//qDebug() << __PRETTY_FUNCTION__;
-	if (devices)
-		hid_free_enumeration(devices);
-	devices = hid_enumerate(USB_VID, USB_PID);
-
-	QString text;
-	hid_device_info *dev = devices;
 	int num = 0;
-	while (dev) {
-		if (dev->usage == USB_USAGE) {
-			text.append(dev->path);
-			text.append(tr(", usage page: %1, usage: %2\n")
-				    .arg(dev->usage_page).arg(dev->usage));
-			num++;
+	hid_device_info *devs = hid_enumerate(USB_VID, USB_PID);
+	for (hid_device_info *dev = devs; dev; dev = dev->next) {
+		if (dev->usage_page != USB_USAGE_PAGE || dev->usage != USB_USAGE)
+			continue;
+		if (!findChild<DeviceWidget *>(dev->path)) {
+			DeviceWidget *device = new DeviceWidget(dev->path);
+			connect(device, &QObject::destroyed, this, &MainWindow::refreshDeviceList);
+			devLayout->addWidget(device);
 		}
-		dev = dev->next;
+		num++;
 	}
-
-	lDevices->setText(tr("Devices found: %1\n%2").arg(num).arg(text));
+	hid_free_enumeration(devs);
+	lDevices->setText(tr("%1 device(s) found.").arg(num));
 }

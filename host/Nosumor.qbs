@@ -5,12 +5,18 @@ QtGuiApplication {
     consoleApplication: false
     cpp.cxxLanguageVersion: "c++11"
     cpp.dynamicLibraries: ["setupapi"]
+    cpp.includePaths: ["../device/usb"]
 
     files: [
         "*.cpp",
-        "*.c",
         "*.h",
     ]
+
+    Group {
+        name: "hid.c"
+        cpp.commonCompilerFlags: ["-Wno-unused-parameter"]
+        files: ["hid.c"]
+    }
 
     Group {     // Properties for the produced executable
         fileTagsFilter: product.type
