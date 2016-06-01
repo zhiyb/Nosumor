@@ -19,7 +19,7 @@
 #define KEYS		(BV(KEY_LEFT) | BV(KEY_RIGHT) | BV(KEY_1) | BV(KEY_2) | BV(KEY_3))
 
 static union {
-	uint32_t mem[5];
+	uint32_t mem[4];
 } hid USBRAM;
 
 STATIC_ASSERT(sizeof(hid) / 2 <= EP1_SIZE, "EP1_SIZE too small");
@@ -41,8 +41,8 @@ STATIC_ASSERT(ARRAY_SIZE(status.compareDMA) == 8, "Need to be 8");
 static void updateReport()
 {
 	uint16_t keys = status.keys;
-	hid.mem[1] = !(keys & BV(KEY_LEFT)) ? KEYCODE_LEFT << 8 : 0;
-	hid.mem[2] = !(keys & BV(KEY_RIGHT)) ? KEYCODE_RIGHT : 0;
+	hid.mem[1] = ((keys & BV(KEY_LEFT)) ? 0 : KEYCODE_LEFT) |
+			((keys & BV(KEY_RIGHT)) ? 0 : KEYCODE_RIGHT << 8);
 }
 
 static inline void initTimer()
@@ -139,7 +139,7 @@ void initKeyboard()
 	memset(&hid, 0, sizeof(hid));
 	hid.mem[0] = HID_KEYBOARD;
 	eptable[1][EP_TX].addr = USB_LOCAL_ADDR(&hid);
-	eptable[1][EP_TX].count = 9;
+	eptable[1][EP_TX].count = HID_REPORT_KEYBOARD_SIZE;
 
 	initTimer();
 	initGPIO();

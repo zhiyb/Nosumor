@@ -26,20 +26,30 @@ extern "C" {
 struct keyboard_t {
 	uint8_t reportID;
 	uint8_t modifiers;
-	uint8_t reserved;
+	//uint8_t reserved;
 	uint8_t keycode[6];
 };
+#define HID_REPORT_KEYBOARD_SIZE	sizeof(struct keyboard_t)
 
 struct keyboard_led_t {
 	uint8_t reportID;
 	uint8_t leds;
 };
+#define HID_REPORT_KEYBOARD_LED_SIZE	sizeof(struct keyboard_led_t)
 
 struct mouse_t {
 	uint8_t reportID;
 	uint8_t buttons;
 	int8_t x, y, wheel;
 };
+#define HID_REPORT_MOUSE_SIZE		sizeof(struct mouse_t)
+
+struct vendor_in_t {
+	uint8_t reportID;
+	uint8_t type;
+	uint16_t data[2];
+};
+#define HID_REPORT_VENDOR_IN_SIZE	sizeof(struct vendor_in_t)
 
 struct desc_t {
 	const void *data;

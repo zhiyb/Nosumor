@@ -40,6 +40,8 @@ static const unsigned char hidReport[] = {
 	0x15, 0x00,		//   Logical minimum (0)
 	0x25, 0x01,		//   Logical maximum (1)
 	0x81, 0x02,		//   Input (Data, Var, Abs)
+#endif
+#if 0
 	0x95, 0x01,		//   Report count (1)
 	0x75, 0x08,		//   Report size (8)
 	0x81, 0x01,		//   Input (Cnst)
@@ -102,8 +104,23 @@ static const unsigned char hidReport[] = {
 	// Vendor defined HID
 	0x06, 0x39, 0xff,	// Usage page (Vendor defined)
 	0x09, 0xff,		// Usage (Vendor usage)
-	0xa1, 0x01,		// Collection (Application)
+	0xa1, 0x03,		// Collection (Report)
 	0x85, HID_VENDOR,	//   Report ID (HID_VENDOR)
+	// Type
+	0x75, 0x08,		//   Report size (8)
+	0x95, 0x01,		//   Report count (1)
+	0x15, 0x00,		//   Logical minimum (0)
+	0x26, 0xff, 0x00,	//   Logical maximum (255)
+	0x09, 0xff,		//   Usage (Vendor usage)
+	0x81, 0x02,		//   Input (Data, Var, Abs)
+	// Data
+	0x75, 0x10,		//   Report size (16)
+	0x95, 0x02,		//   Report count (2)
+	0x15, 0x00,		//   Logical minimum (0)
+	0x27,			//   Logical maximum
+	0xff, 0xff, 0x00, 0x00,	//     (65535)
+	0x09, 0xff,		//   Usage (Vendor usage)
+	0x81, 0x02,		//   Input (Data, Var, Abs)
 	0xc0,			// End collection
 };
 
