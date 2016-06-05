@@ -95,7 +95,7 @@ static void getDescriptor(struct setup_t *setup)
 	uint32_t size = 0;
 
 	switch (type) {
-	case DESC_TYPE_REPORT:
+	case DESC_REPORT:
 		writeString("[REPORT]");
 		dumpHex(index);
 		if (index < descriptors.report.num) {

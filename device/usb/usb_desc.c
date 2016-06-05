@@ -125,7 +125,7 @@ static const unsigned char hidReport2[] ALIGNED(2) = {
 
 static const unsigned char device[] ALIGNED(2) = {
 	18,			// bLength
-	DESC_TYPE_DEVICE,	// bDescriptorType
+	DESC_DEVICE,		// bDescriptorType
 	0x00,			// bcdUSB		USB specification number
 	0x02,
 	0,			// bDeviceClass
@@ -138,8 +138,8 @@ static const unsigned char device[] ALIGNED(2) = {
 	H8(USB_PID),
 	0x00,			// bcdDevice		Device release number
 	0x00,
-	0,			// iManufacturer	Manufacturer string
-	0,			// iProduct		Product string
+	1,			// iManufacturer	Manufacturer string
+	2,			// iProduct		Product string
 	0,			// iSerialNumber	Serial number string
 	1,			// bNumConfigurations	Number of possible configurations
 };
@@ -147,7 +147,7 @@ static const unsigned char device[] ALIGNED(2) = {
 static const unsigned char config[] ALIGNED(2) = {
 	// Configuration descriptor 0
 	9,			// bLength
-	DESC_TYPE_CONFIG,	// bDescriptorType
+	DESC_CONFIG,		// bDescriptorType
 	9 * 5 + 7 * 2,		// wTotalLength		Total length of data
 	0,
 	2,			// bNumInterfaces	Number of interfaces
@@ -156,9 +156,9 @@ static const unsigned char config[] ALIGNED(2) = {
 	0xa0,			// bmAttributes		(Remote wakeup)
 	250,			// bMaxPower		Max power in 2mA units
 
-	//     Interface descriptor 0
+	//   Interface descriptor 0
 	9,			// bLength
-	DESC_TYPE_INTERFACE,	// bDescriptorType
+	DESC_INTERFACE,		// bDescriptorType
 	0,			// bInterfaceNumber	Number of interface
 	0,			// bAlternateSetting	Alternative setting
 	1,			// bNumEndpoints	Number of endpoints used
@@ -167,9 +167,9 @@ static const unsigned char config[] ALIGNED(2) = {
 	1,			// bInterfaceProtocol	0: None, 1: Keyboard, 2: Mouse
 	0,			// iInterface		Interface string
 
-	//         HID descriptor
+	//     HID descriptor
 	9,			// bLength
-	DESC_TYPE_HID,		// bDescriptorType
+	DESC_HID,		// bDescriptorType
 	0x11,			// bcdHID		HID class specification
 	0x01,
 	0x00,			// bCountryCode		Hardware target country
@@ -178,18 +178,18 @@ static const unsigned char config[] ALIGNED(2) = {
 	ARRAY_SIZE(hidReport1),	// wDescriptorLength	Total length of Report descriptor
 	0,
 
-	//         Endpoint descriptor 1
+	//       Endpoint descriptor 1
 	7,			// bLength
-	DESC_TYPE_ENDPOINT,	// bDescriptorType
+	DESC_ENDPOINT,		// bDescriptorType
 	EP_IN | 1,		// bEndpointAddress
 	EP_INTERRUPT,		// bmAttributes
 	EP1_SIZE,		// wMaxPacketSize	Maximum packet size
 	0,
 	1,			// bInterval		Polling interval
 
-	//     Interface descriptor 1
+	//   Interface descriptor 1
 	9,			// bLength
-	DESC_TYPE_INTERFACE,	// bDescriptorType
+	DESC_INTERFACE,		// bDescriptorType
 	1,			// bInterfaceNumber	Number of interface
 	0,			// bAlternateSetting	Alternative setting
 	1,			// bNumEndpoints	Number of endpoints used
@@ -198,9 +198,9 @@ static const unsigned char config[] ALIGNED(2) = {
 	0,			// bInterfaceProtocol	0: None, 1: Keyboard, 2: Mouse
 	0,			// iInterface		Interface string
 
-	//         HID descriptor
+	//     HID descriptor
 	9,			// bLength
-	DESC_TYPE_HID,		// bDescriptorType
+	DESC_HID,		// bDescriptorType
 	0x11,			// bcdHID		HID class specification
 	0x01,
 	0x00,			// bCountryCode		Hardware target country
@@ -209,9 +209,9 @@ static const unsigned char config[] ALIGNED(2) = {
 	ARRAY_SIZE(hidReport2),	// wDescriptorLength	Total length of Report descriptor
 	0,
 
-	//         Endpoint descriptor 1
+	//       Endpoint descriptor 1
 	7,			// bLength
-	DESC_TYPE_ENDPOINT,	// bDescriptorType
+	DESC_ENDPOINT,		// bDescriptorType
 	EP_IN | 2,		// bEndpointAddress
 	EP_INTERRUPT,		// bmAttributes
 	EP2_SIZE,		// wMaxPacketSize	Maximum packet size
@@ -232,8 +232,33 @@ static const struct desc_t desc_report[] = {
 	{hidReport2, sizeof(hidReport2)},
 };
 
+static const unsigned char languages[] ALIGNED(2) = {
+	2 + 1 * 2,	// bLength
+	DESC_STRING,	// bDescriptorType
+	0x09, 0x04,	// wLANGID[x] (0x0409 English - United States)
+};
+
+static const unsigned char str_manufacture[] ALIGNED(2) = {
+	2 + 7 * 2,	// bLength
+	DESC_STRING,	// bDescriptorType
+	'N', 0, 'o', 0, 's', 0, 'u', 0, 'm', 0, 'o', 0, 'r', 0,
+};
+
+static const unsigned char str_product[] ALIGNED(2) = {
+	2 + 7 * 2,	// bLength
+	DESC_STRING,	// bDescriptorType
+	'N', 0, 'o', 0, 's', 0, 'u', 0, 'm', 0, 'o', 0, 'r', 0,
+};
+
+static const struct desc_t desc_string[] = {
+	{languages, sizeof(languages)},
+	{str_manufacture, sizeof(str_manufacture)},
+	{str_product, sizeof(str_product)},
+};
+
 const struct descriptor_t descriptors = {
 	{desc_device, ARRAY_SIZE(desc_device)},
 	{desc_config, ARRAY_SIZE(desc_config)},
 	{desc_report, ARRAY_SIZE(desc_report)},
+	{desc_string, ARRAY_SIZE(desc_string)},
 };

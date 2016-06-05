@@ -70,6 +70,11 @@ static void clearFeature(struct setup_t *setup)
 		usbClassHalt(setup->index, 0);
 		usbTransferEmpty(0, EP_TX);
 		return;
+	case FS_DEVICE_REMOTE_WAKEUP:
+		// Not implemented
+		usbStall(0, EP_TX);
+		//dbbkpt();
+		return;
 	default:
 		// Not implemented
 		usbStall(0, EP_TX);
@@ -89,25 +94,34 @@ static void getDescriptor(struct setup_t *setup)
 	uint32_t size = 0;
 
 	switch (type) {
-	case DESC_TYPE_DEVICE:
+	case DESC_DEVICE:
 		writeString("{DEV}");
 		if (index < descriptors.device.num) {
 			desc = descriptors.device.list[index].data;
 			size = descriptors.device.list[index].size;
 		}
 		break;
-	case DESC_TYPE_CONFIG:
+	case DESC_CONFIG:
 		writeString("{CFG}");
 		if (index < descriptors.config.num) {
 			desc = descriptors.config.list[index].data;
 			size = descriptors.config.list[index].size;
 		}
 		break;
-	case DESC_TYPE_DEV_QUALIFIER:
+	case DESC_DEV_QUALIFIER:
 		writeString("{QUALIFIER}");
 		// Full speed only device
 		usbStall(0, EP_TX);
 		return;
+	case DESC_STRING:
+		writeString("{STR}");
+		dumpHex(index);
+		writeChar('@');
+		dumpHex(setup->index);
+		if (index < descriptors.string.num) {
+			desc = descriptors.string.list[index].data;
+			size = descriptors.string.list[index].size;
+		}
 	}
 
 	size = size < setup->length ? size : setup->length;

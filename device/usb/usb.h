@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include "stm32f1xx.h"
 
-#define USBRAM		__attribute__((section(".usbram")))
-#define USBTABLE	__attribute__((section(".usbtable")))
+#define USBRAM		__attribute__((section(".usbram"), aligned(4)))
+#define USBTABLE	__attribute__((section(".usbtable"), aligned(16)))
 
 #define USB_LOCAL_ADDR(addr)	((uint16_t)(((uint32_t)(addr) - (uint32_t)&_susbram) >> 1))
 #define USB_SYS_ADDR(addr)	((void *)((uint32_t)&_susbram + ((uint32_t)(addr) << 1)))
