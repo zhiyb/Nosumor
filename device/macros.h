@@ -16,6 +16,7 @@
 #define TOSTRING(x)	STRINGIFY(x)
 
 #define ARRAY_SIZE(a)	(sizeof((a)) / sizeof((a)[0]))
+#define ALIGNED(b)	__attribute__((aligned(b)))
 
 // http://www.pixelbeat.org/programming/gcc/static_assert.html
 #define ASSERT_CONCAT_(a, b) a##b

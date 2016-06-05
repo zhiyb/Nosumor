@@ -250,7 +250,7 @@ void usbHandshake(uint16_t epid, uint16_t dir, uint16_t type)
 	}
 	*epr = epmasked | (type ^ (eprv & mask));
 
-#if 1
+#if 0
 	writeChar('<');
 	if (dir != EP_TX) {
 		writeString("RX>");

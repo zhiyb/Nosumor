@@ -21,7 +21,7 @@
 #define EP_ISO_FEEDBACK	0x10
 #define EP_ISO_EXPLICIT	0x20
 
-static const unsigned char hidReport[] = {
+static const unsigned char hidReport1[] ALIGNED(2) = {
 	// Keyboard
 	0x05, 0x01,		// Usage page (Generic desktop)
 	0x09, 0x06,		// Usage (Keyboard)
@@ -97,12 +97,14 @@ static const unsigned char hidReport[] = {
 	0x81, 0x06,		//     Input (Data, Var, Rel)
 	0xc0,			//   End collection
 	0xc0,			// End collection
+};
 
+static const unsigned char hidReport2[] ALIGNED(2) = {
 	// Vendor defined HID
 	0x06, 0x39, 0xff,	// Usage page (Vendor defined)
 	0x09, 0xff,		// Usage (Vendor usage)
 	0xa1, 0x03,		// Collection (Report)
-	0x85, HID_VENDOR,	//   Report ID (HID_VENDOR)
+	//0x85, HID_VENDOR,	//   Report ID (HID_VENDOR)
 	// Type
 	0x75, 0x08,		//   Report size (8)
 	0x95, 0x01,		//   Report count (1)
@@ -121,9 +123,7 @@ static const unsigned char hidReport[] = {
 	0xc0,			// End collection
 };
 
-//STATIC_ASSERT(sizeof(hidReport) <= 64, "sizeof(hidReport) <= 64");
-
-static const unsigned char device[] = {
+static const unsigned char device[] ALIGNED(2) = {
 	18,			// bLength
 	DESC_TYPE_DEVICE,	// bDescriptorType
 	0x00,			// bcdUSB		USB specification number
@@ -144,13 +144,13 @@ static const unsigned char device[] = {
 	1,			// bNumConfigurations	Number of possible configurations
 };
 
-static const unsigned char config[] = {
+static const unsigned char config[] ALIGNED(2) = {
 	// Configuration descriptor 0
 	9,			// bLength
 	DESC_TYPE_CONFIG,	// bDescriptorType
-	9 * 3 + 7 * 1,		// wTotalLength		Total length of data
+	9 * 5 + 7 * 2,		// wTotalLength		Total length of data
 	0,
-	1,			// bNumInterfaces	Number of interfaces
+	2,			// bNumInterfaces	Number of interfaces
 	1,			// bConfigurationValue	Configuration index
 	0,			// iConfiguration	Configuration string
 	0xa0,			// bmAttributes		(Remote wakeup)
@@ -164,7 +164,7 @@ static const unsigned char config[] = {
 	1,			// bNumEndpoints	Number of endpoints used
 	3,			// bInterfaceClass	3: HID class
 	0,			// bInterfaceSubClass	1: Boot interface
-	2,			// bInterfaceProtocol	0: None, 1: Keyboard, 2: Mouse
+	1,			// bInterfaceProtocol	0: None, 1: Keyboard, 2: Mouse
 	0,			// iInterface		Interface string
 
 	//         HID descriptor
@@ -175,7 +175,7 @@ static const unsigned char config[] = {
 	0x00,			// bCountryCode		Hardware target country
 	1,			// bNumDescriptors	Number of HID class descriptors
 	0x22,			// bDescriptorType	Report descriptor type
-	ARRAY_SIZE(hidReport),	// wDescriptorLength	Total length of Report descriptor
+	ARRAY_SIZE(hidReport1),	// wDescriptorLength	Total length of Report descriptor
 	0,
 
 	//         Endpoint descriptor 1
@@ -184,6 +184,37 @@ static const unsigned char config[] = {
 	EP_IN | 1,		// bEndpointAddress
 	EP_INTERRUPT,		// bmAttributes
 	EP1_SIZE,		// wMaxPacketSize	Maximum packet size
+	0,
+	1,			// bInterval		Polling interval
+
+	//     Interface descriptor 1
+	9,			// bLength
+	DESC_TYPE_INTERFACE,	// bDescriptorType
+	1,			// bInterfaceNumber	Number of interface
+	0,			// bAlternateSetting	Alternative setting
+	1,			// bNumEndpoints	Number of endpoints used
+	3,			// bInterfaceClass	3: HID class
+	0,			// bInterfaceSubClass	1: Boot interface
+	0,			// bInterfaceProtocol	0: None, 1: Keyboard, 2: Mouse
+	0,			// iInterface		Interface string
+
+	//         HID descriptor
+	9,			// bLength
+	DESC_TYPE_HID,		// bDescriptorType
+	0x11,			// bcdHID		HID class specification
+	0x01,
+	0x00,			// bCountryCode		Hardware target country
+	1,			// bNumDescriptors	Number of HID class descriptors
+	0x22,			// bDescriptorType	Report descriptor type
+	ARRAY_SIZE(hidReport2),	// wDescriptorLength	Total length of Report descriptor
+	0,
+
+	//         Endpoint descriptor 1
+	7,			// bLength
+	DESC_TYPE_ENDPOINT,	// bDescriptorType
+	EP_IN | 2,		// bEndpointAddress
+	EP_INTERRUPT,		// bmAttributes
+	EP2_SIZE,		// wMaxPacketSize	Maximum packet size
 	0,
 	1,			// bInterval		Polling interval
 };
@@ -197,7 +228,8 @@ static const struct desc_t desc_config[] = {
 };
 
 static const struct desc_t desc_report[] = {
-	{hidReport, sizeof(hidReport)},
+	{hidReport1, sizeof(hidReport1)},
+	{hidReport2, sizeof(hidReport2)},
 };
 
 const struct descriptor_t descriptors = {

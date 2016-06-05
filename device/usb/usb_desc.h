@@ -8,7 +8,7 @@
 
 #define HID_KEYBOARD	1
 #define HID_MOUSE	2
-#define HID_VENDOR	3
+//#define HID_VENDOR	3
 
 #define REQ_GET_DESCRIPTOR	6
 #define REQ_SET_DESCRIPTOR	7

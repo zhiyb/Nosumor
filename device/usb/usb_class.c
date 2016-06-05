@@ -11,18 +11,20 @@
 #define HID_REQ_SET_IDLE	0x0a
 #define HID_REQ_SET_PROTOCOL	0x0b
 
-__IO uint32_t ep1rx[EP1_SIZE / 2] USBRAM;
+//__IO uint32_t ep1rx[EP1_SIZE / 2] USBRAM;
 
 void usbClassInit()
 {
-	eptable[1][EP_RX].addr = USB_LOCAL_ADDR(ep1rx);
-	eptable[1][EP_RX].count = USB_RX_COUNT_REG(EP1_SIZE);
+	//eptable[1][EP_RX].addr = USB_LOCAL_ADDR(ep1rx);
+	//eptable[1][EP_RX].count = USB_RX_COUNT_REG(EP1_SIZE);
 }
 
 void usbClassReset()
 {
 	// Configure endpoint 1
 	USB->EP1R = USB_EP_INTERRUPT | USB_EP_RX_DIS | USB_EP_TX_NAK | 1;
+	// Configure endpoint 2
+	USB->EP2R = USB_EP_INTERRUPT | USB_EP_RX_DIS | USB_EP_TX_NAK | 2;
 }
 
 void usbClassHalt(uint16_t epaddr, uint16_t e)
@@ -37,6 +39,7 @@ void usbClassHalt(uint16_t epaddr, uint16_t e)
 	uint16_t epid = epaddr & EP_ADDR_MASK;
 	switch (epid) {
 	case 1:
+	case 2:
 		if (e)
 			usbDisable(epid, EP_TX);
 		else
@@ -86,13 +89,15 @@ error:
 
 static void getDescriptor(struct setup_t *setup)
 {
-	uint8_t type = setup->descriptor.type, index = setup->descriptor.index;
+	uint8_t type = setup->descriptor.type;//, id = setup->descriptor.index;
+	uint8_t index = setup->index;
 	const void *desc = 0;
 	uint32_t size = 0;
 
 	switch (type) {
 	case DESC_TYPE_REPORT:
 		writeString("[REPORT]");
+		dumpHex(index);
 		if (index < descriptors.report.num) {
 			desc = descriptors.report.list[index].data;
 			size = descriptors.report.list[index].size;
