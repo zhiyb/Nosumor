@@ -10,8 +10,12 @@
 #define KEYCODE_LEFT	0x1d
 #define KEYCODE_RIGHT	0x1b
 
-#define TIM_PSC		32
-#define TIM_CLK		(APB1_TIM_CLK / TIM_PSC)
+#define TIM2_PSC	32
+#define TIM2_CLK	(APB1_TIM_CLK / TIM2_PSC)
+
+// 0.01ms clock
+#define TIM3_PSC	(APB1_TIM_CLK / TIM3_CLK)
+#define TIM3_CLK	(1000 * 100)
 
 #define KEY_ITVL	5
 
@@ -19,14 +23,27 @@
 #define KEYS		(BV(KEY_LEFT) | BV(KEY_RIGHT) | BV(KEY_1) | BV(KEY_2) | BV(KEY_3))
 
 static union {
-	uint32_t mem[4];
+	uint32_t mem[HID_REPORT_KEYBOARD_SIZE / 2];
 } hid USBRAM;
 
-STATIC_ASSERT(sizeof(hid) / 2 <= EP1_SIZE, "EP1_SIZE too small");
+static union {
+	uint32_t mem[HID_REPORT_VENDOR_IN_SIZE / 2];
+} hid_vendor USBRAM;
+
+STATIC_ASSERT(HID_REPORT_VENDOR_IN_SIZE == 6, 0);
 
 static const uint16_t keysBV[] = {BV(KEY_LEFT), BV(KEY_RIGHT), BV(KEY_1), BV(KEY_2), BV(KEY_3)};
 
 static struct {
+	union {
+		// Timestamp
+		volatile uint32_t timestamp;
+		struct {
+			volatile uint16_t cnt;
+			// Timer update count
+			volatile uint16_t udcnt;
+		};
+	} itvlTimer;
 	volatile uint16_t keys;
 	volatile uint16_t valid;
 	uint16_t keysIRQ;
@@ -38,20 +55,36 @@ static struct {
 
 STATIC_ASSERT(ARRAY_SIZE(status.compareDMA) == 8, "Need to be 8");
 
-static void updateReport()
+static void updateReport();
+
+static inline void initIntervalTimer()
 {
-	uint16_t keys = status.keys;
-	hid.mem[1] = ((keys & BV(KEY_LEFT)) ? 0 : KEYCODE_LEFT) |
-			((keys & BV(KEY_RIGHT)) ? 0 : KEYCODE_RIGHT << 8);
+	status.itvlTimer.udcnt = 0;
+
+	// Setup interval timer (TIM3)
+	RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
+	// Continuous, counting up until overflow
+	memset(TIM3, 0, sizeof(*TIM3));
+	TIM3->PSC = TIM3_PSC - 1;
+	TIM3->ARR = 0xffff;
+
+	// Enable timer update interrupt
+	TIM3->DIER = TIM_DIER_UIE;
+	uint32_t prioritygroup = NVIC_GetPriorityGrouping();
+	NVIC_SetPriority(TIM3_IRQn, NVIC_EncodePriority(prioritygroup, 1, 0));
+	NVIC_EnableIRQ(TIM3_IRQn);
+
+	// Enable timer
+	TIM3->CR1 |= TIM_CR1_CEN;
 }
 
-static inline void initTimer()
+static inline void initDebouncingTimer()
 {
 	// Setup debouncing timer (TIM2)
 	RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
 	// Continuous, counting up until overflow
 	memset(TIM2, 0, sizeof(*TIM2));
-	TIM2->PSC = TIM_PSC - 1;
+	TIM2->PSC = TIM2_PSC - 1;
 	TIM2->ARR = 0xffff;
 
 	// Using DMA to transfer TIM2 CCR4
@@ -69,7 +102,7 @@ static inline void initTimer()
 	TIM2->CCER = TIM_CCER_CC4E;
 	TIM2->DIER = TIM_DIER_CC4IE;
 	uint32_t prioritygroup = NVIC_GetPriorityGrouping();
-	NVIC_SetPriority(TIM2_IRQn, NVIC_EncodePriority(prioritygroup, 1, 1));
+	NVIC_SetPriority(TIM2_IRQn, NVIC_EncodePriority(prioritygroup, 1, 2));
 	NVIC_EnableIRQ(TIM2_IRQn);
 
 	// Enable timer
@@ -126,8 +159,8 @@ static inline void initGPIO()
 	status.valid = KEYS;
 	updateReport();
 	uint32_t prioritygroup = NVIC_GetPriorityGrouping();
-	NVIC_SetPriority(EXTI9_5_IRQn, NVIC_EncodePriority(prioritygroup, 1, 0));
-	NVIC_SetPriority(EXTI15_10_IRQn, NVIC_EncodePriority(prioritygroup, 1, 0));
+	NVIC_SetPriority(EXTI9_5_IRQn, NVIC_EncodePriority(prioritygroup, 1, 1));
+	NVIC_SetPriority(EXTI15_10_IRQn, NVIC_EncodePriority(prioritygroup, 1, 1));
 	NVIC_EnableIRQ(EXTI9_5_IRQn);
 	NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
@@ -135,19 +168,35 @@ static inline void initGPIO()
 void initKeyboard()
 {
 	// Initialise status variables
-	status.itvl = TIM_CLK * KEY_ITVL / 1000;
+	status.itvl = TIM2_CLK * KEY_ITVL / 1000;
 	memset(&hid, 0, sizeof(hid));
 	hid.mem[0] = HID_KEYBOARD;
 	eptable[1][EP_TX].addr = USB_LOCAL_ADDR(&hid);
 	eptable[1][EP_TX].count = HID_REPORT_KEYBOARD_SIZE;
+	eptable[2][EP_TX].addr = USB_LOCAL_ADDR(&hid_vendor);
+	eptable[2][EP_TX].count = HID_REPORT_VENDOR_IN_SIZE;
 
-	initTimer();
+	initIntervalTimer();
+	initDebouncingTimer();
 	initGPIO();
 }
 
 uint32_t readKey(uint16_t key)
 {
 	return !(status.keys & BV(key));
+}
+
+static void updateReport()
+{
+	uint16_t keys = status.keys;
+	hid.mem[1] = ((keys & BV(KEY_LEFT)) ? 0 : KEYCODE_LEFT) |
+			((keys & BV(KEY_RIGHT)) ? 0 : KEYCODE_RIGHT << 8);
+
+	status.itvlTimer.cnt = TIM3->CNT;
+	uint32_t timestamp = status.itvlTimer.timestamp;
+	hid_vendor.mem[0] = timestamp & 0xffff;
+	hid_vendor.mem[1] = timestamp >> 16;
+	hid_vendor.mem[2] = keys;
 }
 
 static void keyboardIRQ()
@@ -168,6 +217,7 @@ static void keyboardIRQ()
 		// Update and send HID report
 		updateReport();
 		usbValid(1, EP_TX);
+		usbValid(2, EP_TX);
 		// Add to debouncing timer
 		typeof(&keysBV[0]) key = keysBV;
 		uint32_t i;
@@ -243,4 +293,12 @@ void TIM2_IRQHandler()
 		TIM2->DIER &= ~TIM_DIER_CC4DE;
 	NVIC_EnableIRQ(EXTI9_5_IRQn);
 	NVIC_EnableIRQ(EXTI15_10_IRQn);
+}
+
+void TIM3_IRQHandler()
+{
+	TIM3->SR = 0;
+	uint16_t cnt = TIM3->CNT;
+	status.itvlTimer.udcnt++;
+	status.itvlTimer.cnt = cnt;
 }

@@ -40,7 +40,7 @@ void initRCC()
 void init()
 {
 	initRCC();
-	NVIC_SetPriorityGrouping(4);	// 3+1 bits pripority
+	NVIC_SetPriorityGrouping(5);	// 2+2 bits pripority
 	// Enable DMA
 	RCC->AHBENR |= RCC_AHBENR_DMA1EN;
 

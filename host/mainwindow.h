@@ -12,9 +12,6 @@ class MainWindow : public QMainWindow
 public:
 	MainWindow(QWidget *parent = 0);
 
-protected:
-	void timerEvent(QTimerEvent *);
-
 private slots:
 	void refreshDeviceList();
 

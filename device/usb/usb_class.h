@@ -4,9 +4,10 @@
 #include <stdint.h>
 
 #include "usb_def.h"
+#include "usb_desc.h"
 
-#define EP1_SIZE	10
-#define EP2_SIZE	10
+#define EP1_SIZE	HID_REPORT_KEYBOARD_SIZE
+#define EP2_SIZE	HID_REPORT_VENDOR_IN_SIZE
 
 #ifdef __cplusplus
 extern "C" {

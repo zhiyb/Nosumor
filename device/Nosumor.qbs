@@ -34,7 +34,7 @@ Project {
 
         Group {
             name: "USB"
-            cpp.optimization: "small"
+            //cpp.optimization: "small"
             files: ["usb/**"]
         }
     }

@@ -104,17 +104,17 @@ static const unsigned char hidReport2[] ALIGNED(2) = {
 	0x06, 0x39, 0xff,	// Usage page (Vendor defined)
 	0x09, 0xff,		// Usage (Vendor usage)
 	0xa1, 0x03,		// Collection (Report)
-	//0x85, HID_VENDOR,	//   Report ID (HID_VENDOR)
 	// Type
-	0x75, 0x08,		//   Report size (8)
-	0x95, 0x01,		//   Report count (1)
+	0x75, 0x10,		//   Report size (16)
+	0x95, 0x02,		//   Report count (2)
 	0x15, 0x00,		//   Logical minimum (0)
-	0x26, 0xff, 0x00,	//   Logical maximum (255)
+	0x27,			//   Logical maximum
+	0xff, 0xff, 0x00, 0x00,	//     (65535)
 	0x09, 0xff,		//   Usage (Vendor usage)
 	0x81, 0x02,		//   Input (Data, Var, Abs)
 	// Data
 	0x75, 0x10,		//   Report size (16)
-	0x95, 0x02,		//   Report count (2)
+	0x95, 0x01,		//   Report count (1)
 	0x15, 0x00,		//   Logical minimum (0)
 	0x27,			//   Logical maximum
 	0xff, 0xff, 0x00, 0x00,	//     (65535)
@@ -245,9 +245,10 @@ static const unsigned char str_manufacture[] ALIGNED(2) = {
 };
 
 static const unsigned char str_product[] ALIGNED(2) = {
-	2 + 7 * 2,	// bLength
+	2 + 14 * 2,	// bLength
 	DESC_STRING,	// bDescriptorType
 	'N', 0, 'o', 0, 's', 0, 'u', 0, 'm', 0, 'o', 0, 'r', 0,
+	' ', 0, 'c', 0, 'u', 0, 's', 0, 't', 0, 'o', 0, 'm', 0
 };
 
 static const struct desc_t desc_string[] = {

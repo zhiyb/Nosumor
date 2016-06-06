@@ -32,6 +32,6 @@ DeviceWidget::~DeviceWidget()
 
 void DeviceWidget::dataReceived(vendor_in_t data)
 {
-	lwEvents->addItem(QString("%1: %2, %3")
-			  .arg(data.type).arg(data.data[0]).arg(data.data[1]));
+	lwEvents->addItem(QString("%1, %2").arg(data.timestamp).arg(data.status, 0, 16));
+	lwEvents->scrollToBottom();
 }

@@ -15,15 +15,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 	setCentralWidget(w);
 
 	devLayout = new QVBoxLayout(w);
+	QPushButton *pbRefresh = new QPushButton(tr("&Refresh"));
+	devLayout->addWidget(pbRefresh);
 	devLayout->addWidget(lDevices = new QLabel());
 
 	refreshDeviceList();
-	startTimer(REFRESH_RATE);
-}
-
-void MainWindow::timerEvent(QTimerEvent *)
-{
-	refreshDeviceList();
+	connect(pbRefresh, &QAbstractButton::clicked, this, &MainWindow::refreshDeviceList);
 }
 
 void MainWindow::refreshDeviceList()

@@ -8,7 +8,6 @@
 
 #define HID_KEYBOARD	1
 #define HID_MOUSE	2
-//#define HID_VENDOR	3
 
 #define REQ_GET_DESCRIPTOR	6
 #define REQ_SET_DESCRIPTOR	7
@@ -33,27 +32,26 @@ struct keyboard_t {
 	//uint8_t reserved;
 	uint8_t keycode[6];
 };
-#define HID_REPORT_KEYBOARD_SIZE	sizeof(struct keyboard_t)
+#define HID_REPORT_KEYBOARD_SIZE	8
 
 struct keyboard_led_t {
 	uint8_t reportID;
 	uint8_t leds;
 };
-#define HID_REPORT_KEYBOARD_LED_SIZE	sizeof(struct keyboard_led_t)
+#define HID_REPORT_KEYBOARD_LED_SIZE	2
 
 struct mouse_t {
 	uint8_t reportID;
 	uint8_t buttons;
 	int8_t x, y, wheel;
 };
-#define HID_REPORT_MOUSE_SIZE		sizeof(struct mouse_t)
+#define HID_REPORT_MOUSE_SIZE		5
 
 struct vendor_in_t {
-	uint8_t reportID;
-	uint8_t type;
-	uint16_t data[2];
+	uint32_t timestamp;
+	uint16_t status;
 };
-#define HID_REPORT_VENDOR_IN_SIZE	sizeof(struct vendor_in_t)
+#define HID_REPORT_VENDOR_IN_SIZE	6
 
 struct desc_t {
 	const void *data;
