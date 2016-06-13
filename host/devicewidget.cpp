@@ -14,6 +14,7 @@ DeviceWidget::DeviceWidget(const char *path, QWidget *parent)
 
 	QVBoxLayout *vLayout = new QVBoxLayout(this);
 	vLayout->addWidget(lwEvents = new QListWidget);
+	vLayout->addWidget(view = new ViewWidget);
 
 	connect(&device, &Device::dataReceived, this, &DeviceWidget::dataReceived);
 	connect(&device, &Device::update, this, &DeviceWidget::update);

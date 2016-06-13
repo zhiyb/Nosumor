@@ -10,6 +10,7 @@ QtGuiApplication {
     files: [
         "*.cpp",
         "*.h",
+        "resources.qrc",
     ]
 
     Group {

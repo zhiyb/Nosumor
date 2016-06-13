@@ -3,6 +3,7 @@
 
 #include <QtWidgets>
 #include "device.h"
+#include "viewwidget.h"
 
 class DeviceWidget : public QGroupBox
 {
@@ -21,6 +22,7 @@ private slots:
 private:
 	Device device;
 	QListWidget *lwEvents;
+	ViewWidget *view;
 };
 
 #endif // DEVICEWIDGET_H
