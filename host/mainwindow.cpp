@@ -33,7 +33,7 @@ void MainWindow::refreshDeviceList()
 		if (!findChild<DeviceWidget *>(dev->path)) {
 			DeviceWidget *device = new DeviceWidget(dev->path);
 			connect(device, &DeviceWidget::update, this, &MainWindow::refreshDeviceList);
-			devLayout->addWidget(device);
+			devLayout->addWidget(device, 1);
 		}
 		num++;
 	}

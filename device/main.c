@@ -62,8 +62,9 @@ int main()
 		setLED(LED_RED, readKey(KEY_1));
 		setLED(LED_GREEN, readKey(KEY_2));
 		setLED(LED_BLUE, readKey(KEY_3));
-
+#if 0
 		if (readKey(KEY_3))
 			dbbkpt();
+#endif
 	}
 }

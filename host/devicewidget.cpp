@@ -13,8 +13,7 @@ DeviceWidget::DeviceWidget(const char *path, QWidget *parent)
 	setTitle(QString(path).replace('&', "&&"));
 
 	QVBoxLayout *vLayout = new QVBoxLayout(this);
-	vLayout->addWidget(lwEvents = new QListWidget);
-	vLayout->addWidget(view = new ViewWidget);
+	vLayout->addWidget(view = new ViewWidget(&reports));
 
 	connect(&device, &Device::dataReceived, this, &DeviceWidget::dataReceived);
 	connect(&device, &Device::update, this, &DeviceWidget::update);
@@ -33,6 +32,9 @@ DeviceWidget::~DeviceWidget()
 
 void DeviceWidget::dataReceived(vendor_in_t data)
 {
-	lwEvents->addItem(QString("%1, %2").arg(data.timestamp).arg(data.status, 0, 2));
-	lwEvents->scrollToBottom();
+	report_t report;
+	report.timestamp = data.timestamp;
+	report.status = data.status;
+	reports.append(report);
+	view->update();
 }

@@ -196,7 +196,7 @@ static void updateReport()
 	uint32_t timestamp = status.itvlTimer.timestamp;
 	hid_vendor.mem[0] = timestamp & 0xffff;
 	hid_vendor.mem[1] = timestamp >> 16;
-	hid_vendor.mem[2] = keys;
+	hid_vendor.mem[2] = keys ^ KEYS;
 }
 
 static void keyboardIRQ()

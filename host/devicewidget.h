@@ -4,6 +4,7 @@
 #include <QtWidgets>
 #include "device.h"
 #include "viewwidget.h"
+#include "report.h"
 
 class DeviceWidget : public QGroupBox
 {
@@ -20,8 +21,9 @@ private slots:
 	void dataReceived(vendor_in_t data);
 
 private:
+	QVector<report_t> reports;
+
 	Device device;
-	QListWidget *lwEvents;
 	ViewWidget *view;
 };
 

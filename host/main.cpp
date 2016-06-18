@@ -19,17 +19,9 @@ int main(int argc, char *argv[])
 	format.setRenderableType(QSurfaceFormat::OpenGL);
 	format.setProfile(QSurfaceFormat::CoreProfile);
 	format.setVersion(3, 3);
-	format.setOptions(0);
-	format.setStereo(false);
 	format.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
 	format.setSwapInterval(1);
-	format.setAlphaBufferSize(0);
-	format.setRedBufferSize(8);
-	format.setGreenBufferSize(8);
-	format.setBlueBufferSize(8);
-	format.setDepthBufferSize(0);
-	format.setStencilBufferSize(0);
-	format.setSamples(1);
+	format.setSamples(4);
 	QSurfaceFormat::setDefaultFormat(format);
 
 	MainWindow w;

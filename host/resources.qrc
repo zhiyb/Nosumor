@@ -2,5 +2,9 @@
     <qresource prefix="/shaders">
         <file>basic.vert</file>
         <file>basic.frag</file>
+        <file>report.frag</file>
+        <file>report.vert</file>
+        <file>pixel.frag</file>
+        <file>pixel.vert</file>
     </qresource>
 </RCC>
