@@ -49,7 +49,6 @@ void ViewWidget::initializeGL()
 	}
 
 	initializeOpenGLFunctions();
-	glEnable(GL_MULTISAMPLE);
 	if (!createPrograms())
 		goto failed;
 	glClearColor(0.f, 0.f, 0.f, 1.f);
@@ -158,12 +157,18 @@ void ViewWidget::renderReports()
 	program.bind();
 	program.setUniformValue("size", this->size());
 	quint32 offsetTimestamp = screenOffset();
+	int skip = 0;
 	for (int i = 1; i != size; i++) {
 		const report_t &prev = reports->at(i - 1);
 		const report_t &report = reports->at(i);
 
 		const int left = ((qint32)(prev.timestamp - offsetTimestamp)) / (qint32)cursor.scale;
 		const int right = ((qint32)(report.timestamp - offsetTimestamp)) / (qint32)cursor.scale;
+		if (right <= 0 || left >= this->size().width()) {
+			skip++;
+			continue;
+		}
+
 		const int size = right - left;
 		QMatrix4x4 mat;
 		mat.translate(left, 0.f, 0.f);
@@ -174,6 +179,7 @@ void ViewWidget::renderReports()
 		program.setUniformValue("status", prev.status);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 	}
+	qDebug() << "Skipped:" << skip;
 }
 
 void ViewWidget::updateCursor(int x)

@@ -18,12 +18,15 @@ const vec3 colours[] = vec3[](
 
 void main(void)
 {
-	int bit = int(gl_FragCoord.y) * 8 / int(size.y) + 8;
+	int y = int(gl_FragCoord.y);
+	int bit = y * 8 / int(size.y) + 8;
+	int bitP = (y - 1) * 8 / int(size.y) + 8;
+	int bitN = (y + 1) * 8 / int(size.y) + 8;
 	int field = 1 << bit;
-	if ((status & field) != 0)
+	if (bitP != bit || bitN != bit || int(gl_FragCoord.x) % 10 == 0)
+		fragColour = vec4(0.3, 0.3, 0.3, 1.0);
+	else if ((status & field) != 0)
 		fragColour = vec4(colours[bit & 7], 1.0);
-	else {
-		float a = gl_FragCoord.y / size.y;
-		fragColour = vec4(mix(vec3(0.1, 0.1, 0.1), vec3(0.2, 0.2, 0.2), a), 1.0);
-	}
+	else
+		discard;
 }

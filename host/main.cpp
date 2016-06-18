@@ -21,7 +21,6 @@ int main(int argc, char *argv[])
 	format.setVersion(3, 3);
 	format.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
 	format.setSwapInterval(1);
-	format.setSamples(4);
 	QSurfaceFormat::setDefaultFormat(format);
 
 	MainWindow w;
