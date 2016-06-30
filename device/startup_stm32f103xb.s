@@ -95,7 +95,7 @@ Reset_Handler:
 	// Set stack pointer
 	ldr sp, =_estack
 
-	// No need to initialise SRAM variables
+	// No need to initialise .data
 
 	// Zero fill the bss segment
 	ldr r2, =_sbss
@@ -111,8 +111,8 @@ LoopFillZerobss:
 	bcc FillZerobss
 
 	// Call static constructors
-	bl SystemInit
-	bl __libc_init_array
+	//bl SystemInit
+	//bl __libc_init_array
 	bl main
 	bkpt #0
 	b Reset_Handler

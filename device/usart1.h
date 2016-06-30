@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-void initUSART1();
+void usart1Init();
 void usart1WriteChar(char c);
 void usart1WriteString(const char *str);
 void usart1DumpHex(uint32_t v);

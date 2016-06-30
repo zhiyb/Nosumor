@@ -12,7 +12,7 @@
 struct status_t usbStatus;
 struct ep_t eptable[8][2] USBTABLE;
 
-void initUSB()
+void usbInit()
 {
 	usbStatus.dma.active = 0;
 	uint32_t prioritygroup = NVIC_GetPriorityGrouping();

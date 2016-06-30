@@ -38,7 +38,7 @@ struct ep_t {
 extern uint32_t _susbram;
 extern struct ep_t eptable[8][2];
 
-void initUSB();
+void usbInit();
 uint32_t usbConfigured();
 
 void usbTransfer(uint8_t epid, uint8_t dir, uint8_t buffSize, uint8_t size, const void *ptr);

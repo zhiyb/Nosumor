@@ -9,6 +9,8 @@ extern "C" {
 
 #ifdef DEBUG
 
+#define dbexist()	(CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk)
+
 #define dbbkpt()	asm ("bkpt #0")
 
 static inline int dbcmd(int cmd, void *data)

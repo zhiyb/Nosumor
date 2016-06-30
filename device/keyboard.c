@@ -165,7 +165,7 @@ static inline void initGPIO()
 	NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
-void initKeyboard()
+void keyboardInit()
 {
 	// Initialise status variables
 	status.itvl = TIM2_CLK * KEY_ITVL / 1000;
@@ -184,6 +184,11 @@ void initKeyboard()
 uint32_t readKey(uint16_t key)
 {
 	return !(status.keys & BV(key));
+}
+
+uint32_t readKeys(uint16_t keys)
+{
+	return ~status.keys & keys;
 }
 
 static void updateReport()

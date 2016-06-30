@@ -6,15 +6,31 @@ ENTRY(Reset_Handler)
 /* Highest address of the user mode stack */
 _estack = 0x20005000;    /* end of RAM */
 /* Generate a link error if heap and stack don't fit into RAM */
-_Min_Heap_Size = 0;      /* required amount of heap  */
-_Min_Stack_Size = 0x100; /* required amount of stack */
+_min_heap_size = 0;      /* required amount of heap  */
+_min_stack_size = 0x100; /* required amount of stack */
+
+_flash_origin = 0x08000000;
+_flash_size = 64k;
+_flash_bl_size = 2k;
+_flash_sram_size = 20k;
+_flash_data_size = _flash_size - _flash_bl_size - _flash_sram_size;
+_flash_sram_origin = _flash_origin + _flash_bl_size;
+_flash_data_origin = _flash_origin + _flash_bl_size + _flash_sram_size;
+
+_sram_origin = 0x20000000;
+_sram_size = 20k;
 
 /* Specify the memory areas */
 MEMORY
 {
-  RAM (xrw)	: ORIGIN = 0x20000000, LENGTH = 20k
+  FLASH_BL (rx)		: ORIGIN = _flash_origin,	LENGTH = _flash_bl_size
+  FLASH_SRAM (rx)	: ORIGIN = _flash_sram_origin,	LENGTH = _flash_sram_size
+  FLASH_DATA (rx)	: ORIGIN = _flash_data_origin,	LENGTH = _flash_data_size
+
+  SRAM (xrw)		: ORIGIN = _sram_origin,	LENGTH = _sram_size
+
   /* 16-bit memory locations mapped to 32-bit bus */
-  USBRAM (xrw)	: ORIGIN = 0x40006000, LENGTH = 1k
+  USBRAM (xrw)		: ORIGIN = 0x40006000,		LENGTH = 1k
 }
 
 /* Define output sections */
@@ -26,7 +42,7 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
-  } >RAM
+  } >SRAM
 
   /* The program code and other data goes into FLASH */
   .text :
@@ -43,7 +59,7 @@ SECTIONS
 
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
-  } >RAM
+  } >SRAM
 
   /* Constant data goes into FLASH */
   .rodata :
@@ -52,35 +68,35 @@ SECTIONS
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);
-  } >RAM
+  } >SRAM
 
-  .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >RAM
+  .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >SRAM
   .ARM : {
     __exidx_start = .;
     *(.ARM.exidx*)
     __exidx_end = .;
-  } >RAM
+  } >SRAM
 
   .preinit_array     :
   {
     PROVIDE_HIDDEN (__preinit_array_start = .);
     KEEP (*(.preinit_array*))
     PROVIDE_HIDDEN (__preinit_array_end = .);
-  } >RAM
+  } >SRAM
   .init_array :
   {
     PROVIDE_HIDDEN (__init_array_start = .);
     KEEP (*(SORT(.init_array.*)))
     KEEP (*(.init_array*))
     PROVIDE_HIDDEN (__init_array_end = .);
-  } >RAM
+  } >SRAM
   .fini_array :
   {
     PROVIDE_HIDDEN (__fini_array_start = .);
     KEEP (*(SORT(.fini_array.*)))
     KEEP (*(.fini_array*))
     PROVIDE_HIDDEN (__fini_array_end = .);
-  } >RAM
+  } >SRAM
 
   /* used by the startup to initialize data */
   /*_sidata = LOADADDR(.data);*/
@@ -97,7 +113,7 @@ SECTIONS
 
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
-  } >RAM
+  } >SRAM
 
   
   /* Uninitialized data section */
@@ -114,18 +130,18 @@ SECTIONS
     . = ALIGN(4);
     _ebss = .;         /* define a global symbol at bss end */
     __bss_end__ = _ebss;
-  } >RAM
+  } >SRAM
 
   /* User_heap_stack section, used to check that there is enough RAM left */
-  ._user_heap_stack :
+  /*._user_heap_stack :
   {
     . = ALIGN(4);
     PROVIDE ( end = . );
     PROVIDE ( _end = . );
-    . = . + _Min_Heap_Size;
-    . = . + _Min_Stack_Size;
+    . += _min_heap_size;
+    . += _min_stack_size;
     . = ALIGN(4);
-  } >RAM
+  } >RAM*/
 
   .usbtable :
   {
@@ -140,6 +156,15 @@ SECTIONS
     . = ALIGN(4);
     _eusbram = .;
   } >USBRAM
+
+  .flash_sram :
+  {
+    . = ALIGN(4);
+    _sflash_sram = .;
+    . += _flash_sram_size;
+    . = ALIGN(4);
+    _eflash_sram = .;
+  } > FLASH_SRAM
 
   /* Remove information from the standard libraries */
   /DISCARD/ :

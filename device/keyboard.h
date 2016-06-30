@@ -25,7 +25,7 @@
 extern "C" {
 #endif
 
-void initKeyboard();
+void keyboardInit();
 
 static inline void setLED(uint16_t led, uint16_t val)
 {
@@ -47,6 +47,8 @@ static inline uint32_t readKey(uint16_t key)
 }
 #else
 uint32_t readKey(uint16_t key);
+// keys: bit OR of (1U << KEY)
+uint32_t readKeys(uint16_t keys);
 #endif
 
 #ifdef __cplusplus

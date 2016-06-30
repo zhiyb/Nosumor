@@ -15,6 +15,8 @@ Project {
         Depends {name: "CMSIS"}
         cpp.linkerScripts: ["STM32F103C8_SRAM.ld"]
         cpp.includePaths: [".", "usb"]
+        cpp.linkerFlags: ["-nostartfiles"]
+        //cpp.linkerFlags: ["-nostdlib"]
 
         Properties {
             condition: qbs.buildVariant == "debug"

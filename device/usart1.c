@@ -15,7 +15,7 @@
 // baud = fck / (16 * USARTDIV)
 #define USART_BRR(clk, baud)	((((clk) << 1) / (baud) + 1) >> 1)
 
-void initUSART1()
+void usart1Init()
 {
 	RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_USART1EN;
 
