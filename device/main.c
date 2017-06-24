@@ -89,9 +89,10 @@ int main()
 	usart6WriteString(ESC_YELLOW "Core clock: " ESC_WHITE "0x");
 	usart6DumpHex(SystemCoreClock);
 	usart6WriteString(ESC_DEFAULT "\r\n");
-	for (;;)
+	for (;;) {
 		if (USART6->ISR & USART_ISR_RXNE)
 			usart6WriteChar(toupper(USART6->RDR));
+	}
 
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN;
 	// 01: General purpose output mode

@@ -19,7 +19,7 @@ Project {
             cpp.optimization: "small"
         }
 
-        files: ["*.s", "*.c", "*.h", "*.ld"]
+        files: ["*.S", "*.c", "*.h", "*.ld"]
 
         FileTagger {
             patterns: "*.ld"
