@@ -11,7 +11,7 @@ uint32_t clkAHB();
 uint32_t clkAPB1();
 uint32_t clkAPB2();
 
-void SystemCoreClockUpdate(void);
+void rcc_init();
 
 #ifdef __cplusplus
 }

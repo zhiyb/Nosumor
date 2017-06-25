@@ -30,12 +30,17 @@ Project {
             "escape.h",
             "fio.c",
             "fio.h",
+            "macros.h",
             "main.c",
             "peripheral/uart.c",
             "peripheral/uart.h",
             "startup_stm32f722xx.S",
             "syscalls.c",
             "system_stm32f7xx.c",
+            "usb/usb_io.c",
+            "usb/usb_io.h",
+            "usb/usb_irq.c",
+            "usb/usb_macros.h",
         ]
 
         FileTagger {
