@@ -11,6 +11,7 @@ extern "C" {
 
 #ifdef DEBUG
 
+#define VARIANT	"DEBUG"
 #define dbbkpt()	asm ("bkpt #0")
 
 static inline int dbcmd(int cmd, void *data)
@@ -39,6 +40,7 @@ static inline void dbsystem(char *cmd)
 
 #else	// DEBUG
 
+#define VARIANT	"RELEASE"
 #define dbbkpt()	((void)0)
 #define dbputs(str)	((void)0)
 #define dbputc(str)	((void)0)

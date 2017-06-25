@@ -1,8 +1,12 @@
+#include <stdio.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <stm32f722xx.h>
 #include "debug.h"
 #include "escape.h"
-#include <stm32f722xx.h>
+#include "clock.h"
+#include "fio.h"
+#include "peripheral/uart.h"
 
 // RGB2_RGB:	PA0(R), PA1(G), PA2(B)
 // RGB1_RGB:	PA11(R), PA15(G), PA10(B)
@@ -10,89 +14,71 @@
 // KEY_12:	PA6(K1), PB2(K2)
 // KEY_345:	PC13(K3), PC14(K4), PC15(K5)
 
-extern uint32_t SystemCoreClock;
-void SystemCoreClockUpdate(void);
-
-uint32_t clkAPB2()
-{
-	uint32_t div = (RCC->CR & RCC_CFGR_PPRE2_Msk) >> RCC_CFGR_PPRE2_Pos;
-	if (!(div & 0b100))
-		return SystemCoreClock;
-	return SystemCoreClock / (2 << (div & 0b11));
-}
-
-void usart6Init(unsigned long baud)
+void usart6_init()
 {
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
 	// 10: Alternative function mode
-	GPIOC->MODER |= 0b10 << GPIO_MODER_MODER6_Pos;
-	GPIOC->MODER |= 0b10 << GPIO_MODER_MODER7_Pos;
-	// 01: Pull-up
-	GPIOC->PUPDR |= 0b01 << GPIO_PUPDR_PUPDR6_Pos;
-	GPIOC->PUPDR |= 0b01 << GPIO_PUPDR_PUPDR7_Pos;
+	GPIOC->MODER = (GPIOC->MODER & ~GPIO_MODER_MODER6_Msk) | (0b10 << GPIO_MODER_MODER6_Pos);
+	GPIOC->MODER = (GPIOC->MODER & ~GPIO_MODER_MODER7_Msk) | (0b10 << GPIO_MODER_MODER7_Pos);
 	// AF8: USART6
-	GPIOC->AFR[0] |= 8 << GPIO_AFRL_AFRL6_Pos;
-	GPIOC->AFR[0] |= 8 << GPIO_AFRL_AFRL7_Pos;
-	RCC->APB2ENR |= RCC_APB2ENR_USART6EN;
-	unsigned long clk = clkAPB2();
-	USART6->CR1 = 0;	// Disable USART
-	USART6->CR1 = 0;	// 8-bit, N
-	USART6->CR2 = 0;	// 1 stop
-	USART6->CR3 = 0;
-	USART6->BRR = clk / baud;
-	// Enable transmitter & receiver & USART
-	USART6->CR1 |= USART_CR1_TE | USART_CR1_RE | USART_CR1_UE;
+	GPIOC->AFR[0] = (GPIOC->AFR[0] & ~GPIO_AFRL_AFRL6_Msk) | (8 << GPIO_AFRL_AFRL6_Pos);
+	GPIOC->AFR[0] = (GPIOC->AFR[0] & ~GPIO_AFRL_AFRL7_Msk) | (8 << GPIO_AFRL_AFRL7_Pos);
+	uart_init(USART6);
+	uart_config(USART6, 115200);
+	fio_setup(uart_putc, uart_getc, USART6);
 }
 
-void usart6WriteChar(const char c)
+void rcc_init()
 {
-	while (!(USART6->ISR & USART_ISR_TXE));
-	USART6->TDR = c;
-}
-
-void usart6WriteString(const char *str)
-{
-	char c;
-	while ((c = *str++) != 0)
-		usart6WriteChar(c);
-}
-
-void usart6DumpHex(const uint32_t v)
-{
-	int shift = 32 / 4;
-	while (shift--) {
-		uint8_t b = 0x0f & (v >> (shift * 4));
-		if (b >= 0x0a)
-			usart6WriteChar('a' + b - 0x0a);
-		else
-			usart6WriteChar('0' + b);
-	}
+	// Enable HSE
+	RCC->CR |= RCC_CR_HSEON;
+	while (!(RCC->CR & RCC_CR_HSERDY));
+	// Switch to HSE
+	RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW_Msk) | RCC_CFGR_SW_HSE;
+	while ((RCC->CFGR & RCC_CFGR_SWS_Msk) != RCC_CFGR_SWS_HSE);
+	// Disable HSI
+	RCC->CR &= ~RCC_CR_HSION;
+	// Disable PLL
+	RCC->CR &= ~RCC_CR_PLLON;
+	while (RCC->CR & RCC_CR_PLLRDY);
+	// Configure PLL (HSE, PLLM = 12, PLLN = 270, PLLP = 2, PLLQ = 9)
+	RCC->PLLCFGR = (12 << RCC_PLLCFGR_PLLM_Pos) | (270 << RCC_PLLCFGR_PLLN_Pos) |
+			(0 << RCC_PLLCFGR_PLLP_Pos) | (9 << RCC_PLLCFGR_PLLQ_Pos) |
+			RCC_PLLCFGR_PLLSRC_HSE;
+	// Enable power controller
+	RCC->APB1ENR |= RCC_APB1ENR_PWREN;
+	// Regulator voltage scale 1
+	PWR->CR1 = (PWR->CR1 & ~PWR_CR1_VOS) | (0b11 << PWR_CR1_VOS_Pos);
+	// Enable PLL
+	RCC->CR |= RCC_CR_PLLON;
+	// Enable Over-drive
+	PWR->CR1 |= PWR_CR1_ODEN;
+	while (!(PWR->CSR1 & PWR_CSR1_ODRDY));
+	PWR->CR1 |= PWR_CR1_ODSWEN;
+	while (!(PWR->CSR1 & PWR_CSR1_ODSWRDY));
+	// Set flash latency
+	// ART enable, prefetch enable, 7 wait states
+	FLASH->ACR = FLASH_ACR_ARTEN | FLASH_ACR_PRFTEN | FLASH_ACR_LATENCY_7WS;
+	// Set AHB & APB prescalers
+	// AHB = 1, APB1 = 4, APB2 = 2
+	RCC->CFGR = (RCC->CFGR & ~(RCC_CFGR_HPRE | RCC_CFGR_PPRE1 | RCC_CFGR_PPRE2)) |
+			RCC_CFGR_HPRE_DIV1 | RCC_CFGR_PPRE1_DIV4 | RCC_CFGR_PPRE2_DIV2;
+	// Wait for PLL lock
+	while (!(RCC->CR & RCC_CR_PLLRDY));
+	// Switch to PLL
+	RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW_Msk) | RCC_CFGR_SW_PLL;
+	while ((RCC->CFGR & RCC_CFGR_SWS_Msk) != RCC_CFGR_SWS_PLL);
+	// Update clock configuration
+	SystemCoreClockUpdate();
 }
 
 int main()
 {
-	SystemCoreClockUpdate();
-	usart6Init(115200);
-	usart6WriteString("\r\n" ESC_CYAN "Hello, world!\r\n" ESC_DEFAULT);
-	usart6WriteString(ESC_YELLOW "Core clock: " ESC_WHITE "0x");
-	usart6DumpHex(SystemCoreClock);
-	usart6WriteString(ESC_DEFAULT "\r\n");
-	usart6WriteString(ESC_MAGENTA "Enabling HSE...\r\n");
-	RCC->CR |= RCC_CR_HSEON;
-	while (!(RCC->CR & RCC_CR_HSERDY));
-	usart6WriteString(ESC_MAGENTA "HSE enabled, switching system clock...\r\n");
-	RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW_Msk) | RCC_CFGR_SW_HSE;
-	while ((RCC->CFGR & RCC_CFGR_SWS_Msk) != RCC_CFGR_SWS_HSE);
-	SystemCoreClockUpdate();
-	usart6Init(115200);
-	usart6WriteString(ESC_GREEN "\r\nSuccess!\r\n");
-	usart6WriteString(ESC_YELLOW "Core clock: " ESC_WHITE "0x");
-	usart6DumpHex(SystemCoreClock);
-	usart6WriteString(ESC_DEFAULT "\r\n");
-	for (;;) {
-		if (USART6->ISR & USART_ISR_RXNE)
-			usart6WriteChar(toupper(USART6->RDR));
-	}
+	rcc_init();
+	usart6_init();
+
+	puts(ESC_CLEAR ESC_CYAN VARIANT " build @ " __DATE__ " " __TIME__);
+	printf(ESC_YELLOW "Core clock: " ESC_WHITE "%lu\n", clkAHB());
 
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN;
 	// 01: General purpose output mode

@@ -1,7 +1,8 @@
 #ifndef ESCAPE_H
 #define ESCAPE_H
 
-#define ESC_FF	"\x0c"
+#define ESC_FF		"\x0c"
+#define ESC_CLEAR	"\e[2J\e[0;0H"
 
 #define ESC_DEFAULT	"\e[0m"
 #define ESC_GREY	"\e[90m"

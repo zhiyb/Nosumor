@@ -8,6 +8,8 @@ Project {
     references: ["CMSIS"]
 
     CppApplication {
+        cpp.includePaths: ["."]
+        cpp.commonCompilerFlags: ["-Wno-unused-parameter"]
         Depends {name: "CMSIS"}
 
         Properties {
@@ -20,7 +22,21 @@ Project {
             cpp.optimization: "small"
         }
 
-        files: ["*.S", "*.c", "*.h", "*.ld"]
+        files: [
+            "STM32F722RETx_FLASH.ld",
+            "clock.c",
+            "clock.h",
+            "debug.h",
+            "escape.h",
+            "fio.c",
+            "fio.h",
+            "main.c",
+            "peripheral/uart.c",
+            "peripheral/uart.h",
+            "startup_stm32f722xx.S",
+            "syscalls.c",
+            "system_stm32f7xx.c",
+        ]
 
         FileTagger {
             patterns: "*.ld"
