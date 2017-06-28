@@ -7,14 +7,14 @@
 extern "C" {
 #endif
 
-#define dbexist()	(CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk)
+#define dbgexist()	(CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk)
 
 #ifdef DEBUG
 
 #define VARIANT	"DEBUG"
-#define dbbkpt()	asm ("bkpt #0")
+#define dbgbkpt()	asm ("bkpt #0")
 
-static inline int dbcmd(int cmd, void *data)
+static inline int dbgcmd(int cmd, void *data)
 {
 	register int r0 asm ("r0");
 	asm ("mov r0, %0\n\t"
@@ -27,24 +27,24 @@ static inline int dbcmd(int cmd, void *data)
 }
 
 // SYS_WRITE0
-static inline void dbputs(char *str) {dbcmd(0x04, str);}
+static inline void dbgputs(char *str) {dbgcmd(0x04, str);}
 
 // SYS_WRITEC
-static inline void dbputc(char c) {dbcmd(0x03, &c);}
+static inline void dbgputc(char c) {dbgcmd(0x03, &c);}
 
-static inline void dbsystem(char *cmd)
+static inline void dbgsystem(char *cmd)
 {
 	int data[2] = {(int)cmd, (int)strlen(cmd)};
-	dbcmd(0x12, data);  // SYS_SYSTEM
+	dbgcmd(0x12, data);  // SYS_SYSTEM
 }
 
 #else	// DEBUG
 
 #define VARIANT	"RELEASE"
-#define dbbkpt()	((void)0)
-#define dbputs(str)	((void)0)
-#define dbputc(str)	((void)0)
-#define dbsystem(str)	((void)0)
+#define dbgbkpt()	((void)0)
+#define dbgputs(str)	((void)0)
+#define dbgputc(str)	((void)0)
+#define dbgsystem(str)	((void)0)
 
 #endif	// DEBUG
 

@@ -1,33 +1,38 @@
 #include <stm32f7xx.h>
 #include <macros.h>
 #include <debug.h>
-#include "usb_io.h"
 #include "usb_macros.h"
+#include "usb_irq.h"
+#include "usb_ep0.h"
+#include "usb.h"
 
-static inline void usb_init_gpio();
+static inline void usb_hs_init_gpio();
 
-void usb_init()
+void usb_init(usb_t *usb, USB_OTG_GlobalTypeDef *base)
 {
-	usb_init_gpio();
+	usb->base = base;
+	usb->epcnt[USB_EPIN] = 0;
+	usb->epcnt[USB_EPOUT] = 0;
+	usb_ep0_register(usb);
+	if (base != USB_OTG_HS)
+		return;
+	usb_hs_init_gpio();
 
 	// Enable OTG HS
 	RCC->AHB1ENR |= RCC_AHB1ENR_OTGHSULPIEN | RCC_AHB1ENR_OTGHSEN;
-	USB_OTG_GlobalTypeDef *usb = USB_OTG_HS;
-	usb->GCCFG = 0;
-	usb->GUSBCFG = USB_OTG_GUSBCFG_FDMOD | USB_OTG_GUSBCFG_ULPIAR |
+	base->GCCFG = 0;
+	base->GUSBCFG = USB_OTG_GUSBCFG_FDMOD | USB_OTG_GUSBCFG_ULPIAR |
 			USB_OTG_GUSBCFG_HNPCAP | USB_OTG_GUSBCFG_SRPCAP |
 			(9 << USB_OTG_GUSBCFG_TRDT_Pos) |
 			(4 << USB_OTG_GUSBCFG_TOCAL_Pos) | (1ul << 4);
 	// Core reset
-	usb->GRSTCTL |= USB_OTG_GRSTCTL_CSRST;
-	while (usb->GRSTCTL & USB_OTG_GRSTCTL_CSRST);
-	usb->GOTGCTL = USB_OTG_GOTGCTL_OTGVER;
-	usb->GAHBCFG = USB_OTG_GAHBCFG_PTXFELVL | USB_OTG_GAHBCFG_TXFELVL |
+	base->GRSTCTL |= USB_OTG_GRSTCTL_CSRST;
+	while (base->GRSTCTL & USB_OTG_GRSTCTL_CSRST);
+	base->GOTGCTL = USB_OTG_GOTGCTL_OTGVER;
+	base->GAHBCFG = USB_OTG_GAHBCFG_PTXFELVL | USB_OTG_GAHBCFG_TXFELVL |
 			(5 /* 8x 32-bit */ << USB_OTG_GAHBCFG_HBSTLEN_Pos) |
 			USB_OTG_GAHBCFG_GINT;
-	// Interrupt masks
-	usb->GINTMSK = USB_OTG_GINTMSK_OTGINT | USB_OTG_GINTMSK_MMISM |
-			USB_OTG_GINTMSK_RXFLVLM;
+	usb_hs_irq_init(usb);
 
 	uint32_t pg = NVIC_GetPriorityGrouping();
 	NVIC_SetPriority(OTG_HS_IRQn, NVIC_EncodePriority(pg, 2, 1));
@@ -40,7 +45,7 @@ void usb_init()
 	NVIC_EnableIRQ(OTG_HS_EP1_OUT_IRQn);
 }
 
-static inline void usb_init_gpio()
+static inline void usb_hs_init_gpio()
 {
 	// MCO1: HSE / 1
 	RCC->CFGR = (RCC->CFGR & ~(RCC_CFGR_MCO1 | RCC_CFGR_MCO1PRE)) |
@@ -116,18 +121,20 @@ static inline void usb_init_gpio()
 	while (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY));
 }
 
-int usb_mode()
+int usb_mode(usb_t *usb)
 {
-	return !!(USB_OTG_HS->GINTSTS & USB_OTG_GINTSTS_CMOD);
+	return !!(usb->base->GINTSTS & USB_OTG_GINTSTS_CMOD);
 }
 
-void usb_init_device()
+void usb_init_device(usb_t *usb)
 {
-	USB_OTG_GlobalTypeDef *usb = USB_OTG_HS;
-	USB_OTG_DeviceTypeDef *dev = DEVICE(usb);
+	USB_OTG_GlobalTypeDef *base = usb->base;
+	USB_OTG_DeviceTypeDef *dev = DEVICE(base);
 	// Reset PHY clock
-	PCGCCTL(usb) = 0;
+	PCGCCTL(base) = 0;
 	dev->DCFG = 0;	// Receive OUT packet, High speed
-	usb->GINTMSK |= USB_OTG_GINTMSK_USBRST | USB_OTG_GINTMSK_ENUMDNEM;
+	base->GINTMSK |= USB_OTG_GINTMSK_USBRST | USB_OTG_GINTMSK_ENUMDNEM | USB_OTG_GINTMSK_RXFLVLM;
+	dev->DOEPMSK = USB_OTG_DOEPMSK_XFRCM | USB_OTG_DOEPMSK_STUPM;
+	dev->DIEPMSK = USB_OTG_DIEPMSK_XFRCM | USB_OTG_DIEPMSK_TOM;
 	dev->DCTL = 0;	// Connect device
 }

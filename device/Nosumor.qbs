@@ -24,6 +24,8 @@ Project {
 
         files: [
             "STM32F722RETx_FLASH.ld",
+            "peripheral/audio.c",
+            "peripheral/audio.h",
             "clock.c",
             "clock.h",
             "debug.h",
@@ -37,10 +39,23 @@ Project {
             "startup_stm32f722xx.S",
             "syscalls.c",
             "system_stm32f7xx.c",
-            "usb/usb_io.c",
-            "usb/usb_io.h",
+            "systick.c",
+            "systick.h",
+            "usb/usb.c",
+            "usb/usb.h",
+            "usb/usb_desc.c",
+            "usb/usb_desc.h",
+            "usb/usb_ep.c",
+            "usb/usb_ep.h",
+            "usb/usb_ep0.c",
+            "usb/usb_ep0.h",
             "usb/usb_irq.c",
+            "usb/usb_irq.h",
             "usb/usb_macros.h",
+            "usb/usb_ram.c",
+            "usb/usb_ram.h",
+            "usb/usb_setup.c",
+            "usb/usb_setup.h",
         ]
 
         FileTagger {

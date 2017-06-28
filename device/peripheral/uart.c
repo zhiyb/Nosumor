@@ -26,7 +26,7 @@ void uart_config(USART_TypeDef *uart, uint32_t baud)
 	uart->CR1 = 0;	// 8-bit, N
 	uart->CR2 = 0;	// 1 stop
 	uart->CR3 = 0;
-	uart->BRR = (clk + baud - 1) / baud;
+	uart->BRR = ((clk << 1) / baud + 1) >> 1;
 	// Enable transmitter & receiver & USART
 	uart->CR1 |= USART_CR1_TE | USART_CR1_RE | USART_CR1_UE;
 }

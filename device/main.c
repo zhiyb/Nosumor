@@ -7,10 +7,14 @@
 #include "clock.h"
 #include "fio.h"
 #include "macros.h"
+#include "systick.h"
 #include "peripheral/uart.h"
-#include "usb/usb_io.h"
+#include "usb/usb.h"
+#include "peripheral/audio.h"
 
-// RGB2_RGB:	PA0(R), PA1(G), PA2(B)
+static usb_t usb;
+
+// RGB2_RGB:	PA0(R), PA2(G), PA1(B)
 // RGB1_RGB:	PA11(R), PA15(G), PA10(B)
 // RGB1_LR:	PB14(L), PB15(R)
 // KEY_12:	PA6(K1), PB2(K2)
@@ -36,18 +40,22 @@ void usart6_init()
 static inline void init()
 {
 	rcc_init();
+	systick_init(1000);
 	usart6_init();
 	NVIC_SetPriorityGrouping(4);	// 3+1 bits
 
 	puts(ESC_CLEAR ESC_MAGENTA VARIANT " build @ " __DATE__ " " __TIME__);
 	printf(ESC_YELLOW "Core clock: " ESC_WHITE "%lu\n", clkAHB());
 
+	puts(ESC_CYAN "Initialising audio...");
+	audio_init();
+
 	puts(ESC_CYAN "Initialising USB HS...");
-	usb_init();
+	usb_init(&usb, USB_OTG_HS);
 	printf(ESC_YELLOW "USB in " ESC_WHITE "%s" ESC_YELLOW " mode\n",
-	       usb_mode() ? "host" : "device");
-	while (usb_mode() != 0);
-	usb_init_device();
+	       usb_mode(&usb) ? "host" : "device");
+	while (usb_mode(&usb) != 0);
+	//usb_init_device(&usb);
 
 	puts(ESC_CYAN "Initialising keyboard...");
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN;
@@ -69,7 +77,7 @@ static inline void init()
 	GPIO_MODER(GPIOC, 13, 0b00);
 	GPIO_MODER(GPIOC, 14, 0b00);
 	GPIO_MODER(GPIOC, 15, 0b00);
-	// 01: Pull-up
+	// 01: Pull-up resistors
 	GPIO_PUPDR(GPIOA, 6, GPIO_PUPDR_UP);
 	GPIO_PUPDR(GPIOB, 2, GPIO_PUPDR_UP);
 	GPIO_PUPDR(GPIOC, 13, GPIO_PUPDR_UP);
@@ -81,6 +89,29 @@ int main()
 {
 	init();
 	puts(ESC_GREEN "Initialisation done");
+#if 0
+	int i = 1;
+	while (GPIOC->IDR & GPIO_IDR_IDR_13) {
+		//GPIOA->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1 | GPIO_ODR_ODR_2);
+		GPIOA->ODR &= ~(GPIO_ODR_ODR_2);
+		systick_delay(i << 1);
+		GPIOA->ODR |= (GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1 | GPIO_ODR_ODR_2);
+		GPIOB->ODR &= ~(GPIO_ODR_ODR_14);
+		systick_delay(i);
+		GPIOB->ODR |= (GPIO_ODR_ODR_14);
+		GPIOB->ODR &= ~(GPIO_ODR_ODR_15);
+		systick_delay(i);
+		GPIOB->ODR |= (GPIO_ODR_ODR_15);
+		if (!(GPIOC->IDR & GPIO_IDR_IDR_14)) {
+			systick_delay(500);
+			i++;
+		}
+		if (!(GPIOC->IDR & GPIO_IDR_IDR_15)) {
+			systick_delay(500);
+			i = i == 0 ?: i - 1;
+		}
+	}
+#endif
 	for (;;) {
 		if (!(GPIOA->IDR & GPIO_IDR_IDR_6))
 			GPIOA->ODR |= GPIO_ODR_ODR_15;

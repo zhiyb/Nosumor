@@ -3,14 +3,29 @@
 
 #include <stm32f7xx.h>
 
-#define DEVICE(usb)	((USB_OTG_DeviceTypeDef *)((void *)(usb) + USB_OTG_DEVICE_BASE))
-#define INEP(usb, n)	((USB_OTG_INEndpointTypeDef *)((void *)(usb) + USB_OTG_IN_ENDPOINT_BASE + ((n) << 5)))
-#define OUTEP(usb, n)	((USB_OTG_OUTEndpointTypeDef *)((void *)(usb) + USB_OTG_OUT_ENDPOINT_BASE + ((n) << 5)))
-#define PCGCCTL(usb)	(*((__IO uint32_t *)((void *)(usb) + USB_OTG_PCGCCTL_BASE)))
+#define FUNC(f)	if (f) f
 
-#define DSTS_ENUMSPD_HS_PHY_30MHZ_OR_60MHZ     (0 << 1)
-#define DSTS_ENUMSPD_FS_PHY_30MHZ_OR_60MHZ     (1 << 1)
-#define DSTS_ENUMSPD_LS_PHY_6MHZ               (2 << 1)
-#define DSTS_ENUMSPD_FS_PHY_48MHZ              (3 << 1)
+#define DEVICE(usb)	((USB_OTG_DeviceTypeDef *)((void *)(usb) + USB_OTG_DEVICE_BASE))
+#define EP_IN(usb, n)	((USB_OTG_INEndpointTypeDef *)((void *)(usb) + USB_OTG_IN_ENDPOINT_BASE + ((n) << 5)))
+#define EP_OUT(usb, n)	((USB_OTG_OUTEndpointTypeDef *)((void *)(usb) + USB_OTG_OUT_ENDPOINT_BASE + ((n) << 5)))
+#define PCGCCTL(usb)	(*((__IO uint32_t *)((void *)(usb) + USB_OTG_PCGCCTL_BASE)))
+#define FIFO(usb, n)	(*((__IO uint32_t *)((void *)(usb) + USB_OTG_FIFO_BASE + USB_OTG_FIFO_SIZE * (n))))
+
+#define DAINTMSK_IN(n)	((1ul << (n)) << USB_OTG_DAINTMSK_IEPM_Pos)
+#define DAINTMSK_OUT(n)	((1ul << (n)) << USB_OTG_DAINTMSK_OEPM_Pos)
+
+#define DIEPCTL_MASK	(USB_OTG_DIEPCTL_TXFNUM_Msk | USB_OTG_DIEPCTL_EPTYP_Msk | \
+	USB_OTG_DIEPCTL_USBAEP_Msk | USB_OTG_DIEPCTL_MPSIZ_Msk)
+#define DIEPCTL_SET(r, m)	(r) = ((r) & DIEPCTL_MASK) | (m)
+#define DIEPTXF(a, d)	((((d) >> 2) << USB_OTG_DIEPTXF_INEPTXFD_Pos) | ((a) << USB_OTG_DIEPTXF_INEPTXSA_Pos))
+
+#define STAT_OUT_NAK	(0b0001ul << USB_OTG_GRXSTSP_PKTSTS_Pos)
+#define STAT_OUT_RECV	(0b0010ul << USB_OTG_GRXSTSP_PKTSTS_Pos)
+#define STAT_OUT	(0b0011ul << USB_OTG_GRXSTSP_PKTSTS_Pos)
+#define STAT_SETUP	(0b0100ul << USB_OTG_GRXSTSP_PKTSTS_Pos)
+#define STAT_SETUP_RECV	(0b0110ul << USB_OTG_GRXSTSP_PKTSTS_Pos)
+
+#define STAT_EP(s)	(((s) & USB_OTG_GRXSTSP_EPNUM_Msk) >> USB_OTG_GRXSTSP_EPNUM_Pos)
+#define STAT_CNT(s)	(((s) & USB_OTG_GRXSTSP_BCNT_Msk) >> USB_OTG_GRXSTSP_BCNT_Pos)
 
 #endif // USB_MACROS_H
