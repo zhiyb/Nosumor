@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <math.h>
 #include <stm32f7xx.h>
 #include "../macros.h"
 #include "../escape.h"
@@ -203,7 +204,7 @@ static void audio_test()
 		0x12, 0x82,		// ADC NADC = 2
 		0x13, 0x84,		// ADC MADC = 4
 		0x14, 32,		// ADC DOSR = 32
-		0x1b, 0x00,		// I2S, 32 bits, slave, no high-z
+		0x1b, 0x20,		// I2S, 24 bits, slave, no high-z
 		//0x1d, 0x20,		// DIN-DOUT loopback
 		//0x1d, 0x10,		// ADC-DAC loopback
 		0x1d, 0x00,		// No loopback, BCLK DIV disabled
@@ -240,9 +241,9 @@ static void audio_test()
 		0x27, 0x00,		// SPR analog volume = 0dB
 		0x28, 0x06,		// HPL driver PGA = 0dB, not muted
 		0x29, 0x06,		// HPR driver PGA = 0dB, not muted
-		0x2a, 0x04,		// SPL driver PGA = 6dB, not muted
-		0x2b, 0x04,		// SPR driver PGA = 6dB, not muted
-		0x2c, 0x08,		// DAC high current, HP as headphone
+		0x2a, 0x14,		// SPL driver PGA = 18dB, not muted
+		0x2b, 0x14,		// SPR driver PGA = 18dB, not muted
+		0x2c, 0x10,		// DAC high current, HP as headphone
 		0x2e, 0x0a,		// MICBIAS force on, MICBIAS = 2.5V
 		0x2f, 0x00,		// MIC PGA = 0dB
 		0x30, 0x10,		// MIC1RP selected for MIC PGA
@@ -267,26 +268,35 @@ static void audio_test()
 	for (uint32_t i = 0; i != sizeof(regs) / sizeof(regs[0]); i++)
 		printf("reg 0x%02x: 0x%02x\n", regs[i], (uint8_t)i2c_read_reg(I2C1, I2C_ADDR, regs[i]));
 #endif
+	// sin(x) lookup table
+	int32_t lut[2048];
+	for (uint32_t i = 0; i != 2048; i++)
+		lut[i] = round(sin(2.0f * M_PI * i / 2048.0) * 0x600000);
 	// Enable I2S audio interfaces
-	i2s_enable(SPI1, 1);
 	i2s_enable(SPI2, 1);
+	i2s_enable(SPI1, 1);
 	// I2S loopback
-	uint32_t audio[2] = {0x80000000, 0x7fffffff};
 	// Receive 2 audio channels
-	for (uint32_t i = 0;; i++) {
-		while (!(SPI1->SR & SPI_SR_TXE_Msk));
-		uint32_t data = audio[!!(SPI1->SR & SPI_SR_CHSIDE_Msk)];
-		SPI1->DR = data >> 16;
-
-		while (!(SPI2->SR & SPI_SR_RXNE_Msk));
-		uint32_t *p = &audio[!!(SPI2->SR & SPI_SR_CHSIDE_Msk)];
-		uint32_t adc = SPI2->DR << 16;
-
-		while (!(SPI1->SR & SPI_SR_TXE_Msk));
-		SPI1->DR = data;
-
-		while (!(SPI2->SR & SPI_SR_RXNE_Msk));
-		adc |= SPI2->DR & SPI_DR_DR_Msk;
-		*p = adc;
+	uint32_t audio[2];
+	uint32_t adc[2] = {0, 0};
+	for (uint32_t i = 0, j = 0;;) {
+		if (SPI1->SR & SPI_SR_TXE_Msk) {
+			audio[0] = lut[(i % 512) * 4];
+			audio[1] = lut[i % 2048];
+			uint32_t data = audio[!!(SPI1->SR & SPI_SR_CHSIDE_Msk)];
+			if (i % 2)
+				SPI1->DR = (data << 24) & SPI_DR_DR_Msk;
+			else
+				SPI1->DR = (data >> 8) & SPI_DR_DR_Msk;
+			i++;
+		}
+		if (SPI2->SR & SPI_SR_RXNE_Msk) {
+			uint32_t *p = &adc[!!(SPI2->SR & SPI_SR_CHSIDE_Msk)];
+			if (j % 2)
+				*p |= (SPI2->DR >> 24) & SPI_DR_DR_Msk;
+			else
+				*p = SPI2->DR << 8;
+			j++;
+		}
 	}
 }

@@ -13,6 +13,7 @@ Project {
             "-Wno-unused-parameter",
             "-Wno-unused-function",
         ]
+        cpp.staticLibraries: ["m"]
         Depends {name: "CMSIS"}
 
         Properties {
