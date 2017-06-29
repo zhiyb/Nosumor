@@ -9,7 +9,10 @@ Project {
 
     CppApplication {
         cpp.includePaths: ["."]
-        cpp.commonCompilerFlags: ["-Wno-unused-parameter"]
+        cpp.commonCompilerFlags: [
+            "-Wno-unused-parameter",
+            "-Wno-unused-function",
+        ]
         Depends {name: "CMSIS"}
 
         Properties {

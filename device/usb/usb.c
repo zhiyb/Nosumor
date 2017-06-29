@@ -60,8 +60,10 @@ static inline void usb_hs_init_gpio()
 	GPIO_AFRH(GPIOA, 8, 0);
 
 	// Enable IO compensation cell
-	RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
-	SYSCFG->CMPCR |= SYSCFG_CMPCR_CMP_PD;
+	if (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY)) {
+		SYSCFG->CMPCR |= SYSCFG_CMPCR_CMP_PD;
+		RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+	}
 	// PA3, PA5, PB0, PB1, PB5, PB10, PB11, PB12, PB13, PC0, PC2, PC3
 	GPIO_MODER(GPIOA, 3, 0b10);	// D0	IO
 	GPIO_OTYPER_PP(GPIOA, 3);	// Output push-pull
