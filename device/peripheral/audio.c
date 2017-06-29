@@ -205,21 +205,19 @@ static void audio_test()
 		0x14, 32,		// ADC DOSR = 32
 		0x1b, 0x00,		// I2S, 32 bits, slave, no high-z
 		//0x1d, 0x20,		// DIN-DOUT loopback
-		0x1d, 0x10,		// ADC-DAC loopback
-		//0x1d, 0x00,		// No loopback, BCLK DIV disabled
+		//0x1d, 0x10,		// ADC-DAC loopback
+		0x1d, 0x00,		// No loopback, BCLK DIV disabled
 		0x1e, 0x81,		// BCLK DIV = 1
 		0x20, 0x00,		// Using primary interface inputs
 		0x21, 0x00,		// Using primary interface outputs
 		0x35, 0x12,		// Bus keeper disabled, DOUT from codec
 		0x36, 0x02,		// DIN enabled
 		0x3c, 17,		// DAC using PRB_P17
-		0x3d, 0x04,		// ADC using PRB_R4
+		0x3d, 16,		// ADC using PRB_R16
 		0x3f, 0xd4,		// DAC on, data path settings
 		0x40, 0x00,		// DAC not muted, independent volume
-		//0x41, 0x00,		// DAC left volume = 0dB
-		//0x42, 0x00,		// DAC right volume = 0dB
-		0x41, 0xc2,		// DAC left volume = -31dB
-		0x42, 0xc2,		// DAC right volume = -31dB
+		0x41, 0xd0,		// DAC left volume = -24dB
+		0x42, 0xd0,		// DAC right volume = -24dB
 		0x43, 0x80,		// Headset detection enabled
 		0x44, 0x0f,		// DRC disabled
 		0x47, 0x00,		// Left beep disabled
@@ -227,9 +225,9 @@ static void audio_test()
 		0x51, 0x80,		// ADC on
 		0x52, 0x00,		// ADC not muted, volume fine = 0dB
 		0x53, 0x28,		// ADC volume coarse = 20dB
-		0x56, 0x00,		// AGC disabled, AGC = -5.5dB
-		0x57, 0x00,		// AGC settings
-		0x58, 119,		// AGC max = 59.5dB
+		0x56, 0x80,		// AGC enabled, AGC = -5.5dB
+		//0x57, 0x00,		// AGC settings
+		//0x58, 119,		// AGC max = 59.5dB
 		0x74, 0x00,		// DAC volume control pin disabled
 
 		0x00, 0x01,		// Page 1
@@ -238,15 +236,17 @@ static void audio_test()
 		0x23, 0x44,		// DAC to HP
 		0x24, 0x0f,		// HPL analog volume = -7.5dB
 		0x25, 0x0f,		// HPR analog volume = -7.5dB
-		0x26, 0x0f,		// SPL analog volume = -7.5dB
-		0x27, 0x0f,		// SPR analog volume = -7.5dB
+		0x26, 0x00,		// SPL analog volume = 0dB
+		0x27, 0x00,		// SPR analog volume = 0dB
 		0x28, 0x06,		// HPL driver PGA = 0dB, not muted
 		0x29, 0x06,		// HPR driver PGA = 0dB, not muted
 		0x2a, 0x04,		// SPL driver PGA = 6dB, not muted
 		0x2b, 0x04,		// SPR driver PGA = 6dB, not muted
 		0x2c, 0x08,		// DAC high current, HP as headphone
 		0x2e, 0x0a,		// MICBIAS force on, MICBIAS = 2.5V
+		0x2f, 0x00,		// MIC PGA = 0dB
 		0x30, 0x10,		// MIC1RP selected for MIC PGA
+		0x31, 0x40,		// CM selected for MIC PGA
 	}, *p = data;
 
 	// Software reset
@@ -269,22 +269,24 @@ static void audio_test()
 #endif
 	// Enable I2S audio interfaces
 	i2s_enable(SPI1, 1);
-	//i2s_enable(SPI2, 1);
+	i2s_enable(SPI2, 1);
 	// I2S loopback
 	uint32_t audio[2] = {0x80000000, 0x7fffffff};
 	// Receive 2 audio channels
 	for (uint32_t i = 0;; i++) {
-		audio[1] = i % 256 == 0 ? ~audio[1] : audio[1];
-		audio[0] = i % 1024 == 0 ? ~audio[0] : audio[0];
-		//audio[1]++;
-		//audio[0]++;
-		//uint32_t data = audio[i % 2];
 		while (!(SPI1->SR & SPI_SR_TXE_Msk));
 		uint32_t data = audio[!!(SPI1->SR & SPI_SR_CHSIDE_Msk)];
 		SPI1->DR = data >> 16;
+
+		while (!(SPI2->SR & SPI_SR_RXNE_Msk));
+		uint32_t *p = &audio[!!(SPI2->SR & SPI_SR_CHSIDE_Msk)];
+		uint32_t adc = SPI2->DR << 16;
+
 		while (!(SPI1->SR & SPI_SR_TXE_Msk));
 		SPI1->DR = data;
-		//while (!(SPI2->SR & SPI_SR_RXNE_Msk));
-		//audio[!!(SPI2->SR & SPI_SR_CHSIDE_Msk)] = SPI2->DR;
+
+		while (!(SPI2->SR & SPI_SR_RXNE_Msk));
+		adc |= SPI2->DR & SPI_DR_DR_Msk;
+		*p = adc;
 	}
 }
