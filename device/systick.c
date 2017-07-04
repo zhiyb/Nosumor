@@ -20,6 +20,8 @@ uint32_t systick_cnt()
 
 void systick_delay(uint32_t cycles)
 {
+	if (cycles == 0)
+		return;
 	cycles += cnt;
 	while (cnt != cycles);
 }

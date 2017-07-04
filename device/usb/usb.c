@@ -13,6 +13,10 @@ void usb_init(usb_t *usb, USB_OTG_GlobalTypeDef *base)
 	usb->base = base;
 	usb->epcnt[USB_EPIN] = 0;
 	usb->epcnt[USB_EPOUT] = 0;
+	usb->desc.dev.size = 0;
+	usb->desc.config.size = 0;
+	usb->usbif = 0;
+
 	usb_ep0_register(usb);
 	if (base != USB_OTG_HS)
 		return;

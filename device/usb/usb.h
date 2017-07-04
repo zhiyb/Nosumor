@@ -25,6 +25,18 @@ typedef struct epout_t {
 	void (*recv)(struct usb_t *usb, uint32_t stat);
 } epout_t;
 
+// Descriptor type
+typedef struct desc_t {
+	uint32_t size;
+	char *p;
+} desc_t;
+
+// Interface handlers
+typedef struct usb_if_t {
+	struct usb_if_t *next;
+	void (*config)(struct usb_t *usb);
+} usb_if_t;
+
 // USB port data structure
 typedef struct usb_t {
 	USB_OTG_GlobalTypeDef *base;
@@ -37,6 +49,12 @@ typedef struct usb_t {
 	uint32_t epcnt[2];
 	epin_t epin[USB_EPIN_CNT];
 	epout_t epout[USB_EPOUT_CNT];
+	// Descriptors
+	struct {
+		desc_t dev, config;
+	} desc;
+	// Interfaces
+	usb_if_t *usbif;
 } usb_t;
 
 void usb_init(usb_t *usb, USB_OTG_GlobalTypeDef *base);

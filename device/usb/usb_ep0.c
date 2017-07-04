@@ -63,7 +63,7 @@ void epout_recv(usb_t *usb, uint32_t stat)
 			dbgbkpt();
 		break;
 	case STAT_SETUP_RECV:
-		usb_setup(usb->base, stat);
+		usb_setup(usb, stat);
 		break;
 	default:
 		dbgbkpt();

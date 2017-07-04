@@ -4,7 +4,6 @@ Project {
     property string device: "STM32F722"
     property bool cmsis_dsp: false
 
-    minimumQbsVersion: "1.7.1"
     references: ["CMSIS"]
 
     CppApplication {
@@ -45,6 +44,8 @@ Project {
             "system_stm32f7xx.c",
             "systick.c",
             "systick.h",
+            "usb/keyboard/usb_keyboard.c",
+            "usb/keyboard/usb_keyboard.h",
             "usb/usb.c",
             "usb/usb.h",
             "usb/usb_desc.c",

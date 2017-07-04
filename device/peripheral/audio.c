@@ -120,7 +120,7 @@ void audio_init()
 	SPI2->I2SPR = (8u << SPI_I2SPR_I2SDIV_Pos);
 
 	// Tests
-	audio_test();
+	//audio_test();
 }
 
 static int i2c_check(I2C_TypeDef *i2c, uint8_t addr)

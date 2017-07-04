@@ -2,6 +2,7 @@
 #define USB_SETUP_H
 
 #include <stm32f7xx.h>
+#include "usb.h"
 
 #define SETUP_TYPE_DIR_Pos	7u
 #define SETUP_TYPE_DIR_Msk	(1ul << SETUP_TYPE_DIR_Pos)
@@ -40,7 +41,7 @@
 #define SETUP_DESC_TYPE_ENDPOINT	5u
 #define SETUP_DESC_TYPE_DEVICE_QUALIFIER		6u
 #define SETUP_DESC_TYPE_OTHER_SPEED_CONFIGURATION	7u
-#define SETUP_DESC_TYPE_INTERACE_POWER	8u
+#define SETUP_DESC_TYPE_INTERFACE_POWER	8u
 
 typedef union setup_t {
 	struct {
@@ -59,6 +60,6 @@ typedef union setup_t {
 	uint32_t raw[2];
 } setup_t;
 
-void usb_setup(USB_OTG_GlobalTypeDef *usb, uint32_t stat);
+void usb_setup(usb_t *usb, uint32_t stat);
 
 #endif // USB_SETUP_H

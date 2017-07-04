@@ -9,8 +9,9 @@
 #include "macros.h"
 #include "systick.h"
 #include "peripheral/uart.h"
-#include "usb/usb.h"
 #include "peripheral/audio.h"
+#include "usb/usb.h"
+#include "usb/keyboard/usb_keyboard.h"
 
 static usb_t usb;
 
@@ -55,7 +56,8 @@ static inline void init()
 	printf(ESC_YELLOW "USB in " ESC_WHITE "%s" ESC_YELLOW " mode\n",
 	       usb_mode(&usb) ? "host" : "device");
 	while (usb_mode(&usb) != 0);
-	//usb_init_device(&usb);
+	usb_keyboard_init(&usb);
+	usb_init_device(&usb);
 
 	puts(ESC_CYAN "Initialising keyboard...");
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN;
@@ -89,7 +91,7 @@ int main()
 {
 	init();
 	puts(ESC_GREEN "Initialisation done");
-#if 0
+#if 1
 	int i = 1;
 	while (GPIOC->IDR & GPIO_IDR_IDR_13) {
 		//GPIOA->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1 | GPIO_ODR_ODR_2);
@@ -103,12 +105,12 @@ int main()
 		systick_delay(i);
 		GPIOB->ODR |= (GPIO_ODR_ODR_15);
 		if (!(GPIOC->IDR & GPIO_IDR_IDR_14)) {
-			systick_delay(500);
+			systick_delay(100);
 			i++;
 		}
 		if (!(GPIOC->IDR & GPIO_IDR_IDR_15)) {
 			systick_delay(500);
-			i = i == 0 ?: i - 1;
+			i = i == 0 ? 0 : i - 1;
 		}
 	}
 #endif
