@@ -20,10 +20,10 @@ uint32_t systick_cnt()
 
 void systick_delay(uint32_t cycles)
 {
+	uint32_t c = cnt;
 	if (cycles == 0)
 		return;
-	cycles += cnt;
-	while (cnt != cycles);
+	while (cnt - c < cycles);
 }
 
 void SysTick_Handler()

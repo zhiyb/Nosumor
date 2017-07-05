@@ -7,6 +7,7 @@
 #include "usb_ep0.h"
 #include "usb_ram.h"
 #include "usb_setup.h"
+#include "usb_desc.h"
 #include "usb.h"
 
 usb_t *usb_hs = 0;
@@ -24,11 +25,7 @@ static void usb_reset(usb_t *usb)
 	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
 	// Reset USB device address
 	dev->DCFG &= ~USB_OTG_DCFG_DAD_Msk;
-	// Set endpoint 0 NAK
-	EP_OUT(usb, 0)->DOEPCTL = USB_OTG_DOEPCTL_EPENA | USB_OTG_DOEPCTL_SNAK;
-	// Disable other endpoints
-	for (int i = 1; i != USB_EPOUT_CNT; i++)
-		EP_OUT(usb, i)->DOEPCTL = USB_OTG_DOEPCTL_EPDIS;
+	dev->DAINTMSK = 0;
 	// Reset USB FIFO RAM
 	usb_ram_reset(usb);
 	// Allocate RX queue
@@ -37,8 +34,7 @@ static void usb_reset(usb_t *usb)
 	usb->base->GRXFSIZ = size / 4;
 	FUNC(usb->epin[0].init)(usb, 0);
 	FUNC(usb->epout[0].init)(usb, 0);
-	// Unmask interrupts
-	dev->DAINTMSK = DAINTMSK_IN(0) | DAINTMSK_OUT(0);
+	usb_desc_init(usb);
 }
 
 void OTG_HS_WKUP_IRQHandler()
@@ -73,6 +69,34 @@ void OTG_HS_IRQHandler()
 	if (i & USB_OTG_GINTSTS_ENUMDNE) {
 		usb_ep0_enum(usb, dev->DSTS & USB_OTG_DSTS_ENUMSPD);
 		usb->GINTSTS = USB_OTG_GINTSTS_ENUMDNE;
+		bk = 0;
+	}
+	if (i & USB_OTG_GINTSTS_OEPINT_Msk) {
+		for (uint32_t n = 0u; n != USB_EPOUT_CNT; n++) {
+			USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb, n);
+			if (ep->DOEPINT & USB_OTG_DOEPINT_XFRC_Msk) {
+				FUNC(usb_hs->epout[n].xfr_cplt)(usb_hs, n);
+				ep->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk;
+			}
+			if (ep->DOEPINT & USB_OTG_DOEPINT_STUP_Msk) {
+				FUNC(usb_hs->epout[n].setup_cplt)(usb_hs, n);
+				ep->DOEPINT = USB_OTG_DOEPINT_STUP_Msk;
+			}
+		}
+		bk = 0;
+	}
+	if (i & USB_OTG_GINTSTS_IEPINT_Msk) {
+		for (uint32_t n = 0u; n != USB_EPIN_CNT; n++) {
+			USB_OTG_INEndpointTypeDef *ep = EP_IN(usb_hs, n);
+			if (ep->DIEPINT & USB_OTG_DIEPINT_XFRC_Msk) {
+				FUNC(usb_hs->epin[n].xfr_cplt)(usb_hs, n);
+				ep->DIEPINT = USB_OTG_DIEPINT_XFRC_Msk;
+			}
+			if (ep->DIEPINT & USB_OTG_DIEPINT_TOC_Msk) {
+				FUNC(usb_hs->epin[n].timeout)(usb_hs, n);
+				ep->DIEPINT = USB_OTG_DIEPINT_TOC_Msk;
+			}
+		}
 		bk = 0;
 	}
 	if (bk)

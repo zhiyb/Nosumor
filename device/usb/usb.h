@@ -17,6 +17,7 @@ extern "C" {
 struct usb_t;
 
 // Setup packet
+// It already aligns to byte boundaries
 typedef union setup_t {
 	struct {
 		uint8_t bmRequestType;
@@ -36,11 +37,19 @@ typedef union setup_t {
 
 // Endpoint handlers
 typedef struct epin_t {
+	void *data;
 	void (*init)(struct usb_t *usb, uint32_t ep);
+	void (*halt)(struct usb_t *usb, uint32_t ep, int halt);
+	void (*timeout)(struct usb_t *usb, uint32_t ep);
+	void (*xfr_cplt)(struct usb_t *usb, uint32_t ep);
 } epin_t;
 typedef struct epout_t {
+	void *data;
 	void (*init)(struct usb_t *usb, uint32_t ep);
 	void (*recv)(struct usb_t *usb, uint32_t stat);
+	void (*halt)(struct usb_t *usb, uint32_t ep, int halt);
+	void (*setup_cplt)(struct usb_t *usb, uint32_t ep);
+	void (*xfr_cplt)(struct usb_t *usb, uint32_t ep);
 } epout_t;
 
 // Descriptor type
@@ -53,6 +62,12 @@ typedef struct const_desc_t {
 	uint32_t size;
 	const void *p;
 } cnost_desc_t;
+
+typedef struct desc_string_list_t {
+	struct desc_string_list_t *next;
+	uint32_t lang;
+	desc_t desc;
+} desc_string_list_t;
 
 // Interface handlers
 typedef struct usb_if_t {
@@ -80,13 +95,14 @@ typedef struct usb_t {
 		uint32_t fifo;
 	};
 	// Endpoint allocation
-	uint32_t epcnt[2];
+	uint32_t nepin, nepout;
 	epin_t epin[USB_EPIN_CNT];
 	epout_t epout[USB_EPOUT_CNT];
 	// Descriptors
 	struct {
 		desc_t dev, config;
-		desc_t *string;
+		desc_t lang;
+		desc_string_list_t **string;
 		uint32_t nstring;
 	} desc;
 	// Interfaces

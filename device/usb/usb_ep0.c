@@ -14,6 +14,8 @@ static void epin_init(usb_t *usb, uint32_t ep)
 {
 	uint32_t size = 128, addr = usb_ram_alloc(usb, &size);
 	usb->base->DIEPTXF0_HNPTXFSIZ = DIEPTXF(addr, size);
+	// Unmask interrupts
+	//dev->DAINTMSK = DAINTMSK_IN(0) | DAINTMSK_OUT(0);
 }
 
 void usb_ep0_enum(USB_OTG_GlobalTypeDef *usb, uint32_t speed)
@@ -50,33 +52,22 @@ void epout_recv(usb_t *usb, uint32_t stat)
 	case STAT_OUT_NAK:
 		dbgbkpt();
 		break;
-	case STAT_OUT_RECV:
-		if (STAT_CNT(stat) != 0)
-			dbgbkpt();
-		break;
-	case STAT_OUT:
-		if (STAT_CNT(stat) != 0)
-			dbgbkpt();
-		break;
-	case STAT_SETUP:
-		if (STAT_CNT(stat) != 0)
-			dbgbkpt();
-		break;
 	case STAT_SETUP_RECV:
 		usb_setup(usb, stat);
 		break;
 	default:
-		dbgbkpt();
+		if (STAT_CNT(stat) != 0)
+			dbgbkpt();
 	}
 }
 
 void usb_ep0_register(usb_t *usb)
 {
 	static const epin_t epin = {
-		epin_init,
+		.init = epin_init,
 	};
 	static const epout_t epout = {
-		0, epout_recv,
+		.recv = epout_recv,
 	};
 	int in, out;
 	usb_ep_register(usb, &epin, &in, &epout, &out);

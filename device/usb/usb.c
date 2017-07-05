@@ -1,6 +1,7 @@
 #include <stm32f7xx.h>
 #include <macros.h>
 #include <debug.h>
+#include <systick.h>
 #include "usb_macros.h"
 #include "usb_irq.h"
 #include "usb_ep0.h"
@@ -10,14 +11,8 @@ static inline void usb_hs_init_gpio();
 
 void usb_init(usb_t *usb, USB_OTG_GlobalTypeDef *base)
 {
+	memset(usb, 0, sizeof(usb_t));
 	usb->base = base;
-	usb->epcnt[USB_EPIN] = 0;
-	usb->epcnt[USB_EPOUT] = 0;
-	usb->desc.dev.size = 0;
-	usb->desc.config.size = 0;
-	usb->desc.string = 0;
-	usb->desc.nstring = 0;
-	usb->usbif = 0;
 
 	if (base != USB_OTG_HS)
 		return;
@@ -142,8 +137,11 @@ void usb_init_device(usb_t *usb)
 	USB_OTG_DeviceTypeDef *dev = DEVICE(base);
 	usb_ep0_register(usb);
 	dev->DCFG = 1ul << 14u;	// Receive OUT packet, High speed
-	base->GINTMSK |= USB_OTG_GINTMSK_USBRST | USB_OTG_GINTMSK_ENUMDNEM | USB_OTG_GINTMSK_RXFLVLM;
 	dev->DOEPMSK = USB_OTG_DOEPMSK_XFRCM | USB_OTG_DOEPMSK_STUPM;
 	dev->DIEPMSK = USB_OTG_DIEPMSK_XFRCM | USB_OTG_DIEPMSK_TOM;
-	dev->DCTL = USB_OTG_DCTL_POPRGDNE_Msk | 0;	// Connect device
+	base->GINTMSK |= USB_OTG_GINTMSK_USBRST | USB_OTG_GINTMSK_ENUMDNEM | USB_OTG_GINTMSK_RXFLVLM |
+			USB_OTG_GINTMSK_OEPINT_Msk | USB_OTG_GINTMSK_IEPINT_Msk;
+	dev->DCTL = USB_OTG_DCTL_SDIS_Msk;	// Disconnect device
+	systick_delay(2);
+	dev->DCTL = 0;				// Connect device
 }

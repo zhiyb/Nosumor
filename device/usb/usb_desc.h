@@ -10,6 +10,7 @@ extern "C" {
 #endif
 
 // Endpoint direction
+#define EP_DIR_Msk	0x80
 #define EP_DIR_IN	0x80
 #define EP_DIR_OUT	0x00
 
@@ -30,15 +31,24 @@ extern "C" {
 #define EP_ISO_FEEDBACK	0x10
 #define EP_ISO_EXPLICIT	0x20
 
+// Language IDs
+#define LANG_EN_US	0x0409
+#define LANG_EN_GB	0x0809
+
+void usb_desc_init(usb_t *usb);
+
 desc_t usb_desc_device(usb_t *usb);
 desc_t usb_desc_config(usb_t *usb);
+desc_t usb_desc_lang(usb_t *usb);
+desc_t usb_desc_string(usb_t *usb, uint8_t index, uint16_t lang);
 
+uint32_t usb_desc_add_string(usb_t *usb, uint16_t id, uint16_t lang, const char *str);
 void usb_desc_add_interface(usb_t *usb, uint8_t bNumEndpoints,
 			    uint8_t bInterfaceClass, uint8_t bInterfaceSubClass,
 			    uint8_t bInterfaceProtocol, uint8_t iInterface);
-void usb_desc_add(usb_t *usb, const void *ptr, uint8_t size);
 void usb_desc_add_endpoint(usb_t *usb, uint8_t bEndpointAddress, uint8_t bmAttributes,
 			   uint16_t wMaxPacketSize, uint8_t bInterval);
+void usb_desc_add(usb_t *usb, const void *ptr, uint8_t size);
 
 #ifdef __cplusplus
 }

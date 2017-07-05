@@ -21,6 +21,7 @@
 
 typedef struct data_t {
 	int ep_in;
+	uint8_t report[KEYBOARD_REPORT_SIZE];
 } data_t;
 
 static void epin_init(usb_t *usb, uint32_t ep)
@@ -29,18 +30,24 @@ static void epin_init(usb_t *usb, uint32_t ep)
 	usb->base->DIEPTXF[ep - 1] = DIEPTXF(addr, size);
 }
 
-static void set_idle(uint8_t duration, uint8_t reportID)
+static void ep_halt(struct usb_t *usb, uint32_t ep, int halt)
 {
-	if (duration != 0)
-		dbgbkpt();
+	data_t *p = (data_t *)usb->epin[ep].data;
+	EP_IN(usb->base, ep)->DIEPCTL = USB_OTG_DIEPCTL_USBAEP_Msk |
+			EP_IN_TYP_INTERRUPT | (ep << USB_OTG_DIEPCTL_TXFNUM_Pos) |
+			(KEYBOARD_REPORT_SIZE << USB_OTG_DIEPCTL_MPSIZ_Pos);
+	if (!halt)
+		usb_ep_in_transfer(usb->base, ep, p->report, KEYBOARD_REPORT_SIZE);
 }
 
 static void usbif_config(usb_t *usb, void *data)
 {
 	data_t *p = (data_t *)data;
 	// Register endpoints
-	static const epin_t epin = {
-		epin_init,
+	const epin_t epin = {
+		.data = data,
+		.init = epin_init,
+		.halt = ep_halt,
 	};
 	usb_ep_register(usb, &epin, &p->ep_in, 0, 0);
 
@@ -51,6 +58,12 @@ static void usbif_config(usb_t *usb, void *data)
 	usb_desc_add(usb, &desc_hid, desc_hid.bLength);
 	usb_desc_add_endpoint(usb, EP_DIR_IN | p->ep_in,
 			      EP_INTERRUPT, KEYBOARD_REPORT_SIZE, 1u);
+}
+
+static void set_idle(uint8_t duration, uint8_t reportID)
+{
+	if (duration != 0)
+		dbgbkpt();
 }
 
 static void usb_send_descriptor(usb_t *usb, uint32_t ep, setup_t pkt)
@@ -125,15 +138,13 @@ static void usbif_setup_class(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
 static void usbif_enable(usb_t *usb, void *data)
 {
 	data_t *p = (data_t *)data;
-	EP_IN(usb, p->ep_in)->DIEPCTL = USB_OTG_DIEPCTL_USBAEP_Msk |
-			EP_IN_TYP_INTERRUPT | (p->ep_in << USB_OTG_DIEPCTL_TXFNUM_Pos) |
-			(KEYBOARD_REPORT_SIZE << USB_OTG_DIEPCTL_MPSIZ_Pos);
+	ep_halt(usb, p->ep_in, 0);
 }
 
 void usb_keyboard_init(usb_t *usb)
 {
 	usb_if_t usbif = {
-		.data = malloc(sizeof(data_t)),
+		.data = calloc(1u, sizeof(data_t)),
 		.config = &usbif_config,
 		.setup_std = &usbif_setup_std,
 		.setup_class = &usbif_setup_class,

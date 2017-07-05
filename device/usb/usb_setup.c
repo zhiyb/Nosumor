@@ -16,13 +16,22 @@ static void usb_send_descriptor(usb_t *usb, uint32_t ep, setup_t pkt)
 	case SETUP_DESC_TYPE_CONFIGURATION:
 		desc = usb_desc_config(usb);
 		break;
+	case SETUP_DESC_TYPE_DEVICE_QUALIFIER:
+		usb_ep_in_stall(usb->base, ep);
+		dbgbkpt();
+	case SETUP_DESC_TYPE_STRING:
+		desc = usb_desc_string(usb, pkt.bIndex, pkt.wIndex);
+		break;
 	default:
 		usb_ep_in_stall(usb->base, ep);
 		dbgbkpt();
 		return;
 	}
-	desc.size = desc.size > pkt.wLength ? pkt.wLength : desc.size;
-	usb_ep_in_transfer(usb->base, ep, desc.p, desc.size);
+	if (desc.size) {
+		desc.size = desc.size > pkt.wLength ? pkt.wLength : desc.size;
+		usb_ep_in_transfer(usb->base, ep, desc.p, desc.size);
+	} else
+		usb_ep_in_stall(usb->base, ep);
 }
 
 static void usb_setup_standard_device(usb_t *usb, uint32_t ep, setup_t pkt)
@@ -41,9 +50,10 @@ static void usb_setup_standard_device(usb_t *usb, uint32_t ep, setup_t pkt)
 	case SETUP_TYPE_DIR_H2D:
 		switch (pkt.bRequest) {
 		case SETUP_REQ_SET_ADDRESS:
-			usb_ep_in_transfer(usb->base, ep, 0, 0);
+			//usb->addr = pkt.wValue;
 			DEVICE(usb->base)->DCFG = (DEVICE(usb->base)->DCFG & ~USB_OTG_DCFG_DAD_Msk) |
 					((pkt.wValue << USB_OTG_DCFG_DAD_Pos) & USB_OTG_DCFG_DAD_Msk);
+			usb_ep_in_transfer(usb->base, ep, 0, 0);
 			break;
 		case SETUP_REQ_SET_CONFIGURATION:
 			if (pkt.wValue == 1) {
@@ -78,18 +88,54 @@ static void usb_setup_standard_interface(usb_t *usb, uint32_t ep, setup_t pkt)
 	dbgbkpt();
 }
 
+static int usb_setup_endpoint_halt(usb_t *usb, uint32_t ep, int halt)
+{
+	uint32_t n = ep & ~EP_DIR_Msk;
+	switch (ep & EP_DIR_Msk) {
+	case EP_DIR_IN:
+		if (usb->epin[n].halt) {
+			usb->epin[n].halt(usb, n, halt);
+			return 1;
+		}
+		dbgbkpt();
+		break;
+	case EP_DIR_OUT:
+		if (usb->epout[n].halt) {
+			usb->epout[n].halt(usb, n, halt);
+			return 1;
+		}
+		dbgbkpt();
+		break;
+	default:
+		dbgbkpt();
+	}
+	return 0;
+
+}
+
 static void usb_setup_standard_endpoint(usb_t *usb, uint32_t ep, setup_t pkt)
 {
 	switch (pkt.bmRequestType & SETUP_TYPE_DIR_Msk) {
 	case SETUP_TYPE_DIR_H2D:
 		switch (pkt.bRequest) {
 		case SETUP_REQ_CLEAR_FEATURE:
-			usb_ep_in_stall(usb->base, ep);
-			dbgbkpt();
+			switch (pkt.wValue) {
+			case SETUP_FEATURE_ENDPOINT_HALT:
+				if (usb_setup_endpoint_halt(usb, pkt.wIndex, 0))
+					usb_ep_in_transfer(usb->base, ep, 0, 0);
+				else
+					usb_ep_in_stall(usb->base, ep);
+				break;
+			default:
+				usb_ep_in_stall(usb->base, ep);
+				dbgbkpt();
+			}
+			break;
 		default:
 			usb_ep_in_stall(usb->base, ep);
 			dbgbkpt();
 		}
+		break;
 	default:
 		usb_ep_in_stall(usb->base, ep);
 		dbgbkpt();
