@@ -35,8 +35,8 @@ static void usb_reset(usb_t *usb)
 	uint32_t size = usb_ram_size(usb) / 2;
 	usb_ram_alloc(usb, &size);
 	usb->base->GRXFSIZ = size / 4;
-	FUNC(usb->epin[0].init)(usb);
-	FUNC(usb->epout[0].init)(usb);
+	FUNC(usb->epin[0].init)(usb, 0);
+	FUNC(usb->epout[0].init)(usb, 0);
 	// Unmask interrupts
 	dev->DAINTMSK = DAINTMSK_IN(0) | DAINTMSK_OUT(0);
 }

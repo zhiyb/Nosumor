@@ -1,4 +1,5 @@
 #include <debug.h>
+#include "../escape.h"
 #include "usb_ep.h"
 #include "usb_ep0.h"
 #include "usb_setup.h"
@@ -27,6 +28,15 @@ void usb_ep_in_stall(USB_OTG_GlobalTypeDef *usb, int ep)
 
 void usb_ep_in_transfer(USB_OTG_GlobalTypeDef *usb, int n, const void *p, uint32_t size)
 {
+#ifdef DEBUG
+	dbgprintf(ESC_GREY "<%dI%lu ", n, size);
+	uint8_t *dp = (uint8_t *)p;
+	uint32_t i = size;
+	while (i--)
+		dbgprintf("%02x", *dp++);
+	dbgprintf(">\n");
+#endif
+
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb, n);
 	// Wait for endpoint available
 	while (ep->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk);

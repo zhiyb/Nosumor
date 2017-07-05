@@ -1,15 +1,13 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
-#include <string.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define dbgexist()	(CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk)
 
 #ifdef DEBUG
+
+#include <stdio.h>
+#include <string.h>
+#include "escape.h"
 
 #define VARIANT	"DEBUG"
 #define dbgbkpt()	asm ("bkpt #0")
@@ -38,6 +36,8 @@ static inline void dbgsystem(char *cmd)
 	dbgcmd(0x12, data);  // SYS_SYSTEM
 }
 
+#define dbgprintf	printf
+
 #else	// DEBUG
 
 #define VARIANT	"RELEASE"
@@ -46,10 +46,8 @@ static inline void dbgsystem(char *cmd)
 #define dbgputc(str)	((void)0)
 #define dbgsystem(str)	((void)0)
 
-#endif	// DEBUG
+#define dbgprintf(...)
 
-#ifdef __cplusplus
-}
-#endif
+#endif	// DEBUG
 
 #endif // DEBUG_H

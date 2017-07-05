@@ -5,7 +5,7 @@
 
 uint32_t usb_ram_alloc(usb_t *usb, uint32_t *size)
 {
-	*size &= ~3ul;	// Align to 32-bit words
+	*size = (*size + 3ul) & ~3ul;	// Align to 32-bit words
 	if (usb->top + *size >= usb_ram_size(usb))
 		*size = usb->max - usb->top - 1;
 	uint32_t addr = usb->top;
@@ -31,11 +31,10 @@ uint32_t usb_ram_fifo_alloc(usb_t *usb)
 	return ++usb->fifo;
 }
 
-void usb_interface_alloc(usb_t *usb, usb_if_t *usbif)
+void usb_interface_alloc(usb_t *usb, const usb_if_t *usbif)
 {
-	usb_if_t **p = &usb->usbif;
-	while (*p != 0)
-		p = &(*p)->next;
+	usb_if_t **p;
+	for (p = &usb->usbif; *p != 0; p = &(*p)->next);
 	*p = (usb_if_t *)malloc(sizeof(usb_if_t));
 	**p = *usbif;
 	(*p)->next = 0;

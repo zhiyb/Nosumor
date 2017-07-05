@@ -46,6 +46,7 @@ Project {
             "systick.h",
             "usb/keyboard/usb_keyboard.c",
             "usb/keyboard/usb_keyboard.h",
+            "usb/keyboard/usb_keyboard_desc.h",
             "usb/usb.c",
             "usb/usb.h",
             "usb/usb_desc.c",

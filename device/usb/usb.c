@@ -17,7 +17,6 @@ void usb_init(usb_t *usb, USB_OTG_GlobalTypeDef *base)
 	usb->desc.config.size = 0;
 	usb->usbif = 0;
 
-	usb_ep0_register(usb);
 	if (base != USB_OTG_HS)
 		return;
 	usb_hs_init_gpio();
@@ -136,6 +135,7 @@ void usb_init_device(usb_t *usb)
 {
 	USB_OTG_GlobalTypeDef *base = usb->base;
 	USB_OTG_DeviceTypeDef *dev = DEVICE(base);
+	usb_ep0_register(usb);
 	// Reset PHY clock
 	PCGCCTL(base) = 0;
 	dev->DCFG = 0;	// Receive OUT packet, High speed

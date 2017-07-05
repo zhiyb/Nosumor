@@ -4,6 +4,7 @@
 #include <stm32f7xx.h>
 
 #define FUNC(f)	if (f) f
+#define PACKED	__attribute__((__packed__))
 
 #define DEVICE(usb)	((USB_OTG_DeviceTypeDef *)((void *)(usb) + USB_OTG_DEVICE_BASE))
 #define EP_IN(usb, n)	((USB_OTG_INEndpointTypeDef *)((void *)(usb) + USB_OTG_IN_ENDPOINT_BASE + ((n) << 5)))
@@ -18,6 +19,11 @@
 	USB_OTG_DIEPCTL_USBAEP_Msk | USB_OTG_DIEPCTL_MPSIZ_Msk)
 #define DIEPCTL_SET(r, m)	(r) = ((r) & DIEPCTL_MASK) | (m)
 #define DIEPTXF(a, d)	((((d) >> 2) << USB_OTG_DIEPTXF_INEPTXFD_Pos) | ((a) << USB_OTG_DIEPTXF_INEPTXSA_Pos))
+
+#define EP_IN_TYP_CONTROL	(0b00ul << USB_OTG_DIEPCTL_EPTYP_Pos)
+#define EP_IN_TYP_ISOCHRONOUS	(0b01ul << USB_OTG_DIEPCTL_EPTYP_Pos)
+#define EP_IN_TYP_BULK		(0b10ul << USB_OTG_DIEPCTL_EPTYP_Pos)
+#define EP_IN_TYP_INTERRUPT	(0b11ul << USB_OTG_DIEPCTL_EPTYP_Pos)
 
 #define STAT_OUT_NAK	(0b0001ul << USB_OTG_GRXSTSP_PKTSTS_Pos)
 #define STAT_OUT_RECV	(0b0010ul << USB_OTG_GRXSTSP_PKTSTS_Pos)

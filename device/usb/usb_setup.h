@@ -17,9 +17,9 @@
 
 #define SETUP_TYPE_RCPT_Pos	0u
 #define SETUP_TYPE_RCPT_Msk	(0x1ful << SETUP_TYPE_RCPT_Pos)
-#define SETUP_TYPE_RCPT_DEV	(0ul << SETUP_TYPE_RCPT_Pos)
-#define SETUP_TYPE_RCPT_IF	(1ul << SETUP_TYPE_RCPT_Pos)
-#define SETUP_TYPE_RCPT_EP	(2ul << SETUP_TYPE_RCPT_Pos)
+#define SETUP_TYPE_RCPT_DEVICE	(0ul << SETUP_TYPE_RCPT_Pos)
+#define SETUP_TYPE_RCPT_INTERFACE	(1ul << SETUP_TYPE_RCPT_Pos)
+#define SETUP_TYPE_RCPT_ENDPOINT	(2ul << SETUP_TYPE_RCPT_Pos)
 #define SETUP_TYPE_RCPT_OTHER	(3ul << SETUP_TYPE_RCPT_Pos)
 
 #define SETUP_REQ_GET_STATUS		0u
@@ -42,23 +42,6 @@
 #define SETUP_DESC_TYPE_DEVICE_QUALIFIER		6u
 #define SETUP_DESC_TYPE_OTHER_SPEED_CONFIGURATION	7u
 #define SETUP_DESC_TYPE_INTERFACE_POWER	8u
-
-typedef union setup_t {
-	struct {
-		uint8_t type;
-		uint8_t request;
-		union {
-			uint16_t value;
-			struct {
-				uint8_t dindex;
-				uint8_t dtype;
-			};
-		};
-		uint16_t index;
-		uint16_t length;
-	};
-	uint32_t raw[2];
-} setup_t;
 
 void usb_setup(usb_t *usb, uint32_t stat);
 

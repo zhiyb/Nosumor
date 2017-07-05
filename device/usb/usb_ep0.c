@@ -10,7 +10,7 @@
 #define DSTS_ENUMSPD_LS_PHY_6MHZ               (2 << 1)
 #define DSTS_ENUMSPD_FS_PHY_48MHZ              (3 << 1)
 
-static void epin_init(usb_t *usb)
+static void epin_init(usb_t *usb, uint32_t ep)
 {
 	uint32_t size = 128, addr = usb_ram_alloc(usb, &size);
 	usb->base->DIEPTXF0_HNPTXFSIZ = DIEPTXF(addr, size);
@@ -72,10 +72,10 @@ void epout_recv(usb_t *usb, uint32_t stat)
 
 void usb_ep0_register(usb_t *usb)
 {
-	const epin_t epin = {
+	static const epin_t epin = {
 		epin_init,
 	};
-	const epout_t epout = {
+	static const epout_t epout = {
 		0, epout_recv,
 	};
 	int in, out;
