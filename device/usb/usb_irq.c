@@ -21,7 +21,7 @@ void usb_hs_irq_init(usb_t *usb)
 
 static void usb_reset(usb_t *usb)
 {
-	USB_OTG_DeviceTypeDef *dev = DEVICE(usb);
+	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
 	// Reset USB device address
 	dev->DCFG &= ~USB_OTG_DCFG_DAD_Msk;
 	// Set endpoint 0 NAK

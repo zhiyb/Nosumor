@@ -86,6 +86,8 @@ typedef struct usb_t {
 	// Descriptors
 	struct {
 		desc_t dev, config;
+		desc_t *string;
+		uint32_t nstring;
 	} desc;
 	// Interfaces
 	usb_if_t *usbif;
