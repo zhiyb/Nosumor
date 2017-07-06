@@ -5,9 +5,7 @@
 
 #ifdef DEBUG
 
-#include <stdio.h>
 #include <string.h>
-#include "escape.h"
 
 #define VARIANT	"DEBUG"
 #define dbgbkpt()	asm ("bkpt #0")
@@ -36,8 +34,6 @@ static inline void dbgsystem(char *cmd)
 	dbgcmd(0x12, data);  // SYS_SYSTEM
 }
 
-#define dbgprintf	printf
-
 #else	// DEBUG
 
 #define VARIANT	"RELEASE"
@@ -45,8 +41,6 @@ static inline void dbgsystem(char *cmd)
 #define dbgputs(str)	((void)0)
 #define dbgputc(str)	((void)0)
 #define dbgsystem(str)	((void)0)
-
-#define dbgprintf(...)
 
 #endif	// DEBUG
 

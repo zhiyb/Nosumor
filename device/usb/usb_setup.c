@@ -1,4 +1,4 @@
-#include <debug.h>
+#include "usb_debug.h"
 #include "usb_setup.h"
 #include "usb_ep.h"
 #include "usb_macros.h"

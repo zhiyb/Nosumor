@@ -7,7 +7,6 @@ Project {
     references: ["CMSIS"]
 
     CppApplication {
-        cpp.includePaths: ["."]
         cpp.commonCompilerFlags: [
             "-Wno-unused-parameter",
             "-Wno-unused-function",
@@ -27,6 +26,7 @@ Project {
 
         files: [
             "STM32F722RETx_FLASH.ld",
+            "irq.h",
             "peripheral/audio.c",
             "peripheral/audio.h",
             "clock.c",
@@ -44,11 +44,14 @@ Project {
             "system_stm32f7xx.c",
             "systick.c",
             "systick.h",
+            "usb/keyboard/keyboard.c",
+            "usb/keyboard/keyboard.h",
             "usb/keyboard/usb_keyboard.c",
             "usb/keyboard/usb_keyboard.h",
             "usb/keyboard/usb_keyboard_desc.h",
             "usb/usb.c",
             "usb/usb.h",
+            "usb/usb_debug.h",
             "usb/usb_desc.c",
             "usb/usb_desc.h",
             "usb/usb_ep.c",

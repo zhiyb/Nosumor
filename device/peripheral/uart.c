@@ -1,5 +1,5 @@
+#include "../clock.h"
 #include "uart.h"
-#include <clock.h>
 
 void uart_init(USART_TypeDef *uart)
 {

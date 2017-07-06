@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stm32f7xx.h>
-#include <debug.h>
-#include <escape.h>
+#include "usb_debug.h"
 #include "usb_macros.h"
 #include "usb_ep.h"
 #include "usb_ep0.h"

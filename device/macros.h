@@ -56,4 +56,24 @@
 #define GPIO_PUPDR_UP	0b01
 #define GPIO_PUPDR_DOWN	0b10
 
+#define EXTICR_EXTI_PA	0u
+#define EXTICR_EXTI_PB	1u
+#define EXTICR_EXTI_PC	2u
+#define EXTICR_EXTI_PD	3u
+#define EXTICR_EXTI_PE	4u
+#define EXTICR_EXTI_PF	5u
+#define EXTICR_EXTI_PG	6u
+#define EXTICR_EXTI_PH	7u
+#define EXTICR_EXTI_PI	8u
+#define EXTICR_EXTI_PJ	9u
+#define EXTICR_EXTI_PK	10u
+
+static inline void exticr_exti(uint32_t pin, uint32_t port)
+{
+	uint32_t pos = ((pin) & 3u) << 2u;
+	uint32_t mask = SYSCFG_EXTICR1_EXTI0_Msk << pos;
+	__IO uint32_t *io = &SYSCFG->EXTICR[(pin) >> 2u];
+	*io = (*io & ~mask) | (port << pos);
+}
+
 #endif // MACROS_H

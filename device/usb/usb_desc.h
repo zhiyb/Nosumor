@@ -32,6 +32,7 @@ extern "C" {
 #define EP_ISO_EXPLICIT	0x20
 
 // Language IDs
+#define LANG_ZH_CN	0x0804
 #define LANG_EN_US	0x0409
 #define LANG_EN_GB	0x0809
 

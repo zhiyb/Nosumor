@@ -1,5 +1,5 @@
-#include <debug.h>
 #include "../escape.h"
+#include "usb_debug.h"
 #include "usb_ep.h"
 #include "usb_ep0.h"
 #include "usb_setup.h"
@@ -38,11 +38,13 @@ void usb_ep_in_transfer(USB_OTG_GlobalTypeDef *usb, int n, const void *p, uint32
 		return;
 	}
 
+#ifdef DEBUG
 	dbgprintf(ESC_GREY "<%dI%lu ", n, size);
 	uint8_t *dp = (uint8_t *)p;
 	uint32_t i = size;
 	while (i--)
 		dbgprintf("%02x", *dp++);
+#endif
 
 	uint32_t max = usb_ep_in_max_size(usb, n);
 	uint32_t pcnt = (size + max - 1) / max;
@@ -55,7 +57,9 @@ void usb_ep_in_transfer(USB_OTG_GlobalTypeDef *usb, int n, const void *p, uint32
 	while (size--)
 		FIFO(usb, n) = *ptr++;
 
+#ifdef DEBUG
 	dbgprintf(">\n");
+#endif
 }
 
 uint32_t usb_ep_in_max_size(USB_OTG_GlobalTypeDef *usb, int ep)

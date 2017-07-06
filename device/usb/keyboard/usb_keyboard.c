@@ -1,7 +1,7 @@
 #include <malloc.h>
-#include <debug.h>
 #include "usb_keyboard.h"
 #include "usb_keyboard_desc.h"
+#include "../usb_debug.h"
 #include "../usb_ram.h"
 #include "../usb_desc.h"
 #include "../usb_ep.h"
@@ -54,7 +54,8 @@ static void usbif_config(usb_t *usb, void *data)
 	// bInterfaceClass	3: HID class
 	// bInterfaceSubClass	1: Boot interface
 	// bInterfaceProtocol	0: None, 1: Keyboard, 2: Mouse
-	usb_desc_add_interface(usb, 1u, 3u, 0u, 1u, 0u);
+	usb_desc_add_interface(usb, 1u, 3u, 0u, 1u,
+			       usb_desc_add_string(usb, 0, LANG_EN_US, "HID Keyboard"));
 	usb_desc_add(usb, &desc_hid, desc_hid.bLength);
 	usb_desc_add_endpoint(usb, EP_DIR_IN | p->ep_in,
 			      EP_INTERRUPT, KEYBOARD_REPORT_SIZE, 1u);

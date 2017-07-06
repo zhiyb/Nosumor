@@ -1,7 +1,8 @@
 #include <stm32f7xx.h>
-#include <macros.h>
-#include <debug.h>
-#include <systick.h>
+#include "../macros.h"
+#include "../systick.h"
+#include "../irq.h"
+#include "usb_debug.h"
 #include "usb_macros.h"
 #include "usb_irq.h"
 #include "usb_ep0.h"
@@ -38,10 +39,14 @@ void usb_init(usb_t *usb, USB_OTG_GlobalTypeDef *base)
 	usb_hs_irq_init(usb);
 
 	uint32_t pg = NVIC_GetPriorityGrouping();
-	NVIC_SetPriority(OTG_HS_IRQn, NVIC_EncodePriority(pg, 2, 1));
-	NVIC_SetPriority(OTG_HS_WKUP_IRQn, NVIC_EncodePriority(pg, 2, 1));
-	NVIC_SetPriority(OTG_HS_EP1_IN_IRQn, NVIC_EncodePriority(pg, 2, 0));
-	NVIC_SetPriority(OTG_HS_EP1_OUT_IRQn, NVIC_EncodePriority(pg, 2, 0));
+	NVIC_SetPriority(OTG_HS_IRQn,
+			 NVIC_EncodePriority(pg, NVIC_PRIORITY_USB, 2));
+	NVIC_SetPriority(OTG_HS_WKUP_IRQn,
+			 NVIC_EncodePriority(pg, NVIC_PRIORITY_USB, 0));
+	NVIC_SetPriority(OTG_HS_EP1_IN_IRQn,
+			 NVIC_EncodePriority(pg, NVIC_PRIORITY_USB, 1));
+	NVIC_SetPriority(OTG_HS_EP1_OUT_IRQn,
+			 NVIC_EncodePriority(pg, NVIC_PRIORITY_USB, 1));
 	NVIC_EnableIRQ(OTG_HS_IRQn);
 	NVIC_EnableIRQ(OTG_HS_WKUP_IRQn);
 	NVIC_EnableIRQ(OTG_HS_EP1_IN_IRQn);
