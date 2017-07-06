@@ -1,6 +1,8 @@
 #ifndef USB_DEBUG_H
 #define USB_DEBUG_H
 
+//#undef DEBUG
+
 #include <stdio.h>
 #include "../escape.h"
 #include "../debug.h"

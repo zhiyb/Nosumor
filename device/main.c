@@ -85,7 +85,7 @@ int main()
 	init();
 	puts(ESC_GREEN "Initialisation done");
 	uint32_t s;
-#if 1
+#if 0
 	int i = 1;
 	while (!((s = keyboard_status()) & keyboard_masks[2])) {
 		//GPIOA->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1 | GPIO_ODR_ODR_2);
@@ -109,25 +109,25 @@ int main()
 	for (;;) {
 		s = keyboard_status();
 		if (s & keyboard_masks[0])
-			GPIOA->ODR |= GPIO_ODR_ODR_15;
+			GPIOB->ODR &= ~GPIO_ODR_ODR_15;
 		else
-			GPIOA->ODR &= ~GPIO_ODR_ODR_15;
+			GPIOB->ODR |= GPIO_ODR_ODR_15;
 		if (s & keyboard_masks[1])
-			GPIOA->ODR |= GPIO_ODR_ODR_11;
+			GPIOB->ODR &= ~GPIO_ODR_ODR_14;
 		else
-			GPIOA->ODR &= ~GPIO_ODR_ODR_11;
+			GPIOB->ODR |= GPIO_ODR_ODR_14;
 		if (s & keyboard_masks[2])
-			GPIOA->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1 | GPIO_ODR_ODR_2);
+			GPIOA->ODR &= ~GPIO_ODR_ODR_0;
 		else
-			GPIOA->ODR |= (GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1 | GPIO_ODR_ODR_2);
+			GPIOA->ODR |= GPIO_ODR_ODR_0;
 		if (s & keyboard_masks[3])
-			GPIOB->ODR &= ~(GPIO_ODR_ODR_14);
+			GPIOA->ODR &= ~GPIO_ODR_ODR_2;
 		else
-			GPIOB->ODR |= (GPIO_ODR_ODR_14);
+			GPIOA->ODR |= GPIO_ODR_ODR_2;
 		if (s & keyboard_masks[4])
-			GPIOB->ODR &= ~(GPIO_ODR_ODR_15);
+			GPIOA->ODR &= ~GPIO_ODR_ODR_1;
 		else
-			GPIOB->ODR |= (GPIO_ODR_ODR_15);
+			GPIOA->ODR |= GPIO_ODR_ODR_1;
 	}
 	return 0;
 }

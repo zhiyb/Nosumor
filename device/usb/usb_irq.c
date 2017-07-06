@@ -86,7 +86,7 @@ void OTG_HS_IRQHandler()
 	}
 	if (i & USB_OTG_GINTSTS_IEPINT_Msk) {
 		for (uint32_t n = 0u; n != USB_EPIN_CNT; n++) {
-			USB_OTG_INEndpointTypeDef *ep = EP_IN(usb_hs, n);
+			USB_OTG_INEndpointTypeDef *ep = EP_IN(usb, n);
 			if (ep->DIEPINT & USB_OTG_DIEPINT_XFRC_Msk) {
 				FUNC(usb_hs->epin[n].xfr_cplt)(usb_hs, n);
 				ep->DIEPINT = USB_OTG_DIEPINT_XFRC_Msk;

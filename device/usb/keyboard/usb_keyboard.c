@@ -20,10 +20,20 @@
 #define SETUP_REQ_SET_IDLE	0x0au
 #define SETUP_REQ_SET_PROTOCOL	0x0bu
 
+uint8_t keycodes[KEYBOARD_KEYS] = {
+	// x,    z,    c,    ~,  ESC
+	0x1b, 0x1d, 0x06, 0x35, 0x29,
+};
+
 typedef struct data_t {
 	int ep_in;
 	uint8_t report[KEYBOARD_REPORT_SIZE];
 } data_t;
+
+static struct {
+	usb_t *usb;
+	data_t *data;
+} _usb = {0, 0};
 
 static void epin_init(usb_t *usb, uint32_t ep)
 {
@@ -33,12 +43,11 @@ static void epin_init(usb_t *usb, uint32_t ep)
 
 static void ep_halt(struct usb_t *usb, uint32_t ep, int halt)
 {
-	data_t *p = (data_t *)usb->epin[ep].data;
 	EP_IN(usb->base, ep)->DIEPCTL = USB_OTG_DIEPCTL_USBAEP_Msk |
 			EP_IN_TYP_INTERRUPT | (ep << USB_OTG_DIEPCTL_TXFNUM_Pos) |
 			(KEYBOARD_REPORT_SIZE << USB_OTG_DIEPCTL_MPSIZ_Pos);
 	if (!halt)
-		usb_ep_in_transfer(usb->base, ep, p->report, KEYBOARD_REPORT_SIZE);
+		usb_keyboard_update(keyboard_status());
 }
 
 static void usbif_config(usb_t *usb, void *data)
@@ -55,8 +64,8 @@ static void usbif_config(usb_t *usb, void *data)
 	// bInterfaceClass	3: HID class
 	// bInterfaceSubClass	1: Boot interface
 	// bInterfaceProtocol	0: None, 1: Keyboard, 2: Mouse
-	usb_desc_add_interface(usb, 1u, 3u, 0u, 1u,
-			       usb_desc_add_string(usb, 0, LANG_EN_US, "HID Keyboard"));
+	uint32_t s = usb_desc_add_string(usb, 0, LANG_EN_US, "HID Keyboard");
+	usb_desc_add_interface(usb, 1u, 3u, 0u, 1u, s);
 	usb_desc_add(usb, &desc_hid, desc_hid.bLength);
 	usb_desc_add_endpoint(usb, EP_DIR_IN | p->ep_in,
 			      EP_INTERRUPT, KEYBOARD_REPORT_SIZE, 1u);
@@ -140,6 +149,8 @@ static void usbif_setup_class(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
 static void usbif_enable(usb_t *usb, void *data)
 {
 	data_t *p = (data_t *)data;
+	_usb.usb = usb;
+	_usb.data = p;
 	ep_halt(usb, p->ep_in, 0);
 }
 
@@ -152,13 +163,24 @@ void usb_keyboard_init(usb_t *usb)
 		.setup_class = &usbif_setup_class,
 		.enable = &usbif_enable,
 	};
+	_usb.usb = 0;
 	usb_interface_alloc(usb, &usbif);
 }
 
 void usb_keyboard_update(uint32_t status)
 {
+	if (!_usb.usb)
+		return;
+	memset(_usb.data->report, 0, KEYBOARD_REPORT_SIZE);
+	_usb.data->report[0] = HID_KEYBOARD;	// Report ID
+	// Modifier keys, reserved, keycodes
+	uint8_t *p = &_usb.data->report[3];
+	// Update report
 	const uint32_t *pm = keyboard_masks;
 	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++)
 		if (status & *pm++)
-			;
+			*p++ = keycodes[i];
+	// Send report
+	usb_ep_in_transfer(_usb.usb->base, _usb.data->ep_in,
+			   _usb.data->report, KEYBOARD_REPORT_SIZE);
 }
