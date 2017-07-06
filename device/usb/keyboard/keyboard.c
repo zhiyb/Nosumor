@@ -1,6 +1,8 @@
 #include <stdint.h>
+#include <stdio.h>
 #include <stm32f7xx.h>
 #include "../../irq.h"
+#include "../../systick.h"
 #include "../../macros.h"
 #include "../../debug.h"
 #include "keyboard.h"
@@ -8,12 +10,19 @@
 // KEY_12:	PA6(K1), PB2(K2)
 // KEY_345:	PC13(K3), PC14(K4), PC15(K5)
 
+// Debouncing time (SysTick counts)
+#define KEYBOARD_DEBOUNCING	5
+
 #define KEYBOARD_Msk	((1ul << 2) | (1ul << 6) | (1ul << 13) | (1ul << 14) | (1ul << 15))
 
-static const uint32_t masks[] = {1ul << 2, 1ul << 6, 1ul << 13, 1ul << 14, 1ul << 15};
-static uint32_t stat;
+const uint32_t keyboard_masks[KEYBOARD_KEYS] = {
+	1ul << 2, 1ul << 6, 1ul << 13, 1ul << 14, 1ul << 15
+};
 
-static uint32_t keyboard_status();
+static uint32_t status, debouncing, timeout[KEYBOARD_KEYS];
+
+static uint32_t keyboard_gpio_status();
+static void keyboard_tick(uint32_t tick);
 
 void keyboard_init()
 {
@@ -40,14 +49,15 @@ void keyboard_init()
 	exticr_exti(13, EXTICR_EXTI_PC);
 	exticr_exti(14, EXTICR_EXTI_PC);
 	exticr_exti(15, EXTICR_EXTI_PC);
-	// Falling edge trigger
-	EXTI->RTSR &= ~KEYBOARD_Msk;
+	// Rising and falling edge trigger
+	EXTI->RTSR |= KEYBOARD_Msk;
 	EXTI->FTSR |= KEYBOARD_Msk;
 	// Clear interrupts
 	EXTI->PR = KEYBOARD_Msk;
 	// Unmask interrupts
 	EXTI->IMR |= KEYBOARD_Msk;
-	stat = keyboard_status();
+	status = keyboard_gpio_status();
+	debouncing = 0ul;
 
 	// Enable NVIC interrupts
 	uint32_t pg = NVIC_GetPriorityGrouping();
@@ -60,9 +70,12 @@ void keyboard_init()
 	NVIC_EnableIRQ(EXTI2_IRQn);
 	NVIC_EnableIRQ(EXTI9_5_IRQn);
 	NVIC_EnableIRQ(EXTI15_10_IRQn);
+
+	// Register debouncing tick
+	systick_register_handler(&keyboard_tick);
 }
 
-static uint32_t keyboard_status()
+static uint32_t keyboard_gpio_status()
 {
 	uint32_t stat = ~KEYBOARD_Msk;
 	stat |= GPIOA->IDR & GPIO_IDR_IDR_6;
@@ -73,13 +86,54 @@ static uint32_t keyboard_status()
 	return ~stat;
 }
 
+uint32_t keyboard_status()
+{
+	return status;
+}
+
 static void keyboard_irq()
 {
+	// Critical mutual exclusion interrupt handling section
+	__disable_irq();
 	uint32_t irq = EXTI->PR & KEYBOARD_Msk;
-	stat |= irq;
+	// Disable interrupt triggers for debouncing
+	EXTI->RTSR &= ~irq;
+	EXTI->FTSR &= ~irq;
 	EXTI->PR = irq;
+	__enable_irq();
+
+	// IRQ should be different from here even if reentrant
+	// Timeout value for debouncing
+	uint32_t to = systick_cnt() + KEYBOARD_DEBOUNCING;
+	status ^= irq;
+	usb_keyboard_update(status);
+	// Debouncing setup
+	debouncing |= irq;
+	const uint32_t *pm = keyboard_masks;
+	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++, pm++)
+		if (irq & *pm)
+			timeout[i] = to;
 }
 
 void EXTI2_IRQHandler() __attribute__((alias("keyboard_irq")));
 void EXTI9_5_IRQHandler() __attribute__((alias("keyboard_irq")));
 void EXTI15_10_IRQHandler() __attribute__((alias("keyboard_irq")));
+
+static void keyboard_tick(uint32_t tick)
+{
+	uint32_t db = debouncing;
+	if (!db)
+		return;
+	uint32_t stat = keyboard_gpio_status();
+	const uint32_t *pm = keyboard_masks;
+	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++, pm++)
+		if (db & *pm && tick - timeout[i] > KEYBOARD_DEBOUNCING) {
+			status ^= (status & *pm) ^ (stat & *pm);
+			__disable_irq();
+			EXTI->RTSR |= *pm;
+			EXTI->FTSR |= *pm;
+			debouncing &= ~*pm;
+			__enable_irq();
+		}
+	fflush(stdout);
+}

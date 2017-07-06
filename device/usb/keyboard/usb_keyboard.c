@@ -1,4 +1,5 @@
 #include <malloc.h>
+#include "keyboard.h"
 #include "usb_keyboard.h"
 #include "usb_keyboard_desc.h"
 #include "../usb_debug.h"
@@ -152,4 +153,12 @@ void usb_keyboard_init(usb_t *usb)
 		.enable = &usbif_enable,
 	};
 	usb_interface_alloc(usb, &usbif);
+}
+
+void usb_keyboard_update(uint32_t status)
+{
+	const uint32_t *pm = keyboard_masks;
+	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++)
+		if (status & *pm++)
+			;
 }

@@ -41,6 +41,7 @@ static inline void init()
 {
 	rcc_init();
 	NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUPING);
+	__enable_irq();
 	systick_init(1000);
 	usart6_init();
 
@@ -83,9 +84,10 @@ int main()
 {
 	init();
 	puts(ESC_GREEN "Initialisation done");
+	uint32_t s;
 #if 1
 	int i = 1;
-	while (GPIOC->IDR & GPIO_IDR_IDR_13) {
+	while (!((s = keyboard_status()) & keyboard_masks[2])) {
 		//GPIOA->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1 | GPIO_ODR_ODR_2);
 		GPIOA->ODR &= ~(GPIO_ODR_ODR_2);
 		systick_delay(i << 1);
@@ -96,33 +98,36 @@ int main()
 		GPIOB->ODR &= ~(GPIO_ODR_ODR_15);
 		systick_delay(i);
 		GPIOB->ODR |= (GPIO_ODR_ODR_15);
-		if (!(GPIOC->IDR & GPIO_IDR_IDR_14)) {
-			systick_delay(100);
+		if (s & keyboard_masks[3])
 			i++;
-		}
-		if (!(GPIOC->IDR & GPIO_IDR_IDR_15)) {
-			systick_delay(500);
+		if (s & keyboard_masks[4])
 			i = i == 0 ? 0 : i - 1;
-		}
+		if (s)
+			while (keyboard_status());
 	}
 #endif
 	for (;;) {
-		if (!(GPIOA->IDR & GPIO_IDR_IDR_6))
+		s = keyboard_status();
+		if (s & keyboard_masks[0])
 			GPIOA->ODR |= GPIO_ODR_ODR_15;
-		if (!(GPIOB->IDR & GPIO_IDR_IDR_2))
+		else
+			GPIOA->ODR &= ~GPIO_ODR_ODR_15;
+		if (s & keyboard_masks[1])
 			GPIOA->ODR |= GPIO_ODR_ODR_11;
-		if (GPIOC->IDR & GPIO_IDR_IDR_13)
-			GPIOA->ODR |= (GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1 | GPIO_ODR_ODR_2);
 		else
+			GPIOA->ODR &= ~GPIO_ODR_ODR_11;
+		if (s & keyboard_masks[2])
 			GPIOA->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1 | GPIO_ODR_ODR_2);
-		if (GPIOC->IDR & GPIO_IDR_IDR_14)
-			GPIOB->ODR |= (GPIO_ODR_ODR_14);
 		else
+			GPIOA->ODR |= (GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1 | GPIO_ODR_ODR_2);
+		if (s & keyboard_masks[3])
 			GPIOB->ODR &= ~(GPIO_ODR_ODR_14);
-		if (GPIOC->IDR & GPIO_IDR_IDR_15)
-			GPIOB->ODR |= (GPIO_ODR_ODR_15);
 		else
+			GPIOB->ODR |= (GPIO_ODR_ODR_14);
+		if (s & keyboard_masks[4])
 			GPIOB->ODR &= ~(GPIO_ODR_ODR_15);
+		else
+			GPIOB->ODR |= (GPIO_ODR_ODR_15);
 	}
 	return 0;
 }
