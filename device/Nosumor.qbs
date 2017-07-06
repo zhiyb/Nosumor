@@ -13,7 +13,6 @@ Project {
         type: "application"
         Depends {name: "cpp"}
         Depends {name: "CMSIS"}
-        cpp.linkerScripts: ["STM32F103C8_SRAM.ld"]
         cpp.includePaths: [".", "usb"]
         cpp.linkerFlags: ["-nostartfiles"]
         //cpp.linkerFlags: ["-nostdlib"]
@@ -33,6 +32,12 @@ Project {
             "*.c",
             "*.s",
         ]
+
+        Group {
+            name: "Linker script"
+            files: ["STM32F103C8_SRAM.ld"]
+            fileTags: ["linkerscript"]
+        }
 
         Group {
             name: "USB"

@@ -70,17 +70,11 @@ int main()
 		flashSRAM();
 
 	for (;;) {
-		setLED(LED_LEFT, readKey(KEY_LEFT));
-		setLED(LED_RIGHT, readKey(KEY_RIGHT));
+		setLED(LED_LEFT, !readKeys(BV(KEY_LEFT)));
+		setLED(LED_RIGHT, !readKeys(BV(KEY_RIGHT)));
 
-		if (dbexist()) {
-			setLED(LED_RED, flashBusy());
-			setLED(LED_GREEN, readKey(KEY_2));
-			setLED(LED_BLUE, readKey(KEY_3));
-		} else {
-			setLED(LED_RED, readKey(KEY_1));
-			setLED(LED_GREEN, readKey(KEY_2));
-			setLED(LED_BLUE, readKey(KEY_3));
-		}
+		setLED(LED_RED, flashBusy() | readKeys(BV(KEY_1) | BV(KEY_LEFT)));
+		setLED(LED_GREEN, flashBusy() | readKeys(BV(KEY_2) | BV(KEY_LEFT) | BV(KEY_RIGHT)));
+		setLED(LED_BLUE, flashBusy() | readKeys(BV(KEY_3) | BV(KEY_RIGHT)));
 	}
 }

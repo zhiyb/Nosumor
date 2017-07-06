@@ -9,6 +9,9 @@
 
 #define KEYCODE_LEFT	0x1d
 #define KEYCODE_RIGHT	0x1b
+#define KEYCODE_C	0x06
+#define KEYCODE_GA	0x35
+#define KEYCODE_ESC	0x29
 
 #define TIM2_PSC	32
 #define TIM2_CLK	(APB1_TIM_CLK / TIM2_PSC)
@@ -196,6 +199,9 @@ static void updateReport()
 	uint16_t keys = status.keys;
 	hid.mem[1] = ((keys & BV(KEY_LEFT)) ? 0 : KEYCODE_LEFT) |
 			((keys & BV(KEY_RIGHT)) ? 0 : KEYCODE_RIGHT << 8);
+	hid.mem[2] = ((keys & BV(KEY_1)) ? 0 : KEYCODE_C) |
+			((keys & BV(KEY_2)) ? 0 : KEYCODE_GA << 8);
+	hid.mem[3] = (keys & BV(KEY_3)) ? 0 : KEYCODE_ESC;
 
 	status.itvlTimer.cnt = TIM3->CNT;
 	uint32_t timestamp = status.itvlTimer.timestamp;

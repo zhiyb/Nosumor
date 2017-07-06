@@ -7,9 +7,9 @@
 extern "C" {
 #endif
 
-#ifdef DEBUG
-
 #define dbexist()	(CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk)
+
+#ifdef DEBUG
 
 #define dbbkpt()	asm ("bkpt #0")
 
