@@ -19,7 +19,7 @@ const uint32_t keyboard_masks[KEYBOARD_KEYS] = {
 	1ul << 2, 1ul << 6, 1ul << 13, 1ul << 14, 1ul << 15
 };
 
-static uint32_t status, debouncing, timeout[KEYBOARD_KEYS];
+static volatile uint32_t status, debouncing, timeout[KEYBOARD_KEYS];
 
 static uint32_t keyboard_gpio_status();
 static void keyboard_tick(uint32_t tick);
@@ -93,22 +93,33 @@ uint32_t keyboard_status()
 
 static void keyboard_irq()
 {
-	// Critical mutual exclusion interrupt handling section
+	// Mutual exclusion interrupt
 	__disable_irq();
 	uint32_t irq = EXTI->PR & KEYBOARD_Msk;
+	if (!irq) {
+		__enable_irq();
+		return;
+	}
+	NVIC_DisableIRQ(EXTI2_IRQn);
+	NVIC_DisableIRQ(EXTI9_5_IRQn);
+	NVIC_DisableIRQ(EXTI15_10_IRQn);
+	__enable_irq();
 	// Disable interrupt triggers for debouncing
 	EXTI->RTSR &= ~irq;
 	EXTI->FTSR &= ~irq;
 	EXTI->PR = irq;
-	__enable_irq();
 
 	// IRQ should be different from here even if reentrant
-	// Timeout value for debouncing
-	uint32_t to = systick_cnt() + KEYBOARD_DEBOUNCING;
 	status ^= irq;
 	usb_keyboard_update(status);
+	// Critical section end
+	NVIC_EnableIRQ(EXTI2_IRQn);
+	NVIC_EnableIRQ(EXTI9_5_IRQn);
+	NVIC_EnableIRQ(EXTI15_10_IRQn);
 	// Debouncing setup
 	debouncing |= irq;
+	// Timeout value for debouncing
+	uint32_t to = systick_cnt();
 	const uint32_t *pm = keyboard_masks;
 	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++, pm++)
 		if (irq & *pm)
@@ -124,16 +135,20 @@ static void keyboard_tick(uint32_t tick)
 	uint32_t db = debouncing;
 	if (!db)
 		return;
-	uint32_t stat = keyboard_gpio_status();
+	uint32_t stat = keyboard_gpio_status(), mask = 0;
 	const uint32_t *pm = keyboard_masks;
 	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++, pm++)
-		if (db & *pm && tick - timeout[i] > KEYBOARD_DEBOUNCING) {
-			status ^= (status & *pm) ^ (stat & *pm);
-			__disable_irq();
-			EXTI->RTSR |= *pm;
-			EXTI->FTSR |= *pm;
-			debouncing &= ~*pm;
-			__enable_irq();
-		}
-	fflush(stdout);
+		if ((db & *pm) && tick - timeout[i] > KEYBOARD_DEBOUNCING)
+			mask |= *pm;
+	if (!mask)
+		return;
+	__disable_irq();
+	EXTI->RTSR |= mask;
+	EXTI->FTSR |= mask;
+	uint32_t err = (status & mask) ^ (stat & mask);
+	EXTI->SWIER = err;
+	if (err)
+		dbgbkpt();
+	debouncing &= ~mask;
+	__enable_irq();
 }

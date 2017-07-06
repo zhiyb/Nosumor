@@ -108,7 +108,9 @@ int main()
 			while (keyboard_status());
 	}
 #endif
+#ifdef DEBUG
 	uint32_t mask = keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4];
+#endif
 	for (;;) {
 		s = keyboard_status();
 		if (s & keyboard_masks[0])
@@ -131,11 +133,13 @@ int main()
 			GPIOA->ODR &= ~GPIO_ODR_ODR_1;
 		else
 			GPIOA->ODR |= GPIO_ODR_ODR_1;
+#ifdef DEBUG
 		if ((s & mask) == mask) {
 			usb_connect(&usb, 0);
 			while (keyboard_status());
 			usb_connect(&usb, 1);
 		}
+#endif
 	}
 	return 0;
 }
