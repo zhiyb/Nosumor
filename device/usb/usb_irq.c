@@ -13,10 +13,10 @@ usb_t *usb_hs = 0;
 
 void usb_hs_irq_init(usb_t *usb)
 {
-	usb_hs = usb;
-	// Interrupt masks
-	usb->base->GINTSTS = 0xffffffff;
-	usb->base->GINTMSK = USB_OTG_GINTMSK_OTGINT | USB_OTG_GINTMSK_MMISM;
+	if (usb->base == USB_OTG_HS)
+		usb_hs = usb;
+	else
+		dbgbkpt();
 }
 
 static void usb_reset(usb_t *usb)
@@ -25,7 +25,7 @@ static void usb_reset(usb_t *usb)
 	// Reset USB device address
 	dev->DCFG &= ~USB_OTG_DCFG_DAD_Msk;
 	dev->DAINTMSK = 0;
-	// Reset USB FIFO RAM
+	// Reset USB FIFO RAM allocation
 	usb_ram_reset(usb);
 	// Allocate RX queue
 	uint32_t size = usb_ram_size(usb) / 2;
@@ -34,6 +34,22 @@ static void usb_reset(usb_t *usb)
 	FUNC(usb->epin[0].init)(usb, 0);
 	FUNC(usb->epout[0].init)(usb, 0);
 	usb_desc_init(usb);
+}
+
+void usb_disable(usb_t *usb)
+{
+	// Disable endpoint 0
+	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, 0);
+	if (ep->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk) {
+		DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPDIS_Msk);
+		while (ep->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk);
+	}
+	// Disable other endpoints
+	for (usb_if_t **pi = &usb->usbif; *pi != 0; pi = &(*pi)->next)
+		FUNC((*pi)->disable)(usb, (*pi)->data);
+	// Flush FIFOs
+	usb->base->GRSTCTL = (0b10000ul << USB_OTG_GRSTCTL_FCRST_Pos) |
+			USB_OTG_GRSTCTL_TXFFLSH_Msk | USB_OTG_GRSTCTL_RXFFLSH_Msk;
 }
 
 void OTG_HS_WKUP_IRQHandler()
@@ -60,14 +76,19 @@ void OTG_HS_IRQHandler()
 		bk = 0;
 		usb->GINTMSK |= USB_OTG_GINTMSK_RXFLVLM_Msk;
 	}
-	if (i & USB_OTG_GINTSTS_USBRST) {
-		usb_reset(usb_hs);
-		usb->GINTSTS = USB_OTG_GINTSTS_USBRST;
+	if (i & (USB_OTG_GINTSTS_USBSUSP_Msk | USB_OTG_GINTSTS_ESUSP_Msk)) {
+		usb_disable(usb_hs);
+		usb->GINTSTS = USB_OTG_GINTSTS_USBSUSP_Msk | USB_OTG_GINTSTS_ESUSP_Msk;
 		bk = 0;
 	}
-	if (i & USB_OTG_GINTSTS_ENUMDNE) {
-		usb_ep0_enum(usb, dev->DSTS & USB_OTG_DSTS_ENUMSPD);
-		usb->GINTSTS = USB_OTG_GINTSTS_ENUMDNE;
+	if (i & USB_OTG_GINTSTS_USBRST_Msk) {
+		usb_reset(usb_hs);
+		usb->GINTSTS = USB_OTG_GINTSTS_USBRST_Msk;
+		bk = 0;
+	}
+	if (i & USB_OTG_GINTSTS_ENUMDNE_Msk) {
+		usb_ep0_enum(usb, dev->DSTS & USB_OTG_DSTS_ENUMSPD_Msk);
+		usb->GINTSTS = USB_OTG_GINTSTS_ENUMDNE_Msk;
 		bk = 0;
 	}
 	if (i & USB_OTG_GINTSTS_OEPINT_Msk) {

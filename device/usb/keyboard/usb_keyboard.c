@@ -41,13 +41,23 @@ static void epin_init(usb_t *usb, uint32_t ep)
 	usb->base->DIEPTXF[ep - 1] = DIEPTXF(addr, size);
 }
 
-static void ep_halt(struct usb_t *usb, uint32_t ep, int halt)
+static void ep_halt(struct usb_t *usb, uint32_t n, int halt)
 {
-	EP_IN(usb->base, ep)->DIEPCTL = USB_OTG_DIEPCTL_USBAEP_Msk |
-			EP_IN_TYP_INTERRUPT | (ep << USB_OTG_DIEPCTL_TXFNUM_Pos) |
+	if (halt) {
+		dbgprintf(ESC_RED "HID Keyboard disabled\n");
+		USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
+		if (ep->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk) {
+			DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPDIS_Msk);
+			while (ep->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk);
+		}
+		DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_SD0PID_SEVNFRM_Msk);
+		return;
+	}
+	dbgprintf(ESC_RED "HID Keyboard enabled\n");
+	EP_IN(usb->base, n)->DIEPCTL = USB_OTG_DIEPCTL_USBAEP_Msk |
+			EP_IN_TYP_INTERRUPT | (n << USB_OTG_DIEPCTL_TXFNUM_Pos) |
 			(KEYBOARD_REPORT_SIZE << USB_OTG_DIEPCTL_MPSIZ_Pos);
-	if (!halt)
-		usb_keyboard_update(keyboard_status());
+	//usb_keyboard_update(keyboard_status());
 }
 
 static void usbif_config(usb_t *usb, void *data)
@@ -154,14 +164,22 @@ static void usbif_enable(usb_t *usb, void *data)
 	ep_halt(usb, p->ep_in, 0);
 }
 
+static void usbif_disable(usb_t *usb, void *data)
+{
+	data_t *p = (data_t *)data;
+	_usb.usb = 0;
+	ep_halt(usb, p->ep_in, 1);
+}
+
 void usb_keyboard_init(usb_t *usb)
 {
 	usb_if_t usbif = {
 		.data = calloc(1u, sizeof(data_t)),
 		.config = &usbif_config,
+		.enable = &usbif_enable,
+		.disable = &usbif_disable,
 		.setup_std = &usbif_setup_std,
 		.setup_class = &usbif_setup_class,
-		.enable = &usbif_enable,
 	};
 	_usb.usb = 0;
 	usb_interface_alloc(usb, &usbif);

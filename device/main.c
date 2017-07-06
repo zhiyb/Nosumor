@@ -78,12 +78,14 @@ static inline void init()
 	GPIO_MODER(GPIOA, 11, 0b01);
 	GPIO_MODER(GPIOA, 15, 0b01);
 	GPIOA->ODR &= ~(GPIO_ODR_ODR_10 | GPIO_ODR_ODR_11 | GPIO_ODR_ODR_15);
+
+	puts(ESC_GREEN "Initialisation done");
+	usb_connect(&usb, 1);
 }
 
 int main()
 {
 	init();
-	puts(ESC_GREEN "Initialisation done");
 	uint32_t s;
 #if 0
 	int i = 1;
@@ -106,6 +108,7 @@ int main()
 			while (keyboard_status());
 	}
 #endif
+	uint32_t mask = keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4];
 	for (;;) {
 		s = keyboard_status();
 		if (s & keyboard_masks[0])
@@ -128,6 +131,11 @@ int main()
 			GPIOA->ODR &= ~GPIO_ODR_ODR_1;
 		else
 			GPIOA->ODR |= GPIO_ODR_ODR_1;
+		if ((s & mask) == mask) {
+			usb_connect(&usb, 0);
+			while (keyboard_status());
+			usb_connect(&usb, 1);
+		}
 	}
 	return 0;
 }

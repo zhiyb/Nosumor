@@ -36,6 +36,9 @@ void usb_init(usb_t *usb, USB_OTG_GlobalTypeDef *base)
 	base->GAHBCFG = USB_OTG_GAHBCFG_PTXFELVL | USB_OTG_GAHBCFG_TXFELVL |
 			(5 /* 8x 32-bit */ << USB_OTG_GAHBCFG_HBSTLEN_Pos) |
 			USB_OTG_GAHBCFG_GINT;
+	// Interrupt masks
+	base->GINTSTS = 0xffffffff;
+	base->GINTMSK = USB_OTG_GINTMSK_OTGINT | USB_OTG_GINTMSK_MMISM;
 	usb_hs_irq_init(usb);
 
 	uint32_t pg = NVIC_GetPriorityGrouping();
@@ -140,13 +143,25 @@ void usb_init_device(usb_t *usb)
 {
 	USB_OTG_GlobalTypeDef *base = usb->base;
 	USB_OTG_DeviceTypeDef *dev = DEVICE(base);
+	usb_connect(usb, 0);
 	usb_ep0_register(usb);
 	dev->DCFG = 1ul << 14u;	// Receive OUT packet, High speed
 	dev->DOEPMSK = USB_OTG_DOEPMSK_XFRCM | USB_OTG_DOEPMSK_STUPM;
 	dev->DIEPMSK = USB_OTG_DIEPMSK_XFRCM | USB_OTG_DIEPMSK_TOM;
-	base->GINTMSK |= USB_OTG_GINTMSK_USBRST | USB_OTG_GINTMSK_ENUMDNEM | USB_OTG_GINTMSK_RXFLVLM |
+	base->GINTMSK |= USB_OTG_GINTMSK_USBRST_Msk |
+			USB_OTG_GINTMSK_USBSUSPM_Msk | USB_OTG_GINTMSK_ESUSPM_Msk |
+			USB_OTG_GINTMSK_ENUMDNEM_Msk | USB_OTG_GINTMSK_RXFLVLM_Msk |
 			USB_OTG_GINTMSK_OEPINT_Msk | USB_OTG_GINTMSK_IEPINT_Msk;
-	dev->DCTL = USB_OTG_DCTL_SDIS_Msk;	// Disconnect device
-	systick_delay(2);
-	dev->DCTL = 0;				// Connect device
+}
+
+void usb_connect(usb_t *usb, int e)
+{
+	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
+	if (!e)	{
+		usb_disable(usb);
+		// Disconnect device
+		dev->DCTL = USB_OTG_DCTL_SDIS_Msk;
+		systick_delay(2);
+	} else
+		dev->DCTL = 0;	// Connect device
 }

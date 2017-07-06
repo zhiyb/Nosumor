@@ -30,7 +30,14 @@ void usb_ep_in_transfer(USB_OTG_GlobalTypeDef *usb, int n, const void *p, uint32
 {
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb, n);
 	// Wait for endpoint available
-	while (ep->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk);
+	do {
+		if (!(ep->DIEPCTL & USB_OTG_DIEPCTL_USBAEP_Msk))
+			return;
+		if (ep->DIEPINT & USB_OTG_DIEPINT_TOC_Msk)
+			return;
+		if (ep->DIEPCTL & USB_OTG_DIEPCTL_NAKSTS_Msk)
+			DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_CNAK_Msk);
+	} while (ep->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk);
 	if (size == 0) {
 		ep->DIEPTSIZ = (1ul << USB_OTG_DIEPTSIZ_PKTCNT_Pos) | 0;
 		DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_CNAK_Msk);

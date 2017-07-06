@@ -80,6 +80,7 @@ typedef struct usb_if_t {
 	// Function handlers
 	void (*config)(struct usb_t *usb, void *data);
 	void (*enable)(struct usb_t *usb, void *data);
+	void (*disable)(struct usb_t *usb, void *data);
 	void (*setup_std)(struct usb_t *usb, void *data,
 			  uint32_t ep, setup_t pkt);
 	void (*setup_class)(struct usb_t *usb, void *data,
@@ -112,6 +113,7 @@ typedef struct usb_t {
 void usb_init(usb_t *usb, USB_OTG_GlobalTypeDef *base);
 int usb_mode(usb_t *usb);	// 0: Device; 1: Host
 void usb_init_device(usb_t *usb);
+void usb_connect(usb_t *usb, int e);
 
 #ifdef __cplusplus
 }

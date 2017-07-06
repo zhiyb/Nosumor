@@ -57,9 +57,9 @@ static void usb_setup_standard_device(usb_t *usb, uint32_t ep, setup_t pkt)
 			break;
 		case SETUP_REQ_SET_CONFIGURATION:
 			if (pkt.wValue == 1) {
+				usb_ep_in_transfer(usb->base, ep, 0, 0);
 				for (usb_if_t **ip = &usb->usbif; *ip != 0; ip = &(*ip)->next)
 					FUNC((*ip)->enable)(usb, (*ip)->data);
-				usb_ep_in_transfer(usb->base, ep, 0, 0);
 			} else {
 				usb_ep_in_stall(usb->base, ep);
 				dbgbkpt();
