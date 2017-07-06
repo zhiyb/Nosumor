@@ -2,6 +2,7 @@
 #include "hidapi.h"
 #include <QApplication>
 #include <QMessageBox>
+#include <malloc.h>
 
 volatile int fatal = false;
 

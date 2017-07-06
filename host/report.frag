@@ -23,7 +23,7 @@ void main(void)
 	int bitP = (y - 1) * 8 / int(size.y) + 8;
 	int bitN = (y + 1) * 8 / int(size.y) + 8;
 	int field = 1 << bit;
-	if (bitP != bit || bitN != bit || int(gl_FragCoord.x) % 10 == 0)
+	if (bitP != bit || bitN != bit || int(gl_FragCoord.x) % 20 == 0)
 		fragColour = vec4(0.3, 0.3, 0.3, 1.0);
 	else if ((status & field) != 0)
 		fragColour = vec4(colours[bit & 7], 1.0);
