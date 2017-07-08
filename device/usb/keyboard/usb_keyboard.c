@@ -1,4 +1,5 @@
 #include <malloc.h>
+#include <string.h>
 #include "keyboard.h"
 #include "usb_keyboard.h"
 #include "usb_keyboard_desc.h"
@@ -27,6 +28,7 @@ uint8_t keycodes[KEYBOARD_KEYS] = {
 
 typedef struct data_t {
 	int ep_in;
+	int pending;
 	uint8_t report[KEYBOARD_REPORT_SIZE];
 } data_t;
 
@@ -35,13 +37,18 @@ static struct {
 	data_t *data;
 } _usb = {0, 0};
 
-static void epin_init(usb_t *usb, uint32_t ep)
+static void epin_init(usb_t *usb, uint32_t n)
 {
 	uint32_t size = KEYBOARD_REPORT_SIZE, addr = usb_ram_alloc(usb, &size);
-	usb->base->DIEPTXF[ep - 1] = DIEPTXF(addr, size);
+	usb->base->DIEPTXF[n - 1] = DIEPTXF(addr, size);
+	// Unmask interrupts
+	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
+	ep->DIEPINT = USB_OTG_DIEPINT_XFRC_Msk;
+	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
+	dev->DAINTMSK |= DAINTMSK_IN(n);
 }
 
-static void ep_halt(struct usb_t *usb, uint32_t n, int halt)
+static void epin_halt(struct usb_t *usb, uint32_t n, int halt)
 {
 	if (halt) {
 		dbgprintf(ESC_RED "HID Keyboard disabled\n");
@@ -60,14 +67,25 @@ static void ep_halt(struct usb_t *usb, uint32_t n, int halt)
 	//usb_keyboard_update(keyboard_status());
 }
 
+static void epin_xfr_cplt(usb_t *usb, uint32_t n)
+{
+	__disable_irq();
+	data_t *data = (data_t *)usb->epin[n].data;
+	uint32_t pending = --data->pending;
+	__enable_irq();
+	if (pending)
+		usb_ep_in_transfer(usb->base, n, data->report, KEYBOARD_REPORT_SIZE);
+}
+
 static void usbif_config(usb_t *usb, void *data)
 {
 	data_t *p = (data_t *)data;
 	// Register endpoints
 	const epin_t epin = {
 		.data = data,
-		.init = epin_init,
-		.halt = ep_halt,
+		.init = &epin_init,
+		.halt = &epin_halt,
+		.xfr_cplt = &epin_xfr_cplt,
 	};
 	usb_ep_register(usb, &epin, &p->ep_in, 0, 0);
 
@@ -161,14 +179,14 @@ static void usbif_enable(usb_t *usb, void *data)
 	data_t *p = (data_t *)data;
 	_usb.usb = usb;
 	_usb.data = p;
-	ep_halt(usb, p->ep_in, 0);
+	epin_halt(usb, p->ep_in, 0);
 }
 
 static void usbif_disable(usb_t *usb, void *data)
 {
 	data_t *p = (data_t *)data;
 	_usb.usb = 0;
-	ep_halt(usb, p->ep_in, 1);
+	epin_halt(usb, p->ep_in, 1);
 }
 
 void usb_keyboard_init(usb_t *usb)
@@ -199,6 +217,12 @@ void usb_keyboard_update(uint32_t status)
 		if (status & *pm++)
 			*p++ = keycodes[i];
 	// Send report
+	__disable_irq();
+	if (_usb.data->pending) {
+		__enable_irq();
+		return;
+	}
+	__enable_irq();
 	usb_ep_in_transfer(_usb.usb->base, _usb.data->ep_in,
 			   _usb.data->report, KEYBOARD_REPORT_SIZE);
 }

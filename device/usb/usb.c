@@ -1,3 +1,4 @@
+#include <string.h>
 #include <stm32f7xx.h>
 #include "../macros.h"
 #include "../systick.h"
@@ -35,7 +36,7 @@ void usb_init(usb_t *usb, USB_OTG_GlobalTypeDef *base)
 			(4 << USB_OTG_GUSBCFG_TOCAL_Pos) | (1ul << 4);
 	base->GAHBCFG = USB_OTG_GAHBCFG_PTXFELVL | USB_OTG_GAHBCFG_TXFELVL |
 			(5 /* 8x 32-bit */ << USB_OTG_GAHBCFG_HBSTLEN_Pos) |
-			USB_OTG_GAHBCFG_GINT;
+			USB_OTG_GAHBCFG_GINT_Msk | USB_OTG_GAHBCFG_DMAEN_Msk;
 	// Interrupt masks
 	base->GINTSTS = 0xffffffff;
 	base->GINTMSK = USB_OTG_GINTMSK_OTGINT | USB_OTG_GINTMSK_MMISM;
@@ -145,12 +146,12 @@ void usb_init_device(usb_t *usb)
 	USB_OTG_DeviceTypeDef *dev = DEVICE(base);
 	usb_connect(usb, 0);
 	usb_ep0_register(usb);
-	dev->DCFG = 1ul << 14u;	// Receive OUT packet, High speed
+	dev->DCFG = USB_OTG_DCFG_NZLSOHSK_Msk | (1ul << 14u);	// Transceiver delay
 	dev->DOEPMSK = USB_OTG_DOEPMSK_XFRCM | USB_OTG_DOEPMSK_STUPM;
 	dev->DIEPMSK = USB_OTG_DIEPMSK_XFRCM | USB_OTG_DIEPMSK_TOM;
 	base->GINTMSK |= USB_OTG_GINTMSK_USBRST_Msk |
 			USB_OTG_GINTMSK_USBSUSPM_Msk | USB_OTG_GINTMSK_ESUSPM_Msk |
-			USB_OTG_GINTMSK_ENUMDNEM_Msk | USB_OTG_GINTMSK_RXFLVLM_Msk |
+			USB_OTG_GINTMSK_ENUMDNEM_Msk | //USB_OTG_GINTMSK_RXFLVLM_Msk |
 			USB_OTG_GINTMSK_OEPINT_Msk | USB_OTG_GINTMSK_IEPINT_Msk;
 }
 

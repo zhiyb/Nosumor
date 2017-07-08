@@ -5,6 +5,7 @@
 
 #define FUNC(f)	if (f) f
 #define PACKED	__attribute__((__packed__))
+#define FIELD(r, f)	(((r) & (f##_Msk)) >> (f##_Pos))
 
 #define DEVICE(usb)	((USB_OTG_DeviceTypeDef *)((void *)(usb) + USB_OTG_DEVICE_BASE))
 #define EP_IN(usb, n)	((USB_OTG_INEndpointTypeDef *)((void *)(usb) + USB_OTG_IN_ENDPOINT_BASE + ((n) << 5)))

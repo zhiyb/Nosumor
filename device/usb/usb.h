@@ -46,7 +46,6 @@ typedef struct epin_t {
 typedef struct epout_t {
 	void *data;
 	void (*init)(struct usb_t *usb, uint32_t ep);
-	void (*recv)(struct usb_t *usb, uint32_t stat);
 	void (*halt)(struct usb_t *usb, uint32_t ep, int halt);
 	void (*setup_cplt)(struct usb_t *usb, uint32_t ep);
 	void (*xfr_cplt)(struct usb_t *usb, uint32_t ep);

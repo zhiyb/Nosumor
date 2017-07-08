@@ -154,20 +154,8 @@ static void usb_setup_class_interface(usb_t *usb, uint32_t ep, setup_t pkt)
 	dbgbkpt();
 }
 
-void usb_setup(usb_t *usb, uint32_t stat)
+void usb_setup(usb_t *usb, uint32_t ep, setup_t pkt)
 {
-	uint32_t ep = STAT_EP(stat);
-	uint32_t cnt = STAT_CNT(stat);
-	if (cnt != 8)
-		dbgbkpt();
-	cnt = (cnt + 3) >> 2;
-
-	// Receive setup packet from FIFO
-	setup_t pkt;
-	uint32_t *p = (uint32_t *)&pkt;
-	while (cnt--)
-		*p++ = FIFO(usb->base, ep);
-
 	// Process setup packet
 	switch (pkt.bmRequestType & SETUP_TYPE_TYPE_Msk) {
 	case SETUP_TYPE_TYPE_STD:
@@ -201,9 +189,4 @@ void usb_setup(usb_t *usb, uint32_t stat)
 		dbgbkpt();
 		break;
 	}
-
-	// Reset endpoint setup packet counter
-	EP_OUT(usb->base, ep)->DOEPTSIZ |= USB_OTG_DOEPTSIZ_STUPCNT_Msk | USB_OTG_DOEPTSIZ_PKTCNT_Msk;
-	// Enable endpoint
-	EP_OUT(usb->base, ep)->DOEPCTL |= USB_OTG_DOEPCTL_EPENA_Msk | USB_OTG_DOEPCTL_CNAK_Msk;
 }
