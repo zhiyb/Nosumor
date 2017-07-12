@@ -59,18 +59,8 @@ void usb_init(usb_t *usb, USB_OTG_GlobalTypeDef *base)
 
 static inline void usb_hs_init_gpio()
 {
-	// MCO1: HSE / 1
-	RCC->CFGR = (RCC->CFGR & ~(RCC_CFGR_MCO1 | RCC_CFGR_MCO1PRE)) |
-			(0b10 << RCC_CFGR_MCO1_Pos) | (0 << RCC_CFGR_MCO1PRE_Pos);
 	// Configure GPIOs
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN;
-	// 10: Alternative function mode
-	GPIO_MODER(GPIOA, 8, 0b10);
-	GPIO_OTYPER_PP(GPIOA, 8);
-	GPIO_OSPEEDR(GPIOA, 8, 0b01);	// Medium speed (25MHz)
-	// AF0: MCO1
-	GPIO_AFRH(GPIOA, 8, 0);
-
 	// Enable IO compensation cell
 	if (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY)) {
 		SYSCFG->CMPCR |= SYSCFG_CMPCR_CMP_PD;
@@ -144,13 +134,14 @@ void usb_init_device(usb_t *usb)
 {
 	USB_OTG_GlobalTypeDef *base = usb->base;
 	USB_OTG_DeviceTypeDef *dev = DEVICE(base);
+	// Disconnect USB
 	usb_connect(usb, 0);
 	usb_ep0_register(usb);
 	dev->DCFG = USB_OTG_DCFG_NZLSOHSK_Msk | (1ul << 14u);	// Transceiver delay
 	dev->DOEPMSK = USB_OTG_DOEPMSK_XFRCM | USB_OTG_DOEPMSK_STUPM;
 	dev->DIEPMSK = USB_OTG_DIEPMSK_XFRCM | USB_OTG_DIEPMSK_TOM;
 	base->GINTMSK |= USB_OTG_GINTMSK_USBRST_Msk |
-			USB_OTG_GINTMSK_USBSUSPM_Msk | USB_OTG_GINTMSK_ESUSPM_Msk |
+			USB_OTG_GINTMSK_USBSUSPM_Msk | //USB_OTG_GINTMSK_ESUSPM_Msk |
 			USB_OTG_GINTMSK_ENUMDNEM_Msk | //USB_OTG_GINTMSK_RXFLVLM_Msk |
 			USB_OTG_GINTMSK_OEPINT_Msk | USB_OTG_GINTMSK_IEPINT_Msk;
 }

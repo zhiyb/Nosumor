@@ -71,7 +71,8 @@ static void epin_xfr_cplt(usb_t *usb, uint32_t n)
 {
 	__disable_irq();
 	data_t *data = (data_t *)usb->epin[n].data;
-	uint32_t pending = --data->pending;
+	uint32_t pending = data->pending;
+	data->pending = 0;
 	__enable_irq();
 	if (pending)
 		usb_ep_in_transfer(usb->base, n, data->report, KEYBOARD_REPORT_SIZE);
@@ -89,11 +90,11 @@ static void usbif_config(usb_t *usb, void *data)
 	};
 	usb_ep_register(usb, &epin, &p->ep_in, 0, 0);
 
+	uint32_t s = usb_desc_add_string(usb, 0, LANG_EN_US, "HID Keyboard");
 	// bInterfaceClass	3: HID class
 	// bInterfaceSubClass	1: Boot interface
 	// bInterfaceProtocol	0: None, 1: Keyboard, 2: Mouse
-	uint32_t s = usb_desc_add_string(usb, 0, LANG_EN_US, "HID Keyboard");
-	usb_desc_add_interface(usb, 1u, 3u, 0u, 1u, s);
+	usb_desc_add_interface(usb, 0u, 1u, 3u, 0u, 1u, s);
 	usb_desc_add(usb, &desc_hid, desc_hid.bLength);
 	usb_desc_add_endpoint(usb, EP_DIR_IN | p->ep_in,
 			      EP_INTERRUPT, KEYBOARD_REPORT_SIZE, 1u);

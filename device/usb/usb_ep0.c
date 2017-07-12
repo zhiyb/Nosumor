@@ -5,6 +5,7 @@
 #include "usb_ram.h"
 #include "usb_macros.h"
 #include "usb_setup.h"
+#include "usb_desc.h"
 
 #define MAX_SETUP_CNT	3u
 #define MAX_PKT_CNT	1u
@@ -31,16 +32,26 @@ void usb_ep0_enum(usb_t *usb, uint32_t speed)
 	switch (speed) {
 	case DSTS_ENUMSPD_LS_PHY_6MHZ:
 		// LS: Maximum control packet size: 8 bytes
+		usb->speed = USB_LowSpeed;
 		dbgbkpt();
 		break;
 	case DSTS_ENUMSPD_FS_PHY_48MHZ:
 	case DSTS_ENUMSPD_FS_PHY_30MHZ_OR_60MHZ:
+		usb->speed = USB_FullSpeed;
 		// FS: Maximum control packet size: 64 bytes
-	case DSTS_ENUMSPD_HS_PHY_30MHZ_OR_60MHZ:
-		// HS: Maximum control packet size: 64 bytes
 		EP_IN(usb->base, 0)->DIEPCTL = 0;
 		break;
+	case DSTS_ENUMSPD_HS_PHY_30MHZ_OR_60MHZ:
+		usb->speed = USB_HighSpeed;
+		// HS: Maximum control packet size: 64 bytes
+		EP_IN(usb->base, 0)->DIEPCTL = 0;
 	}
+	// Initialise descriptors and endpoints
+	usb_desc_init(usb);
+	for (int i = 0; i != USB_EPIN_CNT; i++)
+		FUNC(usb->epin[i].init)(usb, i);
+	for (int i = 0; i != USB_EPIN_CNT; i++)
+		FUNC(usb->epout[i].init)(usb, i);
 	// Configure endpoint 0 OUT DMA
 	EP_OUT(usb->base, 0)->DOEPDMA = (uint32_t)usb->epout[0].data;
 	// Reset packet counter

@@ -86,9 +86,9 @@ desc_t usb_desc_config(usb_t *usb)
 	usb->desc.config.p = cp;
 	usb->desc.config.size = cp->bLength;
 	for (usb_if_t **ip = &usb->usbif; *ip != 0; ip = &(*ip)->next) {
-		(*ip)->id = cp->bNumInterfaces;
-		(*ip)->config(usb, (*ip)->data);
+		FUNC((*ip)->config)(usb, (*ip)->data);
 		cp = (desc_config_t *)usb->desc.config.p;
+		(*ip)->id = cp->bNumInterfaces;
 	}
 	cp->wTotalLength = usb->desc.config.size;
 	return usb->desc.config;
@@ -208,7 +208,7 @@ static const desc_interface_t desc_interface = {
 	9u, SETUP_DESC_TYPE_INTERFACE, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
 };
 
-void usb_desc_add_interface(usb_t *usb, uint8_t bNumEndpoints,
+void usb_desc_add_interface(usb_t *usb, uint8_t bAlternateSetting, uint8_t bNumEndpoints,
 			    uint8_t bInterfaceClass, uint8_t bInterfaceSubClass,
 			    uint8_t bInterfaceProtocol, uint8_t iInterface)
 {
@@ -217,14 +217,16 @@ void usb_desc_add_interface(usb_t *usb, uint8_t bNumEndpoints,
 	desc_interface_t *ip = (desc_interface_t *)(usb->desc.config.p + usb->desc.config.size);
 	memcpy(ip, &desc_interface, desc_interface.bLength);
 	ip->bNumEndpoints = bNumEndpoints;
+	ip->bAlternateSetting = bAlternateSetting;
 	ip->bInterfaceClass = bInterfaceClass;
 	ip->bInterfaceSubClass = bInterfaceSubClass;
 	ip->bInterfaceProtocol = bInterfaceProtocol;
 	ip->iInterface = iInterface;
 	usb->desc.config.size += ip->bLength;
 	desc_config_t *pc = (desc_config_t *)usb->desc.config.p;
+	if (bAlternateSetting == 0)
+		pc->bNumInterfaces++;
 	ip->bInterfaceNumber = pc->bNumInterfaces;
-	pc->bNumInterfaces++;
 }
 
 /* Endpoint descriptor */

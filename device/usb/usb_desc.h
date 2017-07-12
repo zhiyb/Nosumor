@@ -44,7 +44,7 @@ desc_t usb_desc_lang(usb_t *usb);
 desc_t usb_desc_string(usb_t *usb, uint8_t index, uint16_t lang);
 
 uint32_t usb_desc_add_string(usb_t *usb, uint16_t id, uint16_t lang, const char *str);
-void usb_desc_add_interface(usb_t *usb, uint8_t bNumEndpoints,
+void usb_desc_add_interface(usb_t *usb, uint8_t bAlternateSetting, uint8_t bNumEndpoints,
 			    uint8_t bInterfaceClass, uint8_t bInterfaceSubClass,
 			    uint8_t bInterfaceProtocol, uint8_t iInterface);
 void usb_desc_add_endpoint(usb_t *usb, uint8_t bEndpointAddress, uint8_t bmAttributes,

@@ -27,15 +27,11 @@ static void usb_reset(usb_t *usb)
 	dev->DAINTMSK = 0;
 	// Reset USB FIFO RAM allocation
 	usb_ram_reset(usb);
-	usb_desc_init(usb);
 	// Allocate RX queue
 	uint32_t size = usb_ram_size(usb) / 2;
 	usb_ram_alloc(usb, &size);
 	usb->base->GRXFSIZ = size / 4;
-	for (int i = 0; i != USB_EPIN_CNT; i++)
-		FUNC(usb->epin[i].init)(usb, i);
-	for (int i = 0; i != USB_EPIN_CNT; i++)
-		FUNC(usb->epout[i].init)(usb, i);
+	usb->speed = USB_Reset;
 }
 
 void usb_disable(usb_t *usb)
@@ -52,6 +48,7 @@ void usb_disable(usb_t *usb)
 	// Flush FIFOs
 	usb->base->GRSTCTL = (0b10000ul << USB_OTG_GRSTCTL_FCRST_Pos) |
 			USB_OTG_GRSTCTL_TXFFLSH_Msk | USB_OTG_GRSTCTL_RXFFLSH_Msk;
+	usb->speed = USB_Reset;
 }
 
 void OTG_HS_WKUP_IRQHandler()
@@ -71,9 +68,9 @@ void OTG_HS_IRQHandler()
 	if (i & USB_OTG_GINTSTS_MMIS) {
 		dbgbkpt();
 	}
-	if (i & (USB_OTG_GINTSTS_USBSUSP_Msk | USB_OTG_GINTSTS_ESUSP_Msk)) {
+	if (i & (USB_OTG_GINTSTS_USBSUSP_Msk)) {
 		usb_disable(usb_hs);
-		usb->GINTSTS = USB_OTG_GINTSTS_USBSUSP_Msk | USB_OTG_GINTSTS_ESUSP_Msk;
+		usb->GINTSTS = USB_OTG_GINTSTS_USBSUSP_Msk;
 		bk = 0;
 	}
 	if (i & USB_OTG_GINTSTS_USBRST_Msk) {

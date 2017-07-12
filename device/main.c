@@ -13,6 +13,7 @@
 #include "peripheral/audio.h"
 #include "usb/usb.h"
 #include "usb/keyboard/keyboard.h"
+#include "usb/audio/usb_audio.h"
 
 static usb_t usb;
 
@@ -37,12 +38,26 @@ void usart6_init()
 	fio_setup(uart_putc, uart_getc, USART6);
 }
 
+static inline void mco1_init()
+{
+	// MCO1: HSE / 1
+	RCC->CFGR = (RCC->CFGR & ~(RCC_CFGR_MCO1 | RCC_CFGR_MCO1PRE)) |
+			(0b10 << RCC_CFGR_MCO1_Pos) | (0 << RCC_CFGR_MCO1PRE_Pos);
+	// Configure GPIOs
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+	GPIO_MODER(GPIOA, 8, 0b10);	// 10: Alternative function mode
+	GPIO_OTYPER_PP(GPIOA, 8);
+	GPIO_OSPEEDR(GPIOA, 8, 0b01);	// Medium speed (25MHz)
+	GPIO_AFRH(GPIOA, 8, 0);		// AF0: MCO1
+}
+
 static inline void init()
 {
 	rcc_init();
 	NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUPING);
 	__enable_irq();
 	systick_init(1000);
+	mco1_init();	// Clock for USB PHY & Audio codec
 	usart6_init();
 
 	puts(ESC_CLEAR ESC_MAGENTA VARIANT " build @ " __DATE__ " " __TIME__);
@@ -51,16 +66,17 @@ static inline void init()
 	puts(ESC_CYAN "Initialising keyboard...");
 	keyboard_init();
 
-	puts(ESC_CYAN "Initialising audio...");
-	audio_init();
+	//puts(ESC_CYAN "Initialising audio...");
+	//audio_init();
 
 	puts(ESC_CYAN "Initialising USB HS...");
 	usb_init(&usb, USB_OTG_HS);
 	printf(ESC_YELLOW "USB in " ESC_WHITE "%s" ESC_YELLOW " mode\n",
 	       usb_mode(&usb) ? "host" : "device");
 	while (usb_mode(&usb) != 0);
-	usb_keyboard_init(&usb);
 	usb_init_device(&usb);
+	usb_keyboard_init(&usb);
+	//usb_audio_init(&usb);
 
 	puts(ESC_CYAN "Initialising LEDs...");
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN;

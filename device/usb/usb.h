@@ -86,9 +86,14 @@ typedef struct usb_if_t {
 			    uint32_t ep, setup_t pkt);
 } usb_if_t;
 
+typedef enum {USB_Reset = 0,
+	      USB_LowSpeed, USB_FullSpeed, USB_HighSpeed,
+} usb_speed_t;
+
 // USB port data structure
 typedef struct usb_t {
 	USB_OTG_GlobalTypeDef *base;
+	usb_speed_t speed;
 	// USB RAM & FIFO allocation
 	struct {
 		uint32_t top, max;
