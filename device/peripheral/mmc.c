@@ -31,59 +31,63 @@ static uint32_t mmc_command(uint32_t cmd, uint32_t arg, uint32_t *stat);
 // RCA: [31:16] RCA, [15:0] stuff bits
 static uint32_t mmc_app_command(uint32_t cmd, uint32_t rca, uint32_t arg, uint32_t *stat);
 
+static inline void mmc_gpio_init()
+{
+	// Enable IO compensation cell
+	if (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY)) {
+		RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+		SYSCFG->CMPCR |= SYSCFG_CMPCR_CMP_PD;
+	}
+	// Initialise GPIOs
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN_Msk |
+			RCC_AHB1ENR_GPIOCEN_Msk | RCC_AHB1ENR_GPIODEN_Msk;
+	// PA15, CD, input
+	GPIO_MODER(GPIOA, 15, 0b00);
+	GPIO_PUPDR(GPIOA, 15, GPIO_PUPDR_UP);
+	// PC8, D0, alternative function
+	GPIO_MODER(GPIOC, 8, 0b10);
+	GPIO_PUPDR(GPIOC, 8, GPIO_PUPDR_UP);
+	GPIO_OTYPER_PP(GPIOC, 8);	// Output push-pull
+	GPIO_OSPEEDR(GPIOC, 8, 0b10);	// High speed (50~100MHz)
+	GPIO_AFRH(GPIOC, 8, 12);	// AF12: SDMMC1
+	// PC9, D1, alternative function
+	GPIO_MODER(GPIOC, 9, 0b10);
+	GPIO_PUPDR(GPIOC, 9, GPIO_PUPDR_UP);
+	GPIO_OTYPER_PP(GPIOC, 9);	// Output push-pull
+	GPIO_OSPEEDR(GPIOC, 9, 0b10);	// High speed (50~100MHz)
+	GPIO_AFRH(GPIOC, 9, 12);	// AF12: SDMMC1
+	// PC10, D2, alternative function
+	GPIO_MODER(GPIOC, 10, 0b10);
+	GPIO_PUPDR(GPIOC, 10, GPIO_PUPDR_UP);
+	GPIO_OTYPER_PP(GPIOC, 10);	// Output push-pull
+	GPIO_OSPEEDR(GPIOC, 10, 0b10);	// High speed (50~100MHz)
+	GPIO_AFRH(GPIOC, 10, 12);	// AF12: SDMMC1
+	// PC11, D3, alternative function
+	GPIO_MODER(GPIOC, 11, 0b10);
+	GPIO_PUPDR(GPIOC, 11, GPIO_PUPDR_UP);
+	GPIO_OTYPER_PP(GPIOC, 11);	// Output push-pull
+	GPIO_OSPEEDR(GPIOC, 11, 0b10);	// High speed (50~100MHz)
+	GPIO_AFRH(GPIOC, 11, 12);	// AF12: SDMMC1
+	// PC12, CK, alternative function
+	GPIO_MODER(GPIOC, 12, 0b10);
+	GPIO_PUPDR(GPIOC, 12, GPIO_PUPDR_UP);
+	GPIO_OTYPER_PP(GPIOC, 12);	// Output push-pull
+	GPIO_OSPEEDR(GPIOC, 12, 0b10);	// High speed (50~100MHz)
+	GPIO_AFRH(GPIOC, 12, 12);	// AF12: SDMMC1
+	// PD2, CMD, alternative function
+	GPIO_MODER(GPIOD, 2, 0b10);
+	GPIO_PUPDR(GPIOD, 2, GPIO_PUPDR_UP);
+	GPIO_OTYPER_PP(GPIOD, 2);	// Output push-pull
+	GPIO_OSPEEDR(GPIOD, 2, 0b10);	// High speed (50~100MHz)
+	GPIO_AFRL(GPIOD, 2, 12);	// AF12: SDMMC1
+	// Wait for IO compensation cell
+	while (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY));
+}
+
 DSTATUS mmc_disk_init()
 {
 	if (stat & STA_NOINIT) {
-		// Enable IO compensation cell
-		if (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY)) {
-			RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
-			SYSCFG->CMPCR |= SYSCFG_CMPCR_CMP_PD;
-		}
-		// Initialise GPIOs
-		RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN_Msk |
-				RCC_AHB1ENR_GPIOCEN_Msk | RCC_AHB1ENR_GPIODEN_Msk;
-		// PA15, CD, input
-		GPIO_MODER(GPIOA, 15, 0b00);
-		GPIO_PUPDR(GPIOA, 15, GPIO_PUPDR_UP);
-		// PC8, D0, alternative function
-		GPIO_MODER(GPIOC, 8, 0b10);
-		GPIO_PUPDR(GPIOC, 8, GPIO_PUPDR_UP);
-		GPIO_OTYPER_PP(GPIOC, 8);	// Output push-pull
-		GPIO_OSPEEDR(GPIOC, 8, 0b10);	// High speed (50~100MHz)
-		GPIO_AFRH(GPIOC, 8, 12);	// AF12: SDMMC1
-		// PC9, D1, alternative function
-		GPIO_MODER(GPIOC, 9, 0b10);
-		GPIO_PUPDR(GPIOC, 9, GPIO_PUPDR_UP);
-		GPIO_OTYPER_PP(GPIOC, 9);	// Output push-pull
-		GPIO_OSPEEDR(GPIOC, 9, 0b10);	// High speed (50~100MHz)
-		GPIO_AFRH(GPIOC, 9, 12);	// AF12: SDMMC1
-		// PC10, D2, alternative function
-		GPIO_MODER(GPIOC, 10, 0b10);
-		GPIO_PUPDR(GPIOC, 10, GPIO_PUPDR_UP);
-		GPIO_OTYPER_PP(GPIOC, 10);	// Output push-pull
-		GPIO_OSPEEDR(GPIOC, 10, 0b10);	// High speed (50~100MHz)
-		GPIO_AFRH(GPIOC, 10, 12);	// AF12: SDMMC1
-		// PC11, D3, alternative function
-		GPIO_MODER(GPIOC, 11, 0b10);
-		GPIO_PUPDR(GPIOC, 11, GPIO_PUPDR_UP);
-		GPIO_OTYPER_PP(GPIOC, 11);	// Output push-pull
-		GPIO_OSPEEDR(GPIOC, 11, 0b10);	// High speed (50~100MHz)
-		GPIO_AFRH(GPIOC, 11, 12);	// AF12: SDMMC1
-		// PC12, CK, alternative function
-		GPIO_MODER(GPIOC, 12, 0b10);
-		GPIO_PUPDR(GPIOC, 12, GPIO_PUPDR_UP);
-		GPIO_OTYPER_PP(GPIOC, 12);	// Output push-pull
-		GPIO_OSPEEDR(GPIOC, 12, 0b10);	// High speed (50~100MHz)
-		GPIO_AFRH(GPIOC, 12, 12);	// AF12: SDMMC1
-		// PD2, CMD, alternative function
-		GPIO_MODER(GPIOD, 2, 0b10);
-		GPIO_PUPDR(GPIOD, 2, GPIO_PUPDR_UP);
-		GPIO_OTYPER_PP(GPIOD, 2);	// Output push-pull
-		GPIO_OSPEEDR(GPIOD, 2, 0b10);	// High speed (50~100MHz)
-		GPIO_AFRL(GPIOD, 2, 12);	// AF12: SDMMC1
-		// Wait for IO compensation cell
-		while (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY));
-
+		mmc_gpio_init();
 		// Initialise SDMMC module
 		RCC->APB2ENR |= RCC_APB2ENR_SDMMC1EN_Msk;
 	}
