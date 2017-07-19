@@ -6,9 +6,10 @@
 #ifdef DEBUG
 
 #include <string.h>
+#include <stm32f7xx.h>
 
 #define VARIANT	"DEBUG"
-#define dbgbkpt()	asm ("bkpt #0")
+#define dbgbkpt()	__BKPT(0)
 
 static inline int dbgcmd(int cmd, void *data)
 {

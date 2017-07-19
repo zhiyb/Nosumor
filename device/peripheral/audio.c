@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <malloc.h>
 #include <math.h>
 #include <stm32f7xx.h>
 #include "../macros.h"
@@ -9,6 +10,9 @@
 
 #define I2C		I2C1
 #define I2C_ADDR	0b0011000u
+
+#define STREAM1		DMA2_Stream5
+#define STREAM2		DMA1_Stream3
 
 static int i2c_check(I2C_TypeDef *i2c, uint8_t addr);
 static void audio_reset();
@@ -84,7 +88,7 @@ void audio_init()
 	RCC->APB2ENR |= RCC_APB2ENR_SPI1EN_Msk;
 	// I2S1: Slave transmit, 32-bit
 	SPI1->CR1 = 0;
-	SPI1->CR2 = 0;
+	SPI1->CR2 = SPI_CR2_TXDMAEN_Msk;
 	SPI1->I2SCFGR = SPI_I2SCFGR_I2SMOD_Msk | SPI_I2SCFGR_CHLEN_Msk |
 			(0b00u << SPI_I2SCFGR_I2SCFG_Pos) |
 			(0b10u << SPI_I2SCFGR_DATLEN_Pos);
@@ -94,6 +98,23 @@ void audio_init()
 	SPI2->I2SCFGR = SPI_I2SCFGR_I2SMOD_Msk | SPI_I2SCFGR_CHLEN_Msk |
 			(0b01u << SPI_I2SCFGR_I2SCFG_Pos) |
 			(0b10u << SPI_I2SCFGR_DATLEN_Pos);
+
+	// DMA2: Channel 3: Stream 5 (SPI1_TX)
+	RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN_Msk;
+	// Disable stream
+	STREAM1->CR = 0ul;
+	// Memory to peripheral, circular, 16bit -> 16bit, very high priority
+	STREAM1->CR = (3ul << DMA_SxCR_CHSEL_Pos) | (0b11ul << DMA_SxCR_PL_Pos) |
+			(0b10ul << DMA_SxCR_MSIZE_Pos) | (0b01ul << DMA_SxCR_PSIZE_Pos) |
+			(0b01ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk | DMA_SxCR_CIRC_Msk;
+	// Peripheral address
+	STREAM1->PAR = (uint32_t)&SPI1->DR;
+	// FIFO control
+	STREAM1->FCR = DMA_SxFCR_DMDIS_Msk;
+
+	// DMA1: Channel 0: Stream 3 (SPI2_RX)
+	RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN_Msk;
+
 	// Enable I2S audio interfaces
 	SPI1->I2SCFGR |= SPI_I2SCFGR_I2SE_Msk;
 	SPI2->I2SCFGR |= SPI_I2SCFGR_I2SE_Msk;
@@ -181,8 +202,8 @@ static void audio_test()
 		0x1b, 0x3c,		// I2S, 32 bits, master, no high-z
 		//0x1d, 0x20,		// DIN-DOUT loopback
 		//0x1d, 0x10,		// ADC-DAC loopback
-		0x1d, 0x01,		// No loopback, DAC_MOD_CLK => BCLK
-		0x1e, 0x81,		// BCLK N disabled
+		0x1d, 0x00,		// No loopback, DAC_CLK => BCLK
+		0x1e, 0x82,		// Enable BCLK N, N = 2
 		0x20, 0x00,		// Using primary interface inputs
 		0x21, 0x00,		// Using primary interface outputs
 		0x35, 0x12,		// Bus keeper disabled, DOUT from codec
@@ -223,8 +244,8 @@ static void audio_test()
 		0x27, 0x00,		// SPR analog volume = 0dB
 		0x28, 0x06,		// HPL driver PGA = 0dB, not muted
 		0x29, 0x06,		// HPR driver PGA = 0dB, not muted
-		0x2a, 0x14,		// SPL driver PGA = 18dB, not muted
-		0x2b, 0x14,		// SPR driver PGA = 18dB, not muted
+		0x2a, 0x04,		// SPL driver PGA = 6dB, not muted
+		0x2b, 0x04,		// SPR driver PGA = 6dB, not muted
 		0x2c, 0x10,		// DAC high current, HP as headphone
 		0x2e, 0x0a,		// MICBIAS force on, MICBIAS = 2.5V
 		//0x2f, 0x00,		// MIC PGA 0dB
@@ -232,12 +253,51 @@ static void audio_test()
 		0x31, 0x40,		// CM selected for MIC PGA
 	}, *p = data;
 
+	// sin(x) lookup table
+	int32_t lut[2048];
+	for (uint32_t i = 0; i != 2048; i++) {
+		int32_t d = lround(sin(2.0f * M_PI * i / 2048.0) * 0x30000000l);
+		//lut[i] = (d >> 16u) | (d << 16u);
+		lut[i] = d;
+	}
+
+	// Allocate buffer for audio waveform
+	int32_t * const buf = malloc(4ul * 2ul * 2048ul), *ptr = buf;
+	if (!buf) {
+		dbgbkpt();
+		return;
+	}
+
+	// Fill audio buffer with sine wave
+	const uint32_t skip[2] = {8ul, 4ul};
+	int32_t *lp[2] = {lut, lut};
+	for (uint32_t i = 0; i != 2048; i++) {
+		*ptr++ = *lp[0];
+		lp[0] += skip[0];
+		if (lp[0] - lut >= 2048)
+			lp[0] -= 2048;
+
+		*ptr++ = *lp[1];
+		lp[1] += skip[1];
+		if (lp[1] - lut >= 2048)
+			lp[1] -= 2048;
+	}
+	dbgbkpt();
+
+	// Setup transmit DMA
+	// Memory address
+	STREAM1->M0AR = (uint32_t)buf;
+	// Number of data items
+	STREAM1->NDTR = 2ul * 2ul * 2048ul;
+	// Enable DMA stream
+	STREAM1->CR |= DMA_SxCR_EN_Msk;
+
 	// Write configration sequence
 	for (uint32_t i = 0; i != sizeof(data) / sizeof(data[0]) / 2; i++) {
 		i2c_write(I2C, I2C_ADDR, p, 2);
-		//i2c_write_reg(I2C1, I2C_ADDR, *p, *(p + 1));
 		p += 2;
 	}
+
 #if 0
 	// Read back status
 	systick_delay(1000);
@@ -248,38 +308,6 @@ static void audio_test()
 	for (uint32_t i = 0; i != sizeof(regs) / sizeof(regs[0]); i++)
 		printf("reg 0x%02x: 0x%02x\n", regs[i], (uint8_t)i2c_read_reg(I2C1, I2C_ADDR, regs[i]));
 #endif
-	// sin(x) lookup table
-	int32_t lut[2048];
-	for (uint32_t i = 0; i != 2048; i++)
-		lut[i] = round(sin(2.0f * M_PI * i / 2048.0) * 0x3000000ul);
-	// I2S loopback
-	// Receive 2 audio channels
-	uint32_t audio[2];
-	uint32_t adc[2] = {0, 0};
-	for (uint32_t i = 0, j = 0;;) {
-		if (SPI1->SR & SPI_SR_TXE_Msk) {
-#if 1
-			audio[0] = lut[i % 2048];
-			audio[1] = lut[i % 2048];
-			uint32_t data = audio[!!(SPI1->SR & SPI_SR_CHSIDE_Msk)];
-#else
-			uint32_t data = adc[!!(SPI1->SR & SPI_SR_CHSIDE_Msk)];
-#endif
-			if (i++ & 1u)
-				SPI1->DR = data & SPI_DR_DR_Msk;
-			else
-				SPI1->DR = (data >> 16u) & SPI_DR_DR_Msk;
-		}
-#if 0
-		if (SPI2->SR & SPI_SR_RXNE_Msk) {
-			uint32_t *p = &adc[!!(SPI2->SR & SPI_SR_CHSIDE_Msk)];
-			if (j++ % 2)
-				*p |= SPI2->DR & SPI_DR_DR_Msk;
-			else
-				*p = (SPI2->DR & SPI_DR_DR_Msk) << 16u;
-		}
-#endif
-	}
 }
 
 void audio_enable(int enable)
