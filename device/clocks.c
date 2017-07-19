@@ -1,5 +1,6 @@
 #include <stm32f7xx.h>
-#include "clock.h"
+#include "clocks.h"
+#include "macros.h"
 
 extern uint32_t SystemCoreClock;
 void SystemCoreClockUpdate(void);
@@ -23,6 +24,19 @@ uint32_t clkAPB2()
 	if (!(div & 0b100))
 		return clkAHB();
 	return clkAHB() / (2 << (div & 0b11));
+}
+
+static inline void mco1_init()
+{
+	// MCO1: HSE / 1
+	RCC->CFGR = (RCC->CFGR & ~(RCC_CFGR_MCO1 | RCC_CFGR_MCO1PRE)) |
+			(0b10 << RCC_CFGR_MCO1_Pos) | (0 << RCC_CFGR_MCO1PRE_Pos);
+	// Configure GPIOs
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+	GPIO_MODER(GPIOA, 8, 0b10);	// 10: Alternative function mode
+	GPIO_OTYPER_PP(GPIOA, 8);
+	GPIO_OSPEEDR(GPIOA, 8, 0b01);	// Medium speed (25MHz)
+	GPIO_AFRH(GPIOA, 8, 0);		// AF0: MCO1
 }
 
 void rcc_init()
@@ -64,7 +78,25 @@ void rcc_init()
 	while (!(RCC->CR & RCC_CR_PLLRDY));
 	// Switch to PLL
 	RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW_Msk) | RCC_CFGR_SW_PLL;
+	// Set dedicated clocks
+	RCC->DCKCFGR2 = 0;
 	while ((RCC->CFGR & RCC_CFGR_SWS_Msk) != RCC_CFGR_SWS_PLL);
 	// Update clock configuration
 	SystemCoreClockUpdate();
+	// Enable clock output for other chips
+	mco1_init();
+}
+
+uint32_t clkSDMMC1()
+{
+	if (RCC->DCKCFGR2 & RCC_DCKCFGR2_SDMMC1SEL_Msk)
+		return clkAHB();
+	return 48ul * 1000 * 1000;
+}
+
+uint32_t clkSDMMC2()
+{
+	if (RCC->DCKCFGR2 & RCC_DCKCFGR2_SDMMC1SEL_Msk)
+		return clkAHB();
+	return 48ul * 1000 * 1000;
 }

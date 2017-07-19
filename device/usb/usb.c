@@ -59,13 +59,13 @@ void usb_init(usb_t *usb, USB_OTG_GlobalTypeDef *base)
 
 static inline void usb_hs_init_gpio()
 {
-	// Configure GPIOs
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN;
 	// Enable IO compensation cell
 	if (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY)) {
-		SYSCFG->CMPCR |= SYSCFG_CMPCR_CMP_PD;
 		RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+		SYSCFG->CMPCR |= SYSCFG_CMPCR_CMP_PD;
 	}
+	// Configure GPIOs
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN;
 	// PA3, PA5, PB0, PB1, PB5, PB10, PB11, PB12, PB13, PC0, PC2, PC3
 	GPIO_MODER(GPIOA, 3, 0b10);	// D0	IO
 	GPIO_OTYPER_PP(GPIOA, 3);	// Output push-pull

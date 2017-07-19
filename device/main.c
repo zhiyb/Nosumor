@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <inttypes.h>
 #include <stm32f722xx.h>
 #include "debug.h"
 #include "escape.h"
-#include "clock.h"
+#include "clocks.h"
+#include "pvd.h"
 #include "fio.h"
 #include "irq.h"
 #include "macros.h"
@@ -14,14 +16,11 @@
 #include "usb/usb.h"
 #include "usb/keyboard/keyboard.h"
 #include "usb/audio/usb_audio.h"
+#include "fatfs/ff.h"
 
 static usb_t usb;
 
-// RGB2_RGB:	PA0(R), PA2(G), PA1(B)
-// RGB1_RGB:	PA11(R), PA15(G), PA10(B)
-// RGB1_LR:	PB14(L), PB15(R)
-
-void usart6_init()
+static inline void usart6_init()
 {
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
 	// 10: Alternative function mode
@@ -38,27 +37,14 @@ void usart6_init()
 	fio_setup(uart_putc, uart_getc, USART6);
 }
 
-static inline void mco1_init()
-{
-	// MCO1: HSE / 1
-	RCC->CFGR = (RCC->CFGR & ~(RCC_CFGR_MCO1 | RCC_CFGR_MCO1PRE)) |
-			(0b10 << RCC_CFGR_MCO1_Pos) | (0 << RCC_CFGR_MCO1PRE_Pos);
-	// Configure GPIOs
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
-	GPIO_MODER(GPIOA, 8, 0b10);	// 10: Alternative function mode
-	GPIO_OTYPER_PP(GPIOA, 8);
-	GPIO_OSPEEDR(GPIOA, 8, 0b01);	// Medium speed (25MHz)
-	GPIO_AFRH(GPIOA, 8, 0);		// AF0: MCO1
-}
-
 static inline void init()
 {
 	rcc_init();
 	NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUPING);
 	__enable_irq();
 	systick_init(1000);
-	mco1_init();	// Clock for USB PHY & Audio codec
 	usart6_init();
+	pvd_init();
 
 	puts(ESC_CLEAR ESC_MAGENTA VARIANT " build @ " __DATE__ " " __TIME__);
 	printf(ESC_YELLOW "Core clock: " ESC_WHITE "%lu\n", clkAHB());
@@ -79,7 +65,9 @@ static inline void init()
 	//usb_audio_init(&usb);
 
 	puts(ESC_CYAN "Initialising LEDs...");
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN;
+	// RGB:	PA0(R), PA1(G), PA2(B)
+	// LED:	PB14(1), PB15(2), PA11(3), PA10(4)
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN;
 	// 01: General purpose output mode
 	GPIO_MODER(GPIOA, 0, 0b01);
 	GPIO_MODER(GPIOA, 1, 0b01);
@@ -87,48 +75,71 @@ static inline void init()
 	GPIOA->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1 | GPIO_ODR_ODR_2);
 	GPIO_MODER(GPIOB, 14, 0b01);
 	GPIO_MODER(GPIOB, 15, 0b01);
-	GPIOB->ODR |= (GPIO_ODR_ODR_14 | GPIO_ODR_ODR_15);
-	GPIOB->ODR &= ~(GPIO_ODR_ODR_15);
-	GPIOB->ODR &= ~(GPIO_ODR_ODR_14);
+	GPIOB->ODR &= ~(GPIO_ODR_ODR_14 | GPIO_ODR_ODR_15);
 	GPIO_MODER(GPIOA, 10, 0b01);
 	GPIO_MODER(GPIOA, 11, 0b01);
-	GPIO_MODER(GPIOA, 15, 0b01);
-	GPIOA->ODR &= ~(GPIO_ODR_ODR_10 | GPIO_ODR_ODR_11 | GPIO_ODR_ODR_15);
+	GPIOA->ODR &= ~(GPIO_ODR_ODR_10 | GPIO_ODR_ODR_11);
 
 	puts(ESC_GREEN "Initialisation done");
 	usb_connect(&usb, 1);
 }
 
+static inline void fatfs_test()
+{
+	puts(ESC_CYAN "Testing FatFS...");
+
+	// Mount volume
+	FATFS fs;
+	FRESULT res;
+	if ((res = f_mount(&fs, "SD:", 1)) != FR_OK) {
+		printf(ESC_RED "f_mount: %d\n", res);
+		return;
+	}
+
+	// Open root directory for listing
+	DIR dir;
+	if ((res = f_opendir(&dir, "SD:/")) != FR_OK) {
+		printf(ESC_RED "f_opendir: %d\n", res);
+		return;
+	}
+	// Iterate through directory
+	FILINFO info;
+	for (;;) {
+		if ((res = f_readdir(&dir, &info)) != FR_OK) {
+			printf(ESC_RED "f_readdir: %d\n", res);
+			return;
+		}
+		if (info.fname[0] == 0)
+			break;
+		printf(ESC_WHITE "%s" ESC_YELLOW " type " ESC_WHITE "0x%x"
+		       ESC_YELLOW " size " ESC_WHITE "%"PRIu64
+		       "\n", info.fname, info.fattrib, info.fsize);
+	}
+	// Close directory
+	if ((res = f_closedir(&dir)) != FR_OK) {
+		printf(ESC_RED "f_closedir: %d\n", res);
+		return;
+	}
+
+	// Unmount volume
+	if ((res = f_mount(NULL, "SD:", 0)) != FR_OK) {
+		printf(ESC_RED "f_unmount: %d\n", res);
+		return;
+	}
+
+	puts(ESC_GREEN "FatFS tests completed");
+}
+
 int main()
 {
 	init();
-	uint32_t s;
-#if 0
-	int i = 1;
-	while (!((s = keyboard_status()) & keyboard_masks[2])) {
-		//GPIOA->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1 | GPIO_ODR_ODR_2);
-		GPIOA->ODR &= ~(GPIO_ODR_ODR_2);
-		systick_delay(i << 1);
-		GPIOA->ODR |= (GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1 | GPIO_ODR_ODR_2);
-		GPIOB->ODR &= ~(GPIO_ODR_ODR_14);
-		systick_delay(i);
-		GPIOB->ODR |= (GPIO_ODR_ODR_14);
-		GPIOB->ODR &= ~(GPIO_ODR_ODR_15);
-		systick_delay(i);
-		GPIOB->ODR |= (GPIO_ODR_ODR_15);
-		if (s & keyboard_masks[3])
-			i++;
-		if (s & keyboard_masks[4])
-			i = i == 0 ? 0 : i - 1;
-		if (s)
-			while (keyboard_status());
-	}
-#endif
+	fatfs_test();
+
 #ifdef DEBUG
 	uint32_t mask = keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4];
 #endif
 	for (;;) {
-		s = keyboard_status();
+		uint32_t s = keyboard_status();
 		if (s & keyboard_masks[0])
 			GPIOB->ODR &= ~GPIO_ODR_ODR_15;
 		else

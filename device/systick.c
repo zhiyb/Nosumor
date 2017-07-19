@@ -1,7 +1,7 @@
 #include <malloc.h>
 #include <stm32f7xx.h>
 #include "systick.h"
-#include "clock.h"
+#include "clocks.h"
 #include "irq.h"
 #include "debug.h"
 

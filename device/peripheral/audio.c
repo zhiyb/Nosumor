@@ -32,7 +32,6 @@ void audio_init()
 
 	// Initialise I2C module
 	RCC->APB1ENR |= RCC_APB1ENR_I2C1EN_Msk;
-	RCC->DCKCFGR2 &= ~RCC_DCKCFGR2_I2C1SEL_Msk;
 	I2C->CR1 = 0;	// Disable I2C, clear interrupts
 	I2C->CR2 = 0;
 	// I2C at 400kHz (using 54MHz input clock)

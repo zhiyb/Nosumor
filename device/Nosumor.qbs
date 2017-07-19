@@ -24,51 +24,87 @@ Project {
             cpp.optimization: "small"
         }
 
+        Group {
+            name: "FatFS"
+            files: [
+                "fatfs/*",
+            ]
+        }
+
+        Group {
+            name: "Peripherals"
+            files: [
+                "peripheral/audio.c",
+                "peripheral/audio.h",
+                "peripheral/mmc_defs.h",
+                "peripheral/mmc.c",
+                "peripheral/mmc.h",
+                "peripheral/uart.c",
+                "peripheral/uart.h",
+            ]
+        }
+
+        Group {
+            name: "USB interfaces"
+            files: [
+                "usb/audio/usb_audio.c",
+                "usb/audio/usb_audio.h",
+                "usb/audio/usb_audio_defs.h",
+                "usb/audio/usb_audio_desc.h",
+                "usb/keyboard/keyboard.c",
+                "usb/keyboard/keyboard.h",
+                "usb/keyboard/usb_keyboard.c",
+                "usb/keyboard/usb_keyboard.h",
+                "usb/keyboard/usb_keyboard_desc.h",
+            ]
+        }
+
+        Group {
+            name: "USB"
+            files: [
+                "usb/usb.c",
+                "usb/usb.h",
+                "usb/usb_debug.h",
+                "usb/usb_desc.c",
+                "usb/usb_desc.h",
+                "usb/usb_ep.c",
+                "usb/usb_ep.h",
+                "usb/usb_ep0.c",
+                "usb/usb_ep0.h",
+                "usb/usb_irq.c",
+                "usb/usb_irq.h",
+                "usb/usb_macros.h",
+                "usb/usb_ram.c",
+                "usb/usb_ram.h",
+                "usb/usb_setup.c",
+                "usb/usb_setup.h",
+            ]
+        }
+
+        Group {
+            name: "System"
+            files: [
+                "STM32F722RETx_FLASH.ld",
+                "clocks.c",
+                "clocks.h",
+                "pvd.c",
+                "pvd.h",
+                "startup_stm32f722xx.S",
+                "syscalls.c",
+                "system_stm32f7xx.c",
+                "debug.h",
+                "systick.c",
+                "systick.h",
+                "fio.c",
+                "fio.h",
+            ]
+        }
+
         files: [
-            "STM32F722RETx_FLASH.ld",
             "irq.h",
-            "peripheral/audio.c",
-            "peripheral/audio.h",
-            "clock.c",
-            "clock.h",
-            "debug.h",
             "escape.h",
-            "fio.c",
-            "fio.h",
             "macros.h",
             "main.c",
-            "peripheral/uart.c",
-            "peripheral/uart.h",
-            "startup_stm32f722xx.S",
-            "syscalls.c",
-            "system_stm32f7xx.c",
-            "systick.c",
-            "systick.h",
-            "usb/audio/usb_audio.c",
-            "usb/audio/usb_audio.h",
-            "usb/audio/usb_audio_defs.h",
-            "usb/audio/usb_audio_desc.h",
-            "usb/keyboard/keyboard.c",
-            "usb/keyboard/keyboard.h",
-            "usb/keyboard/usb_keyboard.c",
-            "usb/keyboard/usb_keyboard.h",
-            "usb/keyboard/usb_keyboard_desc.h",
-            "usb/usb.c",
-            "usb/usb.h",
-            "usb/usb_debug.h",
-            "usb/usb_desc.c",
-            "usb/usb_desc.h",
-            "usb/usb_ep.c",
-            "usb/usb_ep.h",
-            "usb/usb_ep0.c",
-            "usb/usb_ep0.h",
-            "usb/usb_irq.c",
-            "usb/usb_irq.h",
-            "usb/usb_macros.h",
-            "usb/usb_ram.c",
-            "usb/usb_ram.h",
-            "usb/usb_setup.c",
-            "usb/usb_setup.h",
         ]
 
         FileTagger {

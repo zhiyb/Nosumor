@@ -1,5 +1,5 @@
-#ifndef CLOCK_H
-#define CLOCK_H
+#ifndef CLOCKS_H
+#define CLOCKS_H
 
 #include <stdint.h>
 
@@ -10,6 +10,8 @@ extern "C" {
 uint32_t clkAHB();
 uint32_t clkAPB1();
 uint32_t clkAPB2();
+uint32_t clkSDMMC1();
+uint32_t clkSDMMC2();
 
 void rcc_init();
 
@@ -17,4 +19,4 @@ void rcc_init();
 }
 #endif
 
-#endif // CLOCK_H
+#endif // CLOCKS_H
