@@ -113,7 +113,6 @@ DSTATUS mmc_disk_init()
 
 	// Reset card
 	mmc_command(GO_IDLE_STATE, 0, 0);
-	mmc_command(GO_IDLE_STATE, 0, 0);
 
 	// Verify operation (2.7-3.6V, check pattern 0xa5)
 	uint32_t sta, arg = (0b0001ul << 8u) | (0xa5 << 0u);
@@ -246,6 +245,7 @@ static uint32_t mmc_command(uint32_t cmd, uint32_t arg, uint32_t *stat)
 			SDMMC_ICR_CCRCFAILC_Msk | SDMMC_ICR_CTIMEOUTC_Msk;
 	MMC->ARG = arg;
 	MMC->CMD = cmd | SDMMC_CMD_CPSMEN_Msk;
+	while (!(MMC->STA & SDMMC_STA_CMDACT_Msk));
 
 	if (!(cmd & SDMMC_CMD_WAITRESP_0)) {
 		// No response expected

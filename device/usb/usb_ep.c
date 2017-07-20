@@ -60,14 +60,16 @@ int usb_ep_in_wait(USB_OTG_GlobalTypeDef *usb, int n)
 {
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb, n);
 	// Wait for endpoint available
+	uint32_t ctl;
 	do {
-		if (!(ep->DIEPCTL & USB_OTG_DIEPCTL_USBAEP_Msk))
+		ctl = ep->DIEPCTL;
+		if (!(ctl & USB_OTG_DIEPCTL_USBAEP_Msk))
 			return 0;
 		if (ep->DIEPINT & USB_OTG_DIEPINT_TOC_Msk)
 			return 0;
-		if (ep->DIEPCTL & USB_OTG_DIEPCTL_NAKSTS_Msk)
-			DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_CNAK_Msk);
-	} while (ep->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk);
+		if (ctl & USB_OTG_DIEPCTL_NAKSTS_Msk)
+			DIEPCTL_SET(ctl, USB_OTG_DIEPCTL_CNAK_Msk);
+	} while (ctl & USB_OTG_DIEPCTL_EPENA_Msk);
 	return 1;
 }
 
