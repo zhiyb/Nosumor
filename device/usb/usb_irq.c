@@ -36,12 +36,14 @@ static void usb_reset(usb_t *usb)
 
 void usb_disable(usb_t *usb)
 {
+#if 0
 	// Disable endpoint 0
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, 0);
 	if (ep->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk) {
 		DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPDIS_Msk);
 		while (ep->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk);
 	}
+#endif
 	// Disable other endpoints
 	for (usb_if_t **pi = &usb->usbif; *pi != 0; pi = &(*pi)->next)
 		FUNC((*pi)->disable)(usb, (*pi)->data);
@@ -61,7 +63,8 @@ void OTG_HS_IRQHandler()
 {
 	USB_OTG_GlobalTypeDef *usb = usb_hs->base;
 	USB_OTG_DeviceTypeDef *dev = DEVICE(usb);
-	uint32_t i = usb->GINTSTS, bk = 1;
+	uint32_t i = usb->GINTSTS, bk = 1, fn = FIELD(dev->DSTS, USB_OTG_DSTS_FNSOF);
+	i &= usb->GINTMSK;
 	if (i & USB_OTG_GINTSTS_OTGINT) {
 		dbgbkpt();
 	}
@@ -69,7 +72,6 @@ void OTG_HS_IRQHandler()
 		dbgbkpt();
 	}
 	if (i & (USB_OTG_GINTSTS_USBSUSP_Msk)) {
-		usb_disable(usb_hs);
 		usb->GINTSTS = USB_OTG_GINTSTS_USBSUSP_Msk;
 		bk = 0;
 	}
@@ -81,6 +83,13 @@ void OTG_HS_IRQHandler()
 	if (i & USB_OTG_GINTSTS_ENUMDNE_Msk) {
 		usb_ep0_enum(usb_hs, dev->DSTS & USB_OTG_DSTS_ENUMSPD_Msk);
 		usb->GINTSTS = USB_OTG_GINTSTS_ENUMDNE_Msk;
+		bk = 0;
+	}
+	if (i & USB_OTG_GINTSTS_PXFR_INCOMPISOOUT_Msk) {
+		//dbgbkpt();
+		usb->GINTSTS = USB_OTG_GINTSTS_PXFR_INCOMPISOOUT_Msk;
+		putchar((fn & 1) + '0');
+		fflush(stdout);
 		bk = 0;
 	}
 	if (i & USB_OTG_GINTSTS_OEPINT_Msk) {

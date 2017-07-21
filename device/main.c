@@ -52,8 +52,8 @@ static inline void init()
 	puts(ESC_CYAN "Initialising keyboard...");
 	keyboard_init();
 
-	//puts(ESC_CYAN "Initialising audio...");
-	//audio_init();
+	puts(ESC_CYAN "Initialising audio...");
+	audio_init();
 
 	puts(ESC_CYAN "Initialising USB HS...");
 	usb_init(&usb, USB_OTG_HS);
@@ -62,7 +62,7 @@ static inline void init()
 	while (usb_mode(&usb) != 0);
 	usb_init_device(&usb);
 	usb_keyboard_init(&usb);
-	//usb_audio_init(&usb);
+	usb_audio_init(&usb);
 
 	puts(ESC_CYAN "Initialising LEDs...");
 	// RGB:	PA0(R), PA1(G), PA2(B)
@@ -130,11 +130,17 @@ static inline void fatfs_test()
 	puts(ESC_GREEN "FatFS tests completed");
 }
 
+#include "usb/usb_macros.h"
 int main()
 {
 	init();
 	fatfs_test();
 
+	USB_OTG_GlobalTypeDef *base = usb.base;
+	USB_OTG_DeviceTypeDef *dev = DEVICE(base);
+	USB_OTG_INEndpointTypeDef *epi0 = EP_IN(base, 0);
+	USB_OTG_OUTEndpointTypeDef *epo0 = EP_OUT(base, 0);
+	USB_OTG_OUTEndpointTypeDef *epo1 = EP_OUT(base, 1);
 #ifdef DEBUG
 	uint32_t mask = keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4];
 #endif

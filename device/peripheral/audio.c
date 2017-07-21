@@ -253,6 +253,7 @@ static void audio_test()
 		0x31, 0x40,		// CM selected for MIC PGA
 	}, *p = data;
 
+#if 0
 	// sin(x) lookup table
 	int32_t lut[2048];
 	for (uint32_t i = 0; i != 2048; i++) {
@@ -291,6 +292,7 @@ static void audio_test()
 	STREAM1->NDTR = 2ul * 2ul * 2048ul;
 	// Enable DMA stream
 	STREAM1->CR |= DMA_SxCR_EN_Msk;
+#endif
 
 	// Write configration sequence
 	for (uint32_t i = 0; i != sizeof(data) / sizeof(data[0]) / 2; i++) {
@@ -310,21 +312,13 @@ static void audio_test()
 #endif
 }
 
-void audio_enable(int enable)
+void audio_out_enable(int enable)
 {
 	if (enable) {
-		// Enable BCLK N, N = 1
-		i2c_write_reg(I2C, I2C_ADDR, 0x1e, 0x81);
+		// DAC not muted, independent volume
+		i2c_write_reg(I2C, I2C_ADDR, 0x40, 0x00);
 	} else {
-		dbgbkpt();
-	}
-}
-
-void audio_speaker(int enable)
-{
-	if (enable) {
-		;
-	} else {
-		;
+		// DAC muted
+		i2c_write_reg(I2C, I2C_ADDR, 0x40, 0x0c);
 	}
 }

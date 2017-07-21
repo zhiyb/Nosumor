@@ -60,7 +60,7 @@ typedef struct desc_t {
 typedef struct const_desc_t {
 	uint32_t size;
 	const void *p;
-} cnost_desc_t;
+} const_desc_t;
 
 typedef struct desc_string_list_t {
 	struct desc_string_list_t *next;
@@ -94,6 +94,7 @@ typedef enum {USB_Reset = 0,
 typedef struct usb_t {
 	USB_OTG_GlobalTypeDef *base;
 	usb_speed_t speed;
+	uint32_t addr;
 	// USB RAM & FIFO allocation
 	struct {
 		uint32_t top, max;

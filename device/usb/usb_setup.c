@@ -29,7 +29,16 @@ static void usb_send_descriptor(usb_t *usb, uint32_t ep, setup_t pkt)
 	}
 	if (desc.size) {
 		desc.size = desc.size > pkt.wLength ? pkt.wLength : desc.size;
-		usb_ep_in_transfer(usb->base, ep, desc.p, desc.size);
+		if (ep == 0) {
+			while (desc.size) {
+				// Endpoint 0 can only transfer 127 bytes maximum
+				uint32_t s = desc.size > 127u ? 64u : desc.size;
+				usb_ep_in_transfer(usb->base, 0, desc.p, s);
+				desc.p += s;
+				desc.size -= s;
+			}
+		} else
+			usb_ep_in_transfer(usb->base, ep, desc.p, desc.size);
 	} else
 		usb_ep_in_stall(usb->base, ep);
 }

@@ -16,15 +16,19 @@ void usb_init(usb_t *usb, USB_OTG_GlobalTypeDef *base)
 	memset(usb, 0, sizeof(usb_t));
 	usb->base = base;
 
-	if (base != USB_OTG_HS)
+	if (base != USB_OTG_HS) {
+		dbgbkpt();
 		return;
+	}
 	usb_hs_init_gpio();
 
 	// Enable OTG HS
-	RCC->AHB1ENR |= RCC_AHB1ENR_OTGHSULPIEN | RCC_AHB1ENR_OTGHSEN;
+	RCC->AHB1ENR |= RCC_AHB1ENR_OTGHSULPIEN_Msk | RCC_AHB1ENR_OTGHSEN_Msk;
 	// Core reset
-	base->GRSTCTL |= USB_OTG_GRSTCTL_CSRST;
-	while (base->GRSTCTL & USB_OTG_GRSTCTL_CSRST);
+	base->GRSTCTL |= USB_OTG_GRSTCTL_CSRST_Msk;
+	while ((base->GRSTCTL &
+		(USB_OTG_GRSTCTL_CSRST_Msk | USB_OTG_GRSTCTL_AHBIDL_Msk)) !=
+			USB_OTG_GRSTCTL_AHBIDL_Msk);
 	// Reset PHY clock
 	PCGCCTL(base) = 0;
 	base->GOTGCTL = USB_OTG_GOTGCTL_OTGVER;
@@ -137,12 +141,12 @@ void usb_init_device(usb_t *usb)
 	// Disconnect USB
 	usb_connect(usb, 0);
 	usb_ep0_register(usb);
-	dev->DCFG = USB_OTG_DCFG_NZLSOHSK_Msk | (1ul << 14u);	// Transceiver delay
+	dev->DCFG = (0b10 << USB_OTG_DCFG_PERSCHIVL_Pos) |
+			USB_OTG_DCFG_NZLSOHSK_Msk | (1ul << 14u);	// Transceiver delay
 	dev->DOEPMSK = USB_OTG_DOEPMSK_XFRCM | USB_OTG_DOEPMSK_STUPM;
 	dev->DIEPMSK = USB_OTG_DIEPMSK_XFRCM | USB_OTG_DIEPMSK_TOM;
-	base->GINTMSK |= USB_OTG_GINTMSK_USBRST_Msk |
-			USB_OTG_GINTMSK_USBSUSPM_Msk | //USB_OTG_GINTMSK_ESUSPM_Msk |
-			USB_OTG_GINTMSK_ENUMDNEM_Msk | //USB_OTG_GINTMSK_RXFLVLM_Msk |
+	base->GINTMSK |= USB_OTG_GINTMSK_USBRST_Msk | USB_OTG_GINTMSK_USBSUSPM_Msk |
+			USB_OTG_GINTMSK_ENUMDNEM_Msk | USB_OTG_GINTMSK_PXFRM_IISOOXFRM_Msk |
 			USB_OTG_GINTMSK_OEPINT_Msk | USB_OTG_GINTMSK_IEPINT_Msk;
 }
 
@@ -150,10 +154,10 @@ void usb_connect(usb_t *usb, int e)
 {
 	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
 	if (!e)	{
-		usb_disable(usb);
 		// Disconnect device
 		dev->DCTL = USB_OTG_DCTL_SDIS_Msk;
-		systick_delay(2);
+		usb_disable(usb);
+		systick_delay(100);
 	} else
 		dev->DCTL = 0;	// Connect device
 }

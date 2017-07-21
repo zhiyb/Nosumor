@@ -7,7 +7,7 @@
 #include "../escape.h"
 #include "../debug.h"
 
-#undef DEBUG
+//#undef DEBUG
 
 #ifdef DEBUG
 #define dbgprintf	printf

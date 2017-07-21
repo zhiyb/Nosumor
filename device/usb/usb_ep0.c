@@ -18,13 +18,13 @@
 
 static void epin_init(usb_t *usb, uint32_t n)
 {
-	uint32_t size = 128, addr = usb_ram_alloc(usb, &size);
+	uint32_t size = 256, addr = usb_ram_alloc(usb, &size);
 	usb->base->DIEPTXF0_HNPTXFSIZ = DIEPTXF(addr, size);
 	// Unmask interrupts
-	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
-	ep->DOEPINT = 0;
+	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
+	ep->DIEPINT = 0;
 	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
-	dev->DAINTMSK |= DAINTMSK_IN(0);
+	dev->DAINTMSK |= DAINTMSK_IN(n);
 }
 
 void usb_ep0_enum(usb_t *usb, uint32_t speed)
@@ -52,13 +52,6 @@ void usb_ep0_enum(usb_t *usb, uint32_t speed)
 		FUNC(usb->epin[i].init)(usb, i);
 	for (int i = 0; i != USB_EPIN_CNT; i++)
 		FUNC(usb->epout[i].init)(usb, i);
-	// Configure endpoint 0 OUT DMA
-	EP_OUT(usb->base, 0)->DOEPDMA = (uint32_t)usb->epout[0].data;
-	// Reset packet counter
-	EP_OUT(usb->base, 0)->DOEPTSIZ = (MAX_SETUP_CNT << USB_OTG_DOEPTSIZ_STUPCNT_Pos) |
-			(MAX_PKT_CNT << USB_OTG_DOEPTSIZ_PKTCNT_Pos) | MAX_SIZE;
-	// Enable endpoint 0 OUT
-	EP_OUT(usb->base, 0)->DOEPCTL = USB_OTG_DOEPCTL_EPENA | USB_OTG_DOEPCTL_CNAK;
 }
 
 uint32_t usb_ep0_max_size(USB_OTG_GlobalTypeDef *usb)
@@ -70,25 +63,35 @@ uint32_t usb_ep0_max_size(USB_OTG_GlobalTypeDef *usb)
 
 static void epout_init(usb_t *usb, uint32_t n)
 {
-	usb->epout[n].data = malloc(MAX_SIZE);
-	// Unmask interrupts
+	void *data = usb->epout[n].data ?: malloc(MAX_SIZE);
+	usb->epout[n].data = data;
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
+	// Configure endpoint DMA
+	ep->DOEPDMA = (uint32_t)data;
+	// Reset packet counter
+	ep->DOEPTSIZ = (MAX_SETUP_CNT << USB_OTG_DOEPTSIZ_STUPCNT_Pos) |
+			(MAX_PKT_CNT << USB_OTG_DOEPTSIZ_PKTCNT_Pos) | MAX_SIZE;
+	// Enable endpoint
+	ep->DOEPCTL = USB_OTG_DOEPCTL_EPENA | USB_OTG_DOEPCTL_CNAK;
+	// Clear interrupts
 	ep->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk | USB_OTG_DOEPINT_STUP_Msk;
+	// Unmask interrupts
 	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
-	dev->DAINTMSK |= DAINTMSK_OUT(0);
+	dev->DAINTMSK |= DAINTMSK_OUT(n);
 }
 
 static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 {
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 	uint32_t siz = ep->DOEPTSIZ;
-	uint32_t setup_cnt = MAX_SETUP_CNT - FIELD(siz, USB_OTG_DOEPTSIZ_STUPCNT);
-	uint32_t pkt_cnt = MAX_PKT_CNT - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
+	//uint32_t setup_cnt = MAX_SETUP_CNT - FIELD(siz, USB_OTG_DOEPTSIZ_STUPCNT);
+	//uint32_t pkt_cnt = MAX_PKT_CNT - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
 	uint32_t size = MAX_SIZE - FIELD(siz, USB_OTG_DOEPTSIZ_XFRSIZ);
 	if (size == 0u)
 		return;
-	if (size != 8u * setup_cnt)
+	if (size & 7u)
 		dbgbkpt();
+	uint32_t setup_cnt = size >> 3u;
 	// Receive packets
 	setup_t *setup = (setup_t *)usb->epout[0].data;
 	while (setup_cnt--)
@@ -98,21 +101,27 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 static void epout_setup_cplt(usb_t *usb, uint32_t n)
 {
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
-	// Configure endpoint 0 OUT DMA
-	EP_OUT(usb->base, 0)->DOEPDMA = (uint32_t)usb->epout[0].data;
+	// Update device address
+	if (usb->addr)
+		DEVICE(usb->base)->DCFG = (DEVICE(usb->base)->DCFG & ~USB_OTG_DCFG_DAD_Msk) |
+				((usb->addr << USB_OTG_DCFG_DAD_Pos) & USB_OTG_DCFG_DAD_Msk);
+	// Configure endpoint DMA
+	ep->DOEPDMA = (uint32_t)usb->epout[n].data;
 	// Reset packet counter
 	ep->DOEPTSIZ = (MAX_SETUP_CNT << USB_OTG_DOEPTSIZ_STUPCNT_Pos) |
 			(MAX_PKT_CNT << USB_OTG_DOEPTSIZ_PKTCNT_Pos) | MAX_SIZE;
-	// Enable endpoint 0 OUT
+	// Enable endpoint OUT
 	ep->DOEPCTL = USB_OTG_DOEPCTL_EPENA | USB_OTG_DOEPCTL_CNAK;
 }
 
 void usb_ep0_register(usb_t *usb)
 {
 	static const epin_t epin = {
+		.data = 0,
 		.init = epin_init,
 	};
 	static const epout_t epout = {
+		.data = 0,
 		.init = epout_init,
 		.xfr_cplt = epout_xfr_cplt,
 		.setup_cplt = epout_setup_cplt,

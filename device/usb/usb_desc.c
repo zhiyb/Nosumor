@@ -88,7 +88,7 @@ desc_t usb_desc_config(usb_t *usb)
 	for (usb_if_t **ip = &usb->usbif; *ip != 0; ip = &(*ip)->next) {
 		FUNC((*ip)->config)(usb, (*ip)->data);
 		cp = (desc_config_t *)usb->desc.config.p;
-		(*ip)->id = cp->bNumInterfaces;
+		(*ip)->id = cp->bNumInterfaces++;
 	}
 	cp->wTotalLength = usb->desc.config.size;
 	return usb->desc.config;
@@ -208,7 +208,7 @@ static const desc_interface_t desc_interface = {
 	9u, SETUP_DESC_TYPE_INTERFACE, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
 };
 
-void usb_desc_add_interface(usb_t *usb, uint8_t bAlternateSetting, uint8_t bNumEndpoints,
+uint8_t usb_desc_add_interface(usb_t *usb, uint8_t bAlternateSetting, uint8_t bNumEndpoints,
 			    uint8_t bInterfaceClass, uint8_t bInterfaceSubClass,
 			    uint8_t bInterfaceProtocol, uint8_t iInterface)
 {
@@ -224,9 +224,7 @@ void usb_desc_add_interface(usb_t *usb, uint8_t bAlternateSetting, uint8_t bNumE
 	ip->iInterface = iInterface;
 	usb->desc.config.size += ip->bLength;
 	desc_config_t *pc = (desc_config_t *)usb->desc.config.p;
-	if (bAlternateSetting == 0)
-		pc->bNumInterfaces++;
-	ip->bInterfaceNumber = pc->bNumInterfaces;
+	return ip->bInterfaceNumber = pc->bNumInterfaces;
 }
 
 /* Endpoint descriptor */
@@ -238,10 +236,12 @@ typedef struct PACKED desc_ep_t {
 	uint8_t bmAttributes;
 	uint16_t wMaxPacketSize;
 	uint8_t bInterval;
+	uint8_t bRefresh;
+	uint8_t bSynchAddress;
 } desc_ep_t;
 
 static const desc_ep_t desc_ep = {
-	7u, SETUP_DESC_TYPE_ENDPOINT, 0u, 0u, 0u, 0u,
+	9u, SETUP_DESC_TYPE_ENDPOINT, 0u, 0u, 0u, 0u, 0u, 0u,
 };
 
 void usb_desc_add_endpoint(usb_t *usb, uint8_t bEndpointAddress, uint8_t bmAttributes,

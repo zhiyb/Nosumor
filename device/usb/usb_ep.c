@@ -35,7 +35,9 @@ void usb_ep_in_transfer(USB_OTG_GlobalTypeDef *usb, int n, const void *p, uint32
 	if (size == 0) {
 		ep->DIEPTSIZ = (1ul << USB_OTG_DIEPTSIZ_PKTCNT_Pos) | 0;
 		DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_CNAK_Msk);
+#if 0
 		dbgprintf(ESC_GREY "<%dI>\n", n);
+#endif
 		return;
 	}
 
@@ -46,7 +48,7 @@ void usb_ep_in_transfer(USB_OTG_GlobalTypeDef *usb, int n, const void *p, uint32
 	// Enable endpoint
 	DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_CNAK_Msk);
 
-#ifdef DEBUG
+#if 0
 	dbgprintf(ESC_GREY "<%dI%lu ", n, size);
 	uint8_t *dp = (uint8_t *)p;
 	uint32_t i = size;

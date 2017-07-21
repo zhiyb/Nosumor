@@ -108,7 +108,7 @@ static void set_idle(uint8_t duration, uint8_t reportID)
 
 static void usb_send_descriptor(usb_t *usb, uint32_t ep, setup_t pkt)
 {
-	cnost_desc_t desc;
+	const_desc_t desc;
 	switch (pkt.bType) {
 	case SETUP_DESC_TYPE_REPORT:
 		desc.p = desc_report;

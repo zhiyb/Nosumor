@@ -129,4 +129,58 @@
 #define SAMPLING_FREQ_CONTROL	0x01
 #define PITCH_CONTROL		0x02
 
+// Audio format type codec
+#define FORMAT_TYPE_UNDEFINED	0x00
+#define FORMAT_TYPE_I		0x01
+#define FORMAT_TYPE_II		0x02
+#define FORMAT_TYPE_III		0x03
+
+// Audio data formats
+enum {
+	// Type I
+	TYPE_I_UNDEFINED		= 0x0000,
+	PCM				= 0x0001,
+	PCM8				= 0x0002,
+	IEEE_FLOAT			= 0x0003,
+	ALAW				= 0x0004,
+	MULAW				= 0x0005,
+	// Type II
+	TYPE_II_UNDEFINED		= 0x1000,
+	MPEG				= 0x1001,
+	AC_3				= 0x1002,
+	// Type III
+	TYPE_III_UNDEFINED		= 0x2000,
+	IEC1937_AC_3			= 0x2001,
+	IEC1937_MPEG_1_LAYER1		= 0x2002,
+	IEC1937_MPEG_2_NOEXT		= 0x2003,
+	IEC1937_MPEG_2_EXT		= 0x2004,
+	IEC1937_MPEG_2_Layer1_LS	= 0x2005,
+	IEC1937_MPEG_2_Layer2_3_LS	= 0x2006,
+};
+
+// Audio terminal types
+enum {
+	// USB terminal types
+	USB_Undefined			= 0x0100,
+	USB_streaming			= 0x0101,
+	USB_vendor_specific		= 0x01FF,
+	// Input terminal types
+	Input_Undefined			= 0x0200,
+	Microphone			= 0x0201,
+	Desktop_microphone		= 0x0202,
+	Personal_microphone		= 0x0203,
+	Omni_directional_microphone	= 0x0204,
+	Microphone_array		= 0x0205,
+	Processing_microphone_array	= 0x0206,
+	// Output terminal types
+	Output_Undefined		= 0x0300,
+	Speaker				= 0x0301,
+	Headphones			= 0x0302,
+	Head_Mounted_Display_Audio	= 0x0303,
+	Desktop_speaker			= 0x0304,
+	Room_speaker			= 0x0305,
+	Communication_speaker		= 0x0306,
+	Low_frequency_effects_speaker	= 0x0307,
+};
+
 #endif // USB_AUDIO_DEFS_H
