@@ -10,16 +10,20 @@
 #include "../usb_macros.h"
 #include "../usb_setup.h"
 
-#define SETUP_DESC_TYPE_HID		0x21u
-#define SETUP_DESC_TYPE_REPORT		0x22u
-#define SETUP_DESC_TYPE_PHYSICAL	0x23u
+#define SETUP_DESC_TYPE_HID		0x21
+#define SETUP_DESC_TYPE_REPORT		0x22
+#define SETUP_DESC_TYPE_PHYSICAL	0x23
 
-#define SETUP_REQ_GET_REPORT	0x01u
-#define SETUP_REQ_GET_IDLE	0x02u
-#define SETUP_REQ_GET_PROTOCOL	0x03u
-#define SETUP_REQ_SET_REPORT	0x09u
-#define SETUP_REQ_SET_IDLE	0x0au
-#define SETUP_REQ_SET_PROTOCOL	0x0bu
+#define SETUP_REQ_GET_REPORT	0x01
+#define SETUP_REQ_GET_IDLE	0x02
+#define SETUP_REQ_GET_PROTOCOL	0x03
+#define SETUP_REQ_SET_REPORT	0x09
+#define SETUP_REQ_SET_IDLE	0x0a
+#define SETUP_REQ_SET_PROTOCOL	0x0b
+
+#define SETUP_REPORT_INPUT	0x01
+#define SETUP_REPORT_OUTPUT	0x02
+#define SETUP_REPORT_FEATURE	0x03
 
 uint8_t keycodes[KEYBOARD_KEYS] = {
 	// x,    z,    c,    ~,  ESC
@@ -46,24 +50,29 @@ static void epin_init(usb_t *usb, uint32_t n)
 	ep->DIEPINT = USB_OTG_DIEPINT_XFRC_Msk;
 	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
 	dev->DAINTMSK |= DAINTMSK_IN(n);
+	// Configure endpoint
+	ep->DIEPCTL = EP_IN_TYP_INTERRUPT | (n << USB_OTG_DIEPCTL_TXFNUM_Pos) |
+			(KEYBOARD_REPORT_SIZE << USB_OTG_DIEPCTL_MPSIZ_Pos);
 }
 
 static void epin_halt(struct usb_t *usb, uint32_t n, int halt)
 {
+	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
+	uint32_t ctl = ep->DIEPCTL;
+	if (!(ctl & USB_OTG_DIEPCTL_USBAEP_Msk) != !halt)
+		return;
 	if (halt) {
 		dbgprintf(ESC_RED "HID Keyboard disabled\n");
-		USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
-		if (ep->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk) {
+		if (ctl & USB_OTG_DIEPCTL_EPENA_Msk) {
 			DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPDIS_Msk);
 			while (ep->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk);
 		}
 		DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_SD0PID_SEVNFRM_Msk);
+		ep->DIEPCTL &= ~USB_OTG_DIEPCTL_USBAEP_Msk;
 		return;
 	}
 	dbgprintf(ESC_RED "HID Keyboard enabled\n");
-	EP_IN(usb->base, n)->DIEPCTL = USB_OTG_DIEPCTL_USBAEP_Msk |
-			EP_IN_TYP_INTERRUPT | (n << USB_OTG_DIEPCTL_TXFNUM_Pos) |
-			(KEYBOARD_REPORT_SIZE << USB_OTG_DIEPCTL_MPSIZ_Pos);
+	DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_USBAEP_Msk);
 	//usb_keyboard_update(keyboard_status());
 }
 
@@ -123,6 +132,19 @@ static void usb_send_descriptor(usb_t *usb, uint32_t ep, setup_t pkt)
 	usb_ep_in_transfer(usb->base, ep, desc.p, desc.size);
 }
 
+static void usb_send_report(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
+{
+	switch (pkt.bType) {
+	case SETUP_REPORT_INPUT:
+		usb_ep_in_transfer(usb->base, ep, &data->report, KEYBOARD_REPORT_SIZE);
+		break;
+	default:
+		usb_ep_in_stall(usb->base, ep);
+		dbgbkpt();
+		return;
+	}
+}
+
 static void usbif_setup_std(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
 {
 	switch (pkt.bmRequestType & SETUP_TYPE_DIR_Msk) {
@@ -152,11 +174,22 @@ static void usbif_setup_std(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
 static void usbif_setup_class(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
 {
 	switch (pkt.bmRequestType & SETUP_TYPE_DIR_Msk) {
+	case SETUP_TYPE_DIR_D2H:
+		switch (pkt.bRequest) {
+		case SETUP_REQ_GET_REPORT:
+			usb_send_report(usb, data, ep, pkt);
+			break;
+		default:
+			usb_ep_in_stall(usb->base, ep);
+			dbgbkpt();
+		}
+		break;
 	case SETUP_TYPE_DIR_H2D:
 		switch (pkt.bRequest) {
 		case SETUP_REQ_SET_REPORT:
 			usb_ep_in_stall(usb->base, ep);
 			dbgbkpt();
+			break;
 		case SETUP_REQ_SET_IDLE:
 			set_idle(pkt.bType, pkt.bIndex);
 			usb_ep_in_transfer(usb->base, ep, 0, 0);
@@ -164,14 +197,12 @@ static void usbif_setup_class(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
 		case SETUP_REQ_SET_PROTOCOL:
 			usb_ep_in_stall(usb->base, ep);
 			dbgbkpt();
+			break;
 		default:
 			usb_ep_in_stall(usb->base, ep);
 			dbgbkpt();
 		}
 		break;
-	default:
-		usb_ep_in_stall(usb->base, ep);
-		dbgbkpt();
 	}
 }
 
@@ -218,8 +249,11 @@ void usb_keyboard_update(uint32_t status)
 		if (status & *pm++)
 			*p++ = keycodes[i];
 	// Send report
+	if (_usb.data->pending)
+		return;
 	__disable_irq();
-	if (_usb.data->pending) {
+	if (usb_ep_in_active(_usb.usb->base, _usb.data->ep_in)) {
+		_usb.data->pending = 1;
 		__enable_irq();
 		return;
 	}

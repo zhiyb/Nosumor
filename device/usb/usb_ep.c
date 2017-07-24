@@ -21,11 +21,6 @@ void usb_ep_register(usb_t *usb, const epin_t *epin, int *in, const epout_t *epo
 	}
 }
 
-void usb_ep_in_stall(USB_OTG_GlobalTypeDef *usb, int ep)
-{
-	DIEPCTL_SET(EP_IN(usb, ep)->DIEPCTL, USB_OTG_DIEPCTL_STALL_Msk);
-}
-
 void usb_ep_in_transfer(USB_OTG_GlobalTypeDef *usb, int n, const void *p, uint32_t size)
 {
 	// Wait for endpoint available
@@ -43,6 +38,18 @@ void usb_ep_in_transfer(USB_OTG_GlobalTypeDef *usb, int n, const void *p, uint32
 	ep->DIEPDMA = (uint32_t)p;
 	// Enable endpoint
 	DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_CNAK_Msk);
+}
+
+void usb_ep_in_stall(USB_OTG_GlobalTypeDef *usb, int ep)
+{
+	DIEPCTL_SET(EP_IN(usb, ep)->DIEPCTL, USB_OTG_DIEPCTL_STALL_Msk);
+}
+
+uint32_t usb_ep_in_active(USB_OTG_GlobalTypeDef *usb, int ep)
+{
+	return (EP_IN(usb, ep)->DIEPCTL &
+		(USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_NAKSTS_Msk)) ==
+			USB_OTG_DIEPCTL_EPENA_Msk;
 }
 
 int usb_ep_in_wait(USB_OTG_GlobalTypeDef *usb, int n)
