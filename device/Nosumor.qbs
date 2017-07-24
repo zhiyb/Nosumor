@@ -26,6 +26,7 @@ Project {
 
         Group {
             name: "FatFS"
+            cpp.optimization: "small"
             files: [
                 "fatfs/*",
             ]

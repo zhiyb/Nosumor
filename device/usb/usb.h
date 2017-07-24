@@ -3,6 +3,7 @@
 
 #include <stm32f7xx.h>
 #include <stdint.h>
+#include "../macros.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,8 +18,7 @@ extern "C" {
 struct usb_t;
 
 // Setup packet
-// It already aligns to byte boundaries
-typedef union setup_t {
+typedef union PACKED setup_t {
 	struct {
 		uint8_t bmRequestType;
 		uint8_t bRequest;
@@ -29,7 +29,13 @@ typedef union setup_t {
 				uint8_t bType;
 			};
 		};
-		uint16_t wIndex;
+		union {
+			uint16_t wIndex;
+			struct {
+				uint8_t bID;
+				uint8_t bEntityID;
+			};
+		};
 		uint16_t wLength;
 	};
 	uint32_t raw[2];
@@ -94,7 +100,8 @@ typedef enum {USB_Reset = 0,
 typedef struct usb_t {
 	USB_OTG_GlobalTypeDef *base;
 	usb_speed_t speed;
-	uint32_t addr;
+	setup_t setup;
+	void *setup_buf;
 	// USB RAM & FIFO allocation
 	struct {
 		uint32_t top, max;

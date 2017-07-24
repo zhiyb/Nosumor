@@ -10,10 +10,17 @@
 #include "../../peripheral/audio.h"
 
 #define EPOUT_MAX_SIZE	200u
+#define CHANNELS	(1u + 2u)
 
 typedef struct data_t
 {
 	int ep_out;
+	struct {
+		uint8_t mute[CHANNELS];
+		uint16_t vol[CHANNELS];
+		uint16_t vol_min[CHANNELS], vol_max[CHANNELS], vol_res[CHANNELS];
+	} fu_out;
+	uint8_t buf[8];
 } data_t;
 
 static void epout_init(usb_t *usb, uint32_t n)
@@ -58,6 +65,122 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 	dbgbkpt();
 }
 
+static inline desc_t fu_out_get(data_t *data, setup_t pkt)
+{
+	desc_t desc = {0, 0};
+	uint32_t size = 0, stride = 0;
+	uint8_t cs = pkt.bType, cn = pkt.bIndex;
+	switch (cs) {
+	case MUTE_CONTROL:
+		stride = 1;
+		switch (pkt.bRequest) {
+		case GET_CUR:
+			desc.p = data->fu_out.mute;
+			size = ASIZE(data->fu_out.mute);
+			break;
+		default:
+			dbgbkpt();
+		}
+		break;
+	case VOLUME_CONTROL:
+		stride = 2;
+		switch (pkt.bRequest) {
+		case GET_RES:
+			desc.p = data->fu_out.vol_res;
+			size = ASIZE(data->fu_out.vol_res);
+			break;
+		case GET_MAX:
+			desc.p = data->fu_out.vol_max;
+			size = ASIZE(data->fu_out.vol_max);
+			break;
+		case GET_MIN:
+			desc.p = data->fu_out.vol_min;
+			size = ASIZE(data->fu_out.vol_min);
+			break;
+		case GET_CUR:
+			desc.p = data->fu_out.vol;
+			size = ASIZE(data->fu_out.vol);
+			break;
+		default:
+			dbgbkpt();
+		}
+		break;
+	default:
+		dbgbkpt();
+	}
+	if (desc.p) {
+		if (cn == 0xff) {
+			desc.size = MIN(pkt.wLength, size * stride);
+			dbgbkpt();
+		} else if (cn < size) {
+			desc.p += cn * stride;
+			desc.size = MIN(pkt.wLength, stride);
+		} else
+			dbgbkpt();
+		memcpy(data->buf, desc.p, desc.size);
+		desc.p = data->buf;
+	}
+	return desc;
+}
+
+static inline int fu_out_set(data_t *data, setup_t pkt, void *buf)
+{
+	uint8_t cs = pkt.bType, cn = pkt.bIndex;
+	switch (cs) {
+	case MUTE_CONTROL:
+		switch (pkt.bRequest) {
+		case SET_CUR:
+			dbgprintf("(M%u/%x)", cn, *(uint8_t *)buf);
+			return 1;
+		default:
+			dbgbkpt();
+		}
+		break;
+	case VOLUME_CONTROL:
+		switch (pkt.bRequest) {
+		case SET_CUR:
+			dbgprintf("(V%u/%x)", cn, *(uint16_t *)buf);
+			return 1;
+		default:
+			dbgbkpt();
+		}
+		break;
+	default:
+		dbgbkpt();
+	}
+	return 0;
+}
+
+static inline void usb_get(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
+{
+	desc_t desc = {0, 0};
+	switch (pkt.bEntityID) {
+	case FU_Out:
+		desc = fu_out_get(data, pkt);
+		break;
+	}
+	if (desc.size == 0) {
+		usb_ep_in_stall(usb->base, ep);
+		dbgbkpt();
+	} else
+		usb_ep_in_transfer(usb->base, ep, desc.p, desc.size);
+}
+
+static inline void usb_set(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
+{
+	switch (pkt.bEntityID) {
+	case FU_Out:
+		if (fu_out_set(data, pkt, usb->setup_buf))
+			usb_ep_in_transfer(usb->base, ep, 0, 0);
+		else
+			usb_ep_in_stall(usb->base, ep);
+		break;
+	default:
+		usb_ep_in_stall(usb->base, ep);
+		dbgbkpt();
+	}
+}
+
 static void usbif_ac_config(usb_t *usb, void *data)
 {
 	if (!desc_ac.wTotalLength) {
@@ -68,18 +191,58 @@ static void usbif_ac_config(usb_t *usb, void *data)
 		const desc_otd_t *pot = desc_otd;
 		for (uint32_t i = 0; i != ASIZE(desc_otd); i++)
 			desc_ac.wTotalLength += (pot++)->bLength;
+		desc_ac.wTotalLength += desc_fu_out.bLength;
 	}
 	// Audio control interface
 	uint32_t s = usb_desc_add_string(usb, 0, LANG_EN_US, "USB Audio");
-	uint8_t iface = usb_desc_add_interface(usb, 0u, 0u, AUDIO, AUDIOCONTROL, 0u, s);
+	uint8_t iface = usb_desc_add_interface(usb, 0u, 0u, AUDIO, AUDIOCONTROL, PR_PROTOCOL_UNDEFINED, s);
 	desc_ac.baInterfaceNr[0] = iface + 1;
 	usb_desc_add(usb, &desc_ac, desc_ac.bLength);
+	// Input terminals
 	const desc_itd_t *pit = desc_itd;
 	for (uint32_t i = 0; i != ASIZE(desc_itd); i++, pit++)
 		usb_desc_add(usb, pit, pit->bLength);
+	// Feature units
+	usb_desc_add(usb, &desc_fu_out, desc_fu_out.bLength);
+	// Output terminals
 	const desc_otd_t *pot = desc_otd;
 	for (uint32_t i = 0; i != ASIZE(desc_otd); i++, pot++)
 		usb_desc_add(usb, pot, pot->bLength);
+}
+
+static void usbif_ac_setup_class(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
+{
+	switch (pkt.bmRequestType & SETUP_TYPE_DIR_Msk) {
+	case SETUP_TYPE_DIR_D2H:
+		switch (pkt.bRequest) {
+		case GET_RES:
+		case GET_MIN:
+		case GET_MAX:
+		case GET_CUR:
+			usb_get(usb, data, ep, pkt);
+			break;
+		default:
+			usb_ep_in_stall(usb->base, ep);
+			dbgbkpt();
+		}
+		break;
+	case SETUP_TYPE_DIR_H2D:
+		switch (pkt.bRequest) {
+		case SET_RES:
+		case SET_MIN:
+		case SET_MAX:
+		case SET_CUR:
+			usb_set(usb, data, ep, pkt);
+			break;
+		default:
+			usb_ep_in_stall(usb->base, ep);
+			dbgbkpt();
+		}
+		break;
+	default:
+		usb_ep_in_stall(usb->base, ep);
+		dbgbkpt();
+	}
 }
 
 static void usbif_as_config(usb_t *usb, void *data)
@@ -97,23 +260,23 @@ static void usbif_as_config(usb_t *usb, void *data)
 	// Audio streaming interface
 
 	// Alternate setting 0, zero-bandwidth
-	usb_desc_add_interface(usb, 0u, 0u, AUDIO, AUDIOSTREAMING, 0u, 0u);
+	usb_desc_add_interface(usb, 0u, 0u, AUDIO, AUDIOSTREAMING, PR_PROTOCOL_UNDEFINED, 0u);
 
 	// Alternate setting 1, operational
-	usb_desc_add_interface(usb, 1u, 1u, AUDIO, AUDIOSTREAMING, 0u, 0u);
+	usb_desc_add_interface(usb, 1u, 1u, AUDIO, AUDIOSTREAMING, PR_PROTOCOL_UNDEFINED, 0u);
 	usb_desc_add(usb, &desc_as[0], desc_as[0].bLength);
-	usb_desc_add(usb, &desc_pcm[0], desc_pcm[0].bLength);
+	usb_desc_add(usb, &desc_pcm[1], desc_pcm[1].bLength);
 
 	// Endpoint descriptor
 	usb_desc_add_endpoint(usb, EP_DIR_OUT | p->ep_out,
-			      EP_ISOCHRONOUS | EP_ISO_SYNC | EP_ISO_DATA,
+			      EP_ISOCHRONOUS | EP_ISO_NONE | EP_ISO_DATA,
 			      EPOUT_MAX_SIZE, 1u);
 	usb_desc_add(usb, &desc_ep[0], desc_ep[0].bLength);
 }
 
 static void usbif_as_enable(usb_t *usb, void *data)
 {
-	data_t *p = (data_t *)data;
+	//data_t *p = (data_t *)data;
 	//epout_halt(usb, p->ep_out, 0);
 }
 
@@ -159,11 +322,18 @@ static void usbif_as_setup_std(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
 
 void usb_audio_init(usb_t *usb)
 {
-	void *data = calloc(1u, sizeof(data_t));
+	data_t *data = calloc(1u, sizeof(data_t));
+	for (int i = 0; i != CHANNELS; i++) {
+		data->fu_out.vol[i] = 0x0001;
+		data->fu_out.vol_min[i] = 0x8001;
+		data->fu_out.vol_max[i] = 0x7fff;
+		data->fu_out.vol_res[i] = 0x0001;
+	}
 	// Audio control interface
 	const usb_if_t usbif_ac = {
 		.data = data,
 		.config = &usbif_ac_config,
+		.setup_class = &usbif_ac_setup_class,
 	};
 	usb_interface_alloc(usb, &usbif_ac);
 	// Audio streaming interface

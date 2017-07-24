@@ -35,27 +35,14 @@ void usb_ep_in_transfer(USB_OTG_GlobalTypeDef *usb, int n, const void *p, uint32
 	if (size == 0) {
 		ep->DIEPTSIZ = (1ul << USB_OTG_DIEPTSIZ_PKTCNT_Pos) | 0;
 		DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_CNAK_Msk);
-#if 0
-		dbgprintf(ESC_GREY "<%dI>\n", n);
-#endif
 		return;
 	}
-
 	uint32_t max = usb_ep_in_max_size(usb, n);
 	uint32_t pcnt = (size + max - 1) / max;
 	ep->DIEPTSIZ = (pcnt << USB_OTG_DIEPTSIZ_PKTCNT_Pos) | size;
 	ep->DIEPDMA = (uint32_t)p;
 	// Enable endpoint
 	DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_CNAK_Msk);
-
-#if 0
-	dbgprintf(ESC_GREY "<%dI%lu ", n, size);
-	uint8_t *dp = (uint8_t *)p;
-	uint32_t i = size;
-	while (i--)
-		dbgprintf("%02x", *dp++);
-	dbgprintf(">\n");
-#endif
 }
 
 int usb_ep_in_wait(USB_OTG_GlobalTypeDef *usb, int n)
@@ -70,7 +57,7 @@ int usb_ep_in_wait(USB_OTG_GlobalTypeDef *usb, int n)
 		if (ep->DIEPINT & USB_OTG_DIEPINT_TOC_Msk)
 			return 0;
 		if (ctl & USB_OTG_DIEPCTL_NAKSTS_Msk)
-			DIEPCTL_SET(ctl, USB_OTG_DIEPCTL_CNAK_Msk);
+			return 1;
 	} while (ctl & USB_OTG_DIEPCTL_EPENA_Msk);
 	return 1;
 }
@@ -80,4 +67,31 @@ uint32_t usb_ep_in_max_size(USB_OTG_GlobalTypeDef *usb, int ep)
 	if (ep == 0)
 		return usb_ep0_max_size(usb);
 	return EP_IN(usb, ep)->DIEPCTL & USB_OTG_DIEPCTL_MPSIZ_Msk;
+}
+
+void usb_ep_out_transfer(USB_OTG_GlobalTypeDef *usb, int n, void *p,
+			 uint8_t scnt, uint8_t pcnt, uint32_t size)
+{
+	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb, n);
+	// Configure endpoint DMA
+	ep->DOEPDMA = (uint32_t)p;
+	// Reset packet counter
+	ep->DOEPTSIZ = (scnt << USB_OTG_DOEPTSIZ_STUPCNT_Pos) |
+			(pcnt << USB_OTG_DOEPTSIZ_PKTCNT_Pos) | size;
+	// Enable endpoint OUT
+	ep->DOEPCTL = USB_OTG_DOEPCTL_EPENA_Msk | USB_OTG_DOEPCTL_CNAK_Msk;
+}
+
+void usb_ep_out_wait(USB_OTG_GlobalTypeDef *usb, int n)
+{
+	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb, n);
+	// Wait for transfer complete
+	while (!(ep->DOEPINT & USB_OTG_DOEPINT_XFRC_Msk));
+	ep->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk;
+}
+
+void usb_ep_out_ack(USB_OTG_GlobalTypeDef *usb, int n)
+{
+	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb, n);
+	DOEPCTL_SET(ep->DOEPCTL, USB_OTG_DOEPCTL_EPENA_Msk | USB_OTG_DOEPCTL_CNAK_Msk);
 }

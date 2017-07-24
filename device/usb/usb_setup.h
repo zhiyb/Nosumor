@@ -47,6 +47,6 @@
 #define SETUP_FEATURE_DEVICE_REMOTE_WAKEUP	1u
 #define SETUP_FEATURE_TEST_MODE			2u
 
-void usb_setup(usb_t *usb, uint32_t ep, setup_t pkt);
+void usb_setup(usb_t *usb, uint32_t n, setup_t pkt);
 
 #endif // USB_SETUP_H

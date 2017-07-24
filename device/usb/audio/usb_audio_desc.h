@@ -21,9 +21,10 @@ static desc_ac_t desc_ac = {
 	8u + 1u, CS_INTERFACE, HEADER, 0x0100u, 0u, 1u, {1u},
 };
 
-// Terminals
+// Units
 enum {
 	IT_USB = 1,
+	FU_Out,
 	OT_Speaker,
 };
 
@@ -42,7 +43,7 @@ typedef struct PACKED desc_itd_t {
 } desc_itd_t;
 
 static const desc_itd_t desc_itd[] = {
-	{12u, CS_INTERFACE, INPUT_TERMINAL, IT_USB, USB_streaming, OT_Speaker, 2u, 0b11, 0u, 0u},
+	{12u, CS_INTERFACE, INPUT_TERMINAL, IT_USB, USB_streaming, 0u, 2u, 0b11, 0u, 0u},
 };
 
 // Output terminal
@@ -58,7 +59,23 @@ typedef struct PACKED desc_otd_t {
 } desc_otd_t;
 
 static const desc_otd_t desc_otd[] = {
-	{9u, CS_INTERFACE, OUTPUT_TERMINAL, OT_Speaker, Speaker, 0u, IT_USB, 0u},
+	{9u, CS_INTERFACE, OUTPUT_TERMINAL, OT_Speaker, Speaker, 0u, FU_Out, 0u},
+};
+
+// Feature unit
+typedef struct PACKED desc_fu_t {
+	uint8_t bLength;
+	uint8_t bDescriptorType;
+	uint8_t bDescriptorSubtype;
+	uint8_t bUnitID;
+	uint8_t bSourceID;
+	uint8_t bControlSize;
+	uint8_t bmaControls[];
+	//uint8_t iFeature;
+} desc_fu_t;
+
+static const desc_fu_t desc_fu_out = {
+	7u + 2u, CS_INTERFACE, FEATURE_UNIT, FU_Out, IT_USB, 1u, {0b11, 0b11, 0u}
 };
 
 // Type I format descriptor

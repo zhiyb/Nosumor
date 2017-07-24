@@ -87,7 +87,7 @@ static void usb_setup_standard_device(usb_t *usb, uint32_t ep, setup_t pkt)
 
 static void usb_setup_standard_interface(usb_t *usb, uint32_t ep, setup_t pkt)
 {
-	uint32_t i = pkt.wIndex;
+	uint32_t i = pkt.bID;
 	for (usb_if_t **ip = &usb->usbif; *ip != 0; ip = &(*ip)->next)
 		if ((*ip)->id == i && (*ip)->setup_std) {
 			(*ip)->setup_std(usb, (*ip)->data, ep, pkt);
@@ -153,7 +153,7 @@ static void usb_setup_standard_endpoint(usb_t *usb, uint32_t ep, setup_t pkt)
 
 static void usb_setup_class_interface(usb_t *usb, uint32_t ep, setup_t pkt)
 {
-	uint32_t i = pkt.wIndex;
+	uint32_t i = pkt.bID;
 	for (usb_if_t **ip = &usb->usbif; *ip != 0; ip = &(*ip)->next)
 		if ((*ip)->id == i && (*ip)->setup_class) {
 			(*ip)->setup_class(usb, (*ip)->data, ep, pkt);
@@ -163,38 +163,38 @@ static void usb_setup_class_interface(usb_t *usb, uint32_t ep, setup_t pkt)
 	dbgbkpt();
 }
 
-void usb_setup(usb_t *usb, uint32_t ep, setup_t pkt)
+void usb_setup(usb_t *usb, uint32_t n, setup_t pkt)
 {
 	// Process setup packet
 	switch (pkt.bmRequestType & SETUP_TYPE_TYPE_Msk) {
 	case SETUP_TYPE_TYPE_STD:
 		switch (pkt.bmRequestType & SETUP_TYPE_RCPT_Msk) {
 		case SETUP_TYPE_RCPT_DEVICE:
-			usb_setup_standard_device(usb, ep, pkt);
+			usb_setup_standard_device(usb, n, pkt);
 			break;
 		case SETUP_TYPE_RCPT_INTERFACE:
-			usb_setup_standard_interface(usb, ep, pkt);
+			usb_setup_standard_interface(usb, n, pkt);
 			break;
 		case SETUP_TYPE_RCPT_ENDPOINT:
-			usb_setup_standard_endpoint(usb, ep, pkt);
+			usb_setup_standard_endpoint(usb, n, pkt);
 			break;
 		default:
-			usb_ep_in_stall(usb->base, ep);
+			usb_ep_in_stall(usb->base, n);
 			dbgbkpt();
 		}
 		break;
 	case SETUP_TYPE_TYPE_CLASS:
 		switch (pkt.bmRequestType & SETUP_TYPE_RCPT_Msk) {
 		case SETUP_TYPE_RCPT_INTERFACE:
-			usb_setup_class_interface(usb, ep, pkt);
+			usb_setup_class_interface(usb, n, pkt);
 			break;
 		default:
-			usb_ep_in_stall(usb->base, ep);
+			usb_ep_in_stall(usb->base, n);
 			dbgbkpt();
 		}
 		break;
 	default:
-		usb_ep_in_stall(usb->base, ep);
+		usb_ep_in_stall(usb->base, n);
 		dbgbkpt();
 		break;
 	}

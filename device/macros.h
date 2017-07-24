@@ -5,8 +5,9 @@
 
 #define PACKED	__attribute__((__packed__))
 #define FIELD(r, f)	(((r) & (f##_Msk)) >> (f##_Pos))
-#define ROUND(a, b)	((a + (b / 2)) / b)
 #define ASIZE(a)	(sizeof((a)) / sizeof((a)[0]))
+#define ROUND(a, b)	((a + (b / 2)) / b)
+#define MIN(a, b)	((a) < (b) ? (a) : (b))
 
 #define GPIO_AFRL_AFR0_Msk	GPIO_AFRL_AFRL0_Msk
 #define GPIO_AFRL_AFR1_Msk	GPIO_AFRL_AFRL1_Msk

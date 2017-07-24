@@ -61,8 +61,8 @@ static inline void init()
 	       usb_mode(&usb) ? "host" : "device");
 	while (usb_mode(&usb) != 0);
 	usb_init_device(&usb);
-	usb_keyboard_init(&usb);
 	usb_audio_init(&usb);
+	usb_keyboard_init(&usb);
 
 	puts(ESC_CYAN "Initialising LEDs...");
 	// RGB:	PA0(R), PA1(G), PA2(B)
@@ -173,6 +173,9 @@ int main()
 			usb_connect(&usb, 1);
 		}
 #endif
+		__disable_irq();
+		fflush(stdout);
+		__enable_irq();
 	}
 	return 0;
 }
