@@ -48,12 +48,12 @@ static void epout_halt(usb_t *usb, uint32_t n, int halt)
 	if (!(ctl & USB_OTG_DOEPCTL_EPENA_Msk) != !halt)
 		return;
 	if (halt) {
-		dbgprintf(ESC_RED "USB Audio out disabled\n");
+		dbgprintf(ESC_BLUE "USB Audio out disabled\n");
 		DOEPCTL_SET(ep->DOEPCTL, USB_OTG_DOEPCTL_EPDIS_Msk);
 		//while (ep->DOEPCTL & USB_OTG_DOEPCTL_EPENA_Msk);
 		return;
 	}
-	dbgprintf(ESC_RED "USB Audio out enabled\n");
+	dbgprintf(ESC_BLUE "USB Audio out enabled\n");
 	// Enable endpoint
 	uint32_t fn = FIELD(dev->DSTS, USB_OTG_DSTS_FNSOF);
 	fn = (fn & 1) ? 0 : USB_OTG_DOEPCTL_SD0PID_SEVNFRM_Msk;
@@ -75,6 +75,7 @@ static inline desc_t fu_out_get(data_t *data, setup_t pkt)
 		stride = 1;
 		switch (pkt.bRequest) {
 		case GET_CUR:
+			dbgprintf(ESC_GREEN "(m");
 			desc.p = data->fu_out.mute;
 			size = ASIZE(data->fu_out.mute);
 			break;
@@ -86,18 +87,22 @@ static inline desc_t fu_out_get(data_t *data, setup_t pkt)
 		stride = 2;
 		switch (pkt.bRequest) {
 		case GET_RES:
+			dbgprintf(ESC_GREEN "(vr");
 			desc.p = data->fu_out.vol_res;
 			size = ASIZE(data->fu_out.vol_res);
 			break;
 		case GET_MAX:
+			dbgprintf(ESC_GREEN "(vM");
 			desc.p = data->fu_out.vol_max;
 			size = ASIZE(data->fu_out.vol_max);
 			break;
 		case GET_MIN:
+			dbgprintf(ESC_GREEN "(vm");
 			desc.p = data->fu_out.vol_min;
 			size = ASIZE(data->fu_out.vol_min);
 			break;
 		case GET_CUR:
+			dbgprintf(ESC_GREEN "(vc");
 			desc.p = data->fu_out.vol;
 			size = ASIZE(data->fu_out.vol);
 			break;
@@ -115,6 +120,9 @@ static inline desc_t fu_out_get(data_t *data, setup_t pkt)
 		} else if (cn < size) {
 			desc.p += cn * stride;
 			desc.size = MIN(pkt.wLength, stride);
+			uint16_t v;
+			memcpy(&v, desc.p, stride);
+			dbgprintf("%u/%x)", cn, v);
 		} else
 			dbgbkpt();
 		memcpy(data->buf, desc.p, desc.size);
@@ -125,21 +133,43 @@ static inline desc_t fu_out_get(data_t *data, setup_t pkt)
 
 static inline int fu_out_set(data_t *data, setup_t pkt, void *buf)
 {
+	uint16_t v;
 	uint8_t cs = pkt.bType, cn = pkt.bIndex;
 	switch (cs) {
 	case MUTE_CONTROL:
+		v = *(uint8_t *)buf;
 		switch (pkt.bRequest) {
 		case SET_CUR:
-			dbgprintf("(M%u/%x)", cn, *(uint8_t *)buf);
+			dbgprintf(ESC_RED "(M%u/%x)", cn, v);
 			return 1;
 		default:
 			dbgbkpt();
 		}
 		break;
 	case VOLUME_CONTROL:
+		v = *(uint16_t *)buf;
 		switch (pkt.bRequest) {
 		case SET_CUR:
-			dbgprintf("(V%u/%x)", cn, *(uint16_t *)buf);
+			dbgprintf(ESC_RED "(Vc%u/%x)", cn, v);
+			if (cn >= ASIZE(data->fu_out.vol))
+				dbgbkpt();
+			else
+				data->fu_out.vol[cn] = v;
+			return 1;
+		case SET_MIN:
+			dbgprintf(ESC_RED "(Vm%u/%x)", cn, v);
+			if (v != audio_vol_min())
+				return 0;
+			return 1;
+		case SET_MAX:
+			dbgprintf(ESC_RED "(VM%u/%x)", cn, v);
+			if (v != audio_vol_max())
+				return 0;
+			return 1;
+		case SET_RES:
+			dbgprintf(ESC_RED "(Vr%u/%x)", cn, v);
+			if (v != audio_vol_res())
+				return 0;
 			return 1;
 		default:
 			dbgbkpt();
@@ -324,10 +354,10 @@ void usb_audio_init(usb_t *usb)
 {
 	data_t *data = calloc(1u, sizeof(data_t));
 	for (int i = 0; i != CHANNELS; i++) {
-		data->fu_out.vol[i] = 0x0001;
-		data->fu_out.vol_min[i] = 0x8001;
-		data->fu_out.vol_max[i] = 0x7fff;
-		data->fu_out.vol_res[i] = 0x0001;
+		data->fu_out.vol[i] = 0x0000;
+		data->fu_out.vol_min[i] = audio_vol_min();
+		data->fu_out.vol_max[i] = audio_vol_max();
+		data->fu_out.vol_res[i] = audio_vol_res();
 	}
 	// Audio control interface
 	const usb_if_t usbif_ac = {

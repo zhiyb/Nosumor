@@ -92,14 +92,20 @@ typedef struct usb_if_t {
 			    uint32_t ep, setup_t pkt);
 } usb_if_t;
 
-typedef enum {USB_Reset = 0,
-	      USB_LowSpeed, USB_FullSpeed, USB_HighSpeed,
+typedef enum {
+	USB_Reset = 0, USB_LowSpeed, USB_FullSpeed, USB_HighSpeed,
 } usb_speed_t;
+
+typedef enum {
+	USB_Self_Powered = 1, USB_Remote_Wakeup = 2,
+} usb_status_t;	// bit-fields
 
 // USB port data structure
 typedef struct usb_t {
 	USB_OTG_GlobalTypeDef *base;
 	usb_speed_t speed;
+	usb_status_t status;
+	// Setup packet buffers
 	setup_t setup;
 	void *setup_buf;
 	// USB RAM & FIFO allocation
@@ -113,7 +119,7 @@ typedef struct usb_t {
 	epout_t epout[USB_EPOUT_CNT];
 	// Descriptors
 	struct {
-		desc_t dev, config;
+		desc_t dev, dev_qua, config;
 		desc_t lang;
 		desc_string_list_t **string;
 		uint32_t nstring;

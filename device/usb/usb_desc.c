@@ -56,6 +56,36 @@ desc_t usb_desc_device(usb_t *usb)
 	return usb->desc.dev;
 }
 
+/* Device Qualifier descriptor */
+
+typedef struct PACKED desc_dev_qua_t {
+	uint8_t bLength;
+	uint8_t bDescriptorType;
+	uint16_t bcdUSB;
+	uint8_t bDeviceClass;
+	uint8_t bDeviceSubClass;
+	uint8_t bDeviceProtocol;
+	uint8_t bMaxPacketSize0;
+	uint8_t bNumConfigurations;
+	uint8_t bReserved;
+} desc_dev_qua_t;
+
+static const desc_dev_qua_t desc_dev_qua = {
+	10u, SETUP_DESC_TYPE_DEVICE_QUALIFIER, 0x0200, 0u, 0u, 0u, 64u, 0u, 0u,
+};
+
+desc_t usb_desc_device_qualifier(usb_t *usb)
+{
+	if (usb->desc.dev_qua.size)
+		return usb->desc.dev_qua;
+	desc_dev_qua_t *pd = (desc_dev_qua_t *)malloc(desc_dev_qua.bLength);
+	memcpy(pd, &desc_dev_qua, desc_dev_qua.bLength);
+	pd->bMaxPacketSize0 = usb_ep0_max_size(usb->base);
+	usb->desc.dev_qua.p = pd;
+	usb->desc.dev_qua.size = pd->bLength;
+	return usb->desc.dev_qua;
+}
+
 /* Configration descriptor */
 
 typedef struct PACKED desc_config_t {

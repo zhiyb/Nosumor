@@ -17,14 +17,15 @@ static void usb_send_descriptor(usb_t *usb, uint32_t ep, setup_t pkt)
 		desc = usb_desc_config(usb);
 		break;
 	case SETUP_DESC_TYPE_DEVICE_QUALIFIER:
-		usb_ep_in_stall(usb->base, ep);
-		dbgbkpt();
+		desc = usb_desc_device_qualifier(usb);
+		break;
 	case SETUP_DESC_TYPE_STRING:
 		desc = usb_desc_string(usb, pkt.bIndex, pkt.wIndex);
 		break;
 	default:
+		dbgprintf(ESC_MAGENTA "<D%x>", pkt.bType);
 		usb_ep_in_stall(usb->base, ep);
-		dbgbkpt();
+		//dbgbkpt();
 		return;
 	}
 	if (desc.size) {
@@ -50,6 +51,14 @@ static void usb_setup_standard_device(usb_t *usb, uint32_t ep, setup_t pkt)
 		switch (pkt.bRequest) {
 		case SETUP_REQ_GET_DESCRIPTOR:
 			usb_send_descriptor(usb, ep, pkt);
+			break;
+		case SETUP_REQ_GET_STATUS:
+			if (pkt.wValue != 0 || pkt.wIndex != 0 || pkt.wLength != 2) {
+				usb_ep_in_stall(usb->base, ep);
+				dbgbkpt();
+				break;
+			}
+			usb_ep_in_transfer(usb->base, ep, &usb->status, pkt.wLength);
 			break;
 		default:
 			usb_ep_in_stall(usb->base, ep);
