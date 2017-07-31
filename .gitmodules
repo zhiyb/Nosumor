@@ -1,3 +1,6 @@
 [submodule "device/CMSIS"]
 	path = device/CMSIS
 	url = git@github.com:zhiyb/CMSIS-ST.git
+[submodule "host/hidapi"]
+	path = host/hidapi
+	url = https://github.com/signal11/hidapi.git
