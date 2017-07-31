@@ -22,6 +22,7 @@
 #include "usb/audio/usb_audio.h"
 #include "usb/hid/usb_hid.h"
 #include "usb/hid/keyboard/usb_hid_keyboard.h"
+#include "usb/hid/vendor/usb_hid_vendor.h"
 // 3rd party libraries
 #include "fatfs/ff.h"
 
@@ -66,7 +67,8 @@ static inline void init()
 
 	puts(ESC_CYAN "Initialising USB HID interface...");
 	void *hid_data = usb_hid_init(&usb);
-	void *hid_keyboard = usb_hid_keyboard_init(&usb, hid_data);
+	void *hid_keyboard = usb_hid_keyboard_init(hid_data);
+	void *hid_vendor = usb_hid_vendor_init(hid_data);
 
 	puts(ESC_CYAN "Initialising keyboard...");
 	keyboard_init(hid_keyboard);

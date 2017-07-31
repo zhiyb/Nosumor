@@ -138,7 +138,7 @@ static void usb_send_descriptor(usb_t *usb, data_t *data, uint32_t ep, setup_t p
 		return;
 	}
 	desc.size = desc.size > pkt.wLength ? pkt.wLength : desc.size;
-	usb_ep_in_transfer(usb->base, ep, desc.p, desc.size);
+	usb_ep_in_descriptor(usb->base, ep, desc);
 }
 
 static void usb_send_report(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)

@@ -6,7 +6,7 @@
 #include "usb_ram.h"
 #include "usb.h"
 
-static void usb_send_descriptor(usb_t *usb, uint32_t ep, setup_t pkt)
+static void usb_get_descriptor(usb_t *usb, uint32_t ep, setup_t pkt)
 {
 	desc_t desc;
 	switch (pkt.bType) {
@@ -28,20 +28,8 @@ static void usb_send_descriptor(usb_t *usb, uint32_t ep, setup_t pkt)
 		//dbgbkpt();
 		return;
 	}
-	if (desc.size) {
-		desc.size = desc.size > pkt.wLength ? pkt.wLength : desc.size;
-		if (ep == 0) {
-			while (desc.size) {
-				// Endpoint 0 can only transfer 127 bytes maximum
-				uint32_t s = desc.size > 127u ? 64u : desc.size;
-				usb_ep_in_transfer(usb->base, 0, desc.p, s);
-				desc.p += s;
-				desc.size -= s;
-			}
-		} else
-			usb_ep_in_transfer(usb->base, ep, desc.p, desc.size);
-	} else
-		usb_ep_in_stall(usb->base, ep);
+	desc.size = desc.size > pkt.wLength ? pkt.wLength : desc.size;
+	usb_ep_in_descriptor(usb->base, ep, desc);
 }
 
 static void usb_setup_standard_device(usb_t *usb, uint32_t ep, setup_t pkt)
@@ -50,7 +38,7 @@ static void usb_setup_standard_device(usb_t *usb, uint32_t ep, setup_t pkt)
 	case SETUP_TYPE_DIR_D2H:
 		switch (pkt.bRequest) {
 		case SETUP_REQ_GET_DESCRIPTOR:
-			usb_send_descriptor(usb, ep, pkt);
+			usb_get_descriptor(usb, ep, pkt);
 			break;
 		case SETUP_REQ_GET_STATUS:
 			if (pkt.wValue != 0 || pkt.wIndex != 0 || pkt.wLength != 2) {

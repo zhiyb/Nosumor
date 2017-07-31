@@ -66,6 +66,8 @@ Project {
                 "usb/hid/usb_hid.h",
                 "usb/hid/keyboard/usb_hid_keyboard.c",
                 "usb/hid/keyboard/usb_hid_keyboard.h",
+                "usb/hid/vendor/usb_hid_vendor.c",
+                "usb/hid/vendor/usb_hid_vendor.h",
             ]
         }
 
