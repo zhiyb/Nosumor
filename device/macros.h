@@ -3,7 +3,8 @@
 
 #include <stm32f7xx.h>
 
-#define PACKED	__attribute__((__packed__))
+#define PACKED	__attribute__((packed))
+#define ALIGNED	__attribute__((aligned))
 #define FIELD(r, f)	(((r) & (f##_Msk)) >> (f##_Pos))
 #define ASIZE(a)	(sizeof((a)) / sizeof((a)[0]))
 #define ROUND(a, b)	((a + (b / 2)) / b)

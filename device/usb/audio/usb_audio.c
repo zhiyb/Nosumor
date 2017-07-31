@@ -56,7 +56,7 @@ static void epout_halt(usb_t *usb, uint32_t n, int halt)
 	dbgprintf(ESC_BLUE "USB Audio out enabled\n");
 	// Enable endpoint
 	uint32_t fn = FIELD(dev->DSTS, USB_OTG_DSTS_FNSOF);
-	fn = (fn & 1) ? 0 : USB_OTG_DOEPCTL_SD0PID_SEVNFRM_Msk;
+	fn = 0;///*(fn & 1) ? 0 :*/ USB_OTG_DOEPCTL_SD0PID_SEVNFRM_Msk;
 	DOEPCTL_SET(ep->DOEPCTL, USB_OTG_DOEPCTL_EPENA | USB_OTG_DOEPCTL_CNAK | fn);
 }
 
@@ -295,11 +295,11 @@ static void usbif_as_config(usb_t *usb, void *data)
 	// Alternate setting 1, operational
 	usb_desc_add_interface(usb, 1u, 1u, AUDIO, AUDIOSTREAMING, PR_PROTOCOL_UNDEFINED, 0u);
 	usb_desc_add(usb, &desc_as[0], desc_as[0].bLength);
-	usb_desc_add(usb, &desc_pcm[1], desc_pcm[1].bLength);
+	usb_desc_add(usb, &desc_pcm[2], desc_pcm[2].bLength);
 
 	// Endpoint descriptor
 	usb_desc_add_endpoint(usb, EP_DIR_OUT | p->ep_out,
-			      EP_ISOCHRONOUS | EP_ISO_NONE | EP_ISO_DATA,
+			      EP_ISOCHRONOUS | EP_ISO_SYNC | EP_ISO_DATA,
 			      EPOUT_MAX_SIZE, 1u);
 	usb_desc_add(usb, &desc_ep[0], desc_ep[0].bLength);
 }
@@ -316,8 +316,9 @@ static void usbif_as_disable(usb_t *usb, void *data)
 	epout_halt(usb, p->ep_out, 1);
 }
 
-static void usbif_as_setup_std(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
+static void usbif_as_setup_std(usb_t *usb, void *p, uint32_t ep, setup_t pkt)
 {
+	data_t *data = p;
 	switch (pkt.bmRequestType & SETUP_TYPE_DIR_H2D) {
 	case SETUP_TYPE_DIR_H2D:
 		switch (pkt.bRequest) {
@@ -325,12 +326,12 @@ static void usbif_as_setup_std(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
 			switch (pkt.wValue) {
 			case 0:
 				audio_out_enable(0);
-				epout_halt(usb, ep, 1);
+				epout_halt(usb, data->ep_out, 1);
 				usb_ep_in_transfer(usb->base, ep, 0, 0);
 				break;
 			case 1:
 				audio_out_enable(1);
-				epout_halt(usb, ep, 0);
+				epout_halt(usb, data->ep_out, 0);
 				usb_ep_in_transfer(usb->base, ep, 0, 0);
 				break;
 			default:
@@ -365,7 +366,7 @@ void usb_audio_init(usb_t *usb)
 		.config = &usbif_ac_config,
 		.setup_class = &usbif_ac_setup_class,
 	};
-	usb_interface_alloc(usb, &usbif_ac);
+	usb_interface_register(usb, &usbif_ac);
 	// Audio streaming interface
 	const usb_if_t usbif_as = {
 		.data = data,
@@ -374,5 +375,5 @@ void usb_audio_init(usb_t *usb)
 		.disable = &usbif_as_disable,
 		.setup_std = &usbif_as_setup_std,
 	};
-	usb_interface_alloc(usb, &usbif_as);
+	usb_interface_register(usb, &usbif_as);
 }

@@ -2,7 +2,7 @@
 #define KEYBOARD_H
 
 #include <stdint.h>
-#include "usb_keyboard.h"
+#include <usb/hid/usb_hid.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,7 +13,7 @@ extern "C" {
 
 extern const uint32_t keyboard_masks[KEYBOARD_KEYS];
 
-void keyboard_init();
+void keyboard_init(hid_t *hid_keyboard);
 uint32_t keyboard_status();
 
 #ifdef __cplusplus

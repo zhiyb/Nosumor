@@ -1,14 +1,14 @@
 #include <malloc.h>
 #include <string.h>
-#include "keyboard.h"
-#include "usb_keyboard.h"
-#include "usb_keyboard_desc.h"
+#include "usb_hid.h"
 #include "../usb_debug.h"
 #include "../usb_ram.h"
 #include "../usb_desc.h"
 #include "../usb_ep.h"
 #include "../usb_macros.h"
 #include "../usb_setup.h"
+
+#define HID_REPORT_MAX_SIZE	64
 
 #define SETUP_DESC_TYPE_HID		0x21
 #define SETUP_DESC_TYPE_REPORT		0x22
@@ -25,25 +25,33 @@
 #define SETUP_REPORT_OUTPUT	0x02
 #define SETUP_REPORT_FEATURE	0x03
 
-uint8_t keycodes[KEYBOARD_KEYS] = {
-	// x,    z,    c,    ~,  ESC
-	0x1b, 0x1d, 0x06, 0x35, 0x29,
+typedef struct PACKED desc_hid_t {
+	uint8_t bLength;
+	uint8_t bDescriptorType;
+	uint16_t bcdHID;
+	uint8_t bCountryCode;
+	uint8_t bNumDescriptors;
+	uint8_t bClassDescriptorType;
+	uint16_t wDescriptorLength;
+} desc_hid_t;
+
+static const desc_hid_t desc_hid = {
+	// 0x21: HID descriptor
+	// 0x22: Report descriptor
+	9u, 0x21u, 0x0111u, 0x00u, 1u, 0x22u, 0u,
 };
 
 typedef struct data_t {
-	int ep_in;
-	int pending;
-	uint8_t report[KEYBOARD_REPORT_SIZE];
-} data_t;
-
-static struct {
 	usb_t *usb;
-	data_t *data;
-} _usb = {0, 0};
+	hid_t *hid;
+	desc_hid_t desc_hid;
+	desc_t desc_report;
+	int usages, ep_in;
+} data_t;
 
 static void epin_init(usb_t *usb, uint32_t n)
 {
-	uint32_t size = KEYBOARD_REPORT_SIZE, addr = usb_ram_alloc(usb, &size);
+	uint32_t size = HID_REPORT_MAX_SIZE, addr = usb_ram_alloc(usb, &size);
 	usb->base->DIEPTXF[n - 1] = DIEPTXF(addr, size);
 	// Unmask interrupts
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
@@ -52,7 +60,7 @@ static void epin_init(usb_t *usb, uint32_t n)
 	dev->DAINTMSK |= DAINTMSK_IN(n);
 	// Configure endpoint
 	ep->DIEPCTL = EP_IN_TYP_INTERRUPT | (n << USB_OTG_DIEPCTL_TXFNUM_Pos) |
-			(KEYBOARD_REPORT_SIZE << USB_OTG_DIEPCTL_MPSIZ_Pos);
+			(HID_REPORT_MAX_SIZE << USB_OTG_DIEPCTL_MPSIZ_Pos);
 }
 
 static void epin_halt(struct usb_t *usb, uint32_t n, int halt)
@@ -78,18 +86,18 @@ static void epin_halt(struct usb_t *usb, uint32_t n, int halt)
 
 static void epin_xfr_cplt(usb_t *usb, uint32_t n)
 {
-	__disable_irq();
 	data_t *data = (data_t *)usb->epin[n].data;
-	uint32_t pending = data->pending;
-	data->pending = 0;
-	__enable_irq();
-	if (pending)
-		usb_ep_in_transfer(usb->base, n, data->report, KEYBOARD_REPORT_SIZE);
+	for (hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next)
+		if ((*hid)->pending) {
+			(*hid)->pending = 0;
+			usb_ep_in_transfer(usb->base, n, (*hid)->report, (*hid)->size);
+			break;
+		}
 }
 
-static void usbif_config(usb_t *usb, void *data)
+static void usbif_config(usb_t *usb, void *p)
 {
-	data_t *p = (data_t *)data;
+	data_t *data = (data_t *)p;
 	// Register endpoints
 	const epin_t epin = {
 		.data = data,
@@ -97,16 +105,18 @@ static void usbif_config(usb_t *usb, void *data)
 		.halt = &epin_halt,
 		.xfr_cplt = &epin_xfr_cplt,
 	};
-	usb_ep_register(usb, &epin, &p->ep_in, 0, 0);
+	usb_ep_register(usb, &epin, &data->ep_in, 0, 0);
 
-	uint32_t s = usb_desc_add_string(usb, 0, LANG_EN_US, "HID Keyboard");
+	for (hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next) {
+		;
+	}
 	// bInterfaceClass	3: HID class
 	// bInterfaceSubClass	1: Boot interface
 	// bInterfaceProtocol	0: None, 1: Keyboard, 2: Mouse
-	usb_desc_add_interface(usb, 0u, 1u, 3u, 0u, 1u, s);
-	usb_desc_add(usb, &desc_hid, desc_hid.bLength);
-	usb_desc_add_endpoint(usb, EP_DIR_IN | p->ep_in,
-			      EP_INTERRUPT, KEYBOARD_REPORT_SIZE, 1u);
+	usb_desc_add_interface(usb, 0u, 1u, 3u, 1u, 0u, 0);
+	usb_desc_add(usb, &data->desc_hid, data->desc_hid.bLength);
+	usb_desc_add_endpoint(usb, EP_DIR_IN | data->ep_in,
+			      EP_INTERRUPT, HID_REPORT_MAX_SIZE, 1u);
 }
 
 static void set_idle(uint8_t duration, uint8_t reportID)
@@ -115,13 +125,12 @@ static void set_idle(uint8_t duration, uint8_t reportID)
 		dbgbkpt();
 }
 
-static void usb_send_descriptor(usb_t *usb, uint32_t ep, setup_t pkt)
+static void usb_send_descriptor(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
 {
-	const_desc_t desc;
+	desc_t desc;
 	switch (pkt.bType) {
 	case SETUP_DESC_TYPE_REPORT:
-		desc.p = desc_report;
-		desc.size = sizeof(desc_report);
+		desc = data->desc_report;
 		break;
 	default:
 		usb_ep_in_stall(usb->base, ep);
@@ -134,9 +143,16 @@ static void usb_send_descriptor(usb_t *usb, uint32_t ep, setup_t pkt)
 
 static void usb_send_report(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
 {
+	uint8_t id = pkt.bIndex;
 	switch (pkt.bType) {
 	case SETUP_REPORT_INPUT:
-		usb_ep_in_transfer(usb->base, ep, &data->report, KEYBOARD_REPORT_SIZE);
+		for (hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next)
+			if ((*hid)->id == id) {
+				usb_ep_in_transfer(usb->base, ep, (*hid)->report, (*hid)->size);
+				return;
+			}
+		usb_ep_in_stall(usb->base, ep);
+		dbgbkpt();
 		break;
 	default:
 		usb_ep_in_stall(usb->base, ep);
@@ -145,13 +161,14 @@ static void usb_send_report(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
 	}
 }
 
-static void usbif_setup_std(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
+static void usbif_setup_std(usb_t *usb, void *p, uint32_t ep, setup_t pkt)
 {
+	data_t *data = (data_t *)p;
 	switch (pkt.bmRequestType & SETUP_TYPE_DIR_Msk) {
 	case SETUP_TYPE_DIR_D2H:
 		switch (pkt.bRequest) {
 		case SETUP_REQ_GET_DESCRIPTOR:
-			usb_send_descriptor(usb, ep, pkt);
+			usb_send_descriptor(usb, data, ep, pkt);
 			break;
 		default:
 			usb_ep_in_stall(usb->base, ep);
@@ -171,8 +188,9 @@ static void usbif_setup_std(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
 	}
 }
 
-static void usbif_setup_class(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
+static void usbif_setup_class(usb_t *usb, void *p, uint32_t ep, setup_t pkt)
 {
+	data_t *data = (data_t *)p;
 	switch (pkt.bmRequestType & SETUP_TYPE_DIR_Msk) {
 	case SETUP_TYPE_DIR_D2H:
 		switch (pkt.bRequest) {
@@ -206,58 +224,79 @@ static void usbif_setup_class(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
 	}
 }
 
-static void usbif_enable(usb_t *usb, void *data)
+static void usbif_enable(usb_t *usb, void *p)
 {
-	data_t *p = (data_t *)data;
-	_usb.usb = usb;
-	_usb.data = p;
-	epin_halt(usb, p->ep_in, 0);
+	data_t *data = (data_t *)p;
+	data->usb = usb;
+	epin_halt(usb, data->ep_in, 0);
 }
 
-static void usbif_disable(usb_t *usb, void *data)
+static void usbif_disable(usb_t *usb, void *p)
 {
-	data_t *p = (data_t *)data;
-	_usb.usb = 0;
-	epin_halt(usb, p->ep_in, 1);
+	data_t *data = (data_t *)p;
+	data->usb = 0;
+	for (hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next)
+		(*hid)->pending = 0;
+	epin_halt(usb, data->ep_in, 1);
 }
 
-void usb_keyboard_init(usb_t *usb)
+data_t *usb_hid_init(usb_t *usb)
 {
+	data_t *data = (data_t *)calloc(1u, sizeof(data_t));
 	usb_if_t usbif = {
-		.data = calloc(1u, sizeof(data_t)),
+		.data = data,
 		.config = &usbif_config,
 		.enable = &usbif_enable,
 		.disable = &usbif_disable,
 		.setup_std = &usbif_setup_std,
 		.setup_class = &usbif_setup_class,
 	};
-	_usb.usb = 0;
-	usb_interface_alloc(usb, &usbif);
+	// Copy HID descriptor
+	memcpy(&data->desc_hid, &desc_hid, desc_hid.bLength);
+	// Register interface
+	usb_interface_register(usb, &usbif);
+	return usbif.data;
 }
 
-void usb_keyboard_update(uint32_t status)
+void usb_hid_update(hid_t *hid)
 {
-	if (!_usb.usb)
+	int ep_in = hid->hid_data->ep_in;
+	usb_t *usb = hid->hid_data->usb;
+	if (!usb)
 		return;
-	memset(_usb.data->report, 0, KEYBOARD_REPORT_SIZE);
-	_usb.data->report[0] = HID_KEYBOARD;	// Report ID
-	// Modifier keys, reserved, keycodes
-	uint8_t *p = &_usb.data->report[3];
-	// Update report
-	const uint32_t *pm = keyboard_masks;
-	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++)
-		if (status & *pm++)
-			*p++ = keycodes[i];
-	// Send report
-	if (_usb.data->pending)
+	if (hid->pending)
 		return;
+	// Check endpoint available
 	__disable_irq();
-	if (usb_ep_in_active(_usb.usb->base, _usb.data->ep_in)) {
-		_usb.data->pending = 1;
-		__enable_irq();
-		return;
-	}
+	hid->pending = usb_ep_in_active(usb->base, ep_in);
 	__enable_irq();
-	usb_ep_in_transfer(_usb.usb->base, _usb.data->ep_in,
-			   _usb.data->report, KEYBOARD_REPORT_SIZE);
+	if (hid->pending)
+		return;
+	// Send report
+	usb_ep_in_transfer(usb->base, ep_in, hid->report, hid->size);
+}
+
+void usb_hid_register(hid_t *hid, const_desc_t desc_report)
+{
+	// Allocate report ID
+	data_t *data = hid->hid_data;
+	hid->id = ++data->usages;
+	// Append to HID list
+	hid_t **hp;
+	for (hp = &data->hid; *hp != 0; hp = &(*hp)->next);
+	*hp = hid;
+	// Allocate additional report descriptor space
+	data->desc_report.p = realloc(data->desc_report.p,
+				      data->desc_report.size + desc_report.size);
+	uint8_t *p = data->desc_report.p + data->desc_report.size;
+	// Copy report descriptor
+	memcpy(p, desc_report.p, desc_report.size);
+	data->desc_report.size += desc_report.size;
+	data->desc_hid.wDescriptorLength += desc_report.size;
+	// Update report ID
+	for (uint32_t i = 0; i != desc_report.size; i++)
+		if (*p++ == 0x85) {
+			*p = hid->id;
+			break;
+		}
 }

@@ -100,6 +100,10 @@ static const desc_type_i_t desc_pcm[] = {
 	//1u, {{0x00, 0xee, 0x02}}	// 192,000
 	1u, {0x80, 0xbb, 0x00}},	// 48,000
 	//1u, {0x44, 0xac, 0x00}},	// 44,100
+	{8u + 3u * 1u, CS_INTERFACE, FORMAT_TYPE, FORMAT_TYPE_I, 2u, 2u, 16u,
+	//1u, {{0x00, 0xee, 0x02}}	// 192,000
+	1u, {0x80, 0xbb, 0x00}},	// 48,000
+	//1u, {0x44, 0xac, 0x00}},	// 44,100
 };
 
 // Audio stream interface

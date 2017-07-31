@@ -1,20 +1,13 @@
-#ifndef USB_KEYBOARD_DESC_H
-#define USB_KEYBOARD_DESC_H
-
-#include <stdint.h>
-#include "../usb_macros.h"
-
-#define HID_KEYBOARD	1u
-#define HID_MOUSE	2u
-
-#define KEYBOARD_REPORT_SIZE	9u
+#include <malloc.h>
+#include <string.h>
+#include "usb_hid_keyboard.h"
 
 static const uint8_t desc_report[] = {
 	// Keyboard
 	0x05, 0x01,		// Usage page (Generic desktop)
 	0x09, 0x06,		// Usage (Keyboard)
 	0xa1, 0x01,		// Collection (Application)
-	0x85, HID_KEYBOARD,	//   Report ID (HID_KEYBOARD)
+	0x85, 0,		//   Report ID
 #if 1	// Modifier keys
 	0x75, 0x01,		//   Report size (1)
 	0x95, 0x08,		//   Report count (8)
@@ -53,20 +46,17 @@ static const uint8_t desc_report[] = {
 	0xc0,			// End collection
 };
 
-typedef struct PACKED desc_hid_t {
-	uint8_t bLength;
-	uint8_t bDescriptorType;
-	uint16_t bcdHID;
-	uint8_t bCountryCode;
-	uint8_t bNumDescriptors;
-	uint8_t bClassDescriptorType;
-	uint16_t wDescriptorLength;
-} desc_hid_t;
+#define KEYBOARD_REPORT_SIZE	9u
 
-static const desc_hid_t desc_hid = {
-	// 0x21: HID descriptor
-	// 0x22: Report descriptor
-	9u, 0x21u, 0x0111u, 0x00u, 1u, 0x22u, sizeof(desc_report),
-};
-
-#endif // USB_KEYBOARD_DESC_H
+hid_t *usb_hid_keyboard_init(struct usb_t *usb, void *p)
+{
+	hid_t *hid = calloc(1u, sizeof(hid_t));
+	hid->hid_data = (data_t *)p;
+	hid->size = KEYBOARD_REPORT_SIZE;
+	const_desc_t desc = {
+		.p = desc_report,
+		.size = sizeof(desc_report),
+	};
+	usb_hid_register(hid, desc);
+	return hid;
+}

@@ -12,6 +12,7 @@ Project {
             "-Wno-unused-function",
         ]
         cpp.staticLibraries: ["m"]
+        cpp.includePaths: ["."]
         Depends {name: "CMSIS"}
 
         Properties {
@@ -27,6 +28,7 @@ Project {
         Group {
             name: "FatFS"
             cpp.optimization: "small"
+            cpp.commonCompilerFlags: outer.concat(["-Wno-comment"])
             files: [
                 "fatfs/*",
             ]
@@ -42,6 +44,8 @@ Project {
                 "peripheral/mmc.h",
                 "peripheral/uart.c",
                 "peripheral/uart.h",
+                "peripheral/keyboard.c",
+                "peripheral/keyboard.h",
             ]
         }
 
@@ -52,11 +56,16 @@ Project {
                 "usb/audio/usb_audio.h",
                 "usb/audio/usb_audio_defs.h",
                 "usb/audio/usb_audio_desc.h",
-                "usb/keyboard/keyboard.c",
-                "usb/keyboard/keyboard.h",
-                "usb/keyboard/usb_keyboard.c",
-                "usb/keyboard/usb_keyboard.h",
-                "usb/keyboard/usb_keyboard_desc.h",
+            ]
+        }
+
+        Group {
+            name: "USB HID interface"
+            files: [
+                "usb/hid/usb_hid.c",
+                "usb/hid/usb_hid.h",
+                "usb/hid/keyboard/usb_hid_keyboard.c",
+                "usb/hid/keyboard/usb_hid_keyboard.h",
             ]
         }
 

@@ -31,7 +31,7 @@ uint32_t usb_ram_fifo_alloc(usb_t *usb)
 	return ++usb->fifo;
 }
 
-void usb_interface_alloc(usb_t *usb, const usb_if_t *usbif)
+void usb_interface_register(usb_t *usb, const usb_if_t *usbif)
 {
 	usb_if_t **p;
 	for (p = &usb->usbif; *p != 0; p = &(*p)->next);

@@ -3,19 +3,26 @@
 #include <ctype.h>
 #include <inttypes.h>
 #include <stm32f722xx.h>
+// Miscellaneous macros and helpers
+#include "macros.h"
 #include "debug.h"
 #include "escape.h"
+#include "fio.h"
+// Core peripherals
 #include "clocks.h"
 #include "pvd.h"
-#include "fio.h"
 #include "irq.h"
-#include "macros.h"
 #include "systick.h"
+// Peripherals
 #include "peripheral/uart.h"
+#include "peripheral/keyboard.h"
 #include "peripheral/audio.h"
+// USB interfaces
 #include "usb/usb.h"
-#include "usb/keyboard/keyboard.h"
 #include "usb/audio/usb_audio.h"
+#include "usb/hid/usb_hid.h"
+#include "usb/hid/keyboard/usb_hid_keyboard.h"
+// 3rd party libraries
 #include "fatfs/ff.h"
 
 static usb_t usb;
@@ -49,12 +56,6 @@ static inline void init()
 	puts(ESC_CLEAR ESC_MAGENTA VARIANT " build @ " __DATE__ " " __TIME__);
 	printf(ESC_YELLOW "Core clock: " ESC_WHITE "%lu\n", clkAHB());
 
-	puts(ESC_CYAN "Initialising keyboard...");
-	keyboard_init();
-
-	puts(ESC_CYAN "Initialising audio...");
-	audio_init();
-
 	puts(ESC_CYAN "Initialising USB HS...");
 	usb_init(&usb, USB_OTG_HS);
 	printf(ESC_YELLOW "USB in " ESC_WHITE "%s" ESC_YELLOW " mode\n",
@@ -62,7 +63,16 @@ static inline void init()
 	while (usb_mode(&usb) != 0);
 	usb_init_device(&usb);
 	usb_audio_init(&usb);
-	usb_keyboard_init(&usb);
+
+	puts(ESC_CYAN "Initialising USB HID interface...");
+	void *hid_data = usb_hid_init(&usb);
+	void *hid_keyboard = usb_hid_keyboard_init(&usb, hid_data);
+
+	puts(ESC_CYAN "Initialising keyboard...");
+	keyboard_init(hid_keyboard);
+
+	puts(ESC_CYAN "Initialising audio...");
+	audio_init();
 
 	puts(ESC_CYAN "Initialising LEDs...");
 	// RGB:	PA0(R), PA1(G), PA2(B)

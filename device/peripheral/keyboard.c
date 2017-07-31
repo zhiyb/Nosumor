@@ -1,10 +1,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stm32f7xx.h>
-#include "../../irq.h"
-#include "../../systick.h"
-#include "../../macros.h"
-#include "../../debug.h"
+#include <usb/hid/usb_hid.h>
+#include <irq.h>
+#include <systick.h>
+#include <macros.h>
+#include <debug.h>
 #include "keyboard.h"
 
 // KEY_12:	PA6(K1), PB2(K2)
@@ -19,13 +20,22 @@ const uint32_t keyboard_masks[KEYBOARD_KEYS] = {
 	1ul << 2, 1ul << 6, 1ul << 13, 1ul << 14, 1ul << 15
 };
 
+uint8_t keycodes[KEYBOARD_KEYS] = {
+	// x,    z,    c,    ~,  ESC
+	0x1b, 0x1d, 0x06, 0x35, 0x29,
+};
+
+hid_t *hid = 0;
+
 static volatile uint32_t status, debouncing, timeout[KEYBOARD_KEYS];
 
 static uint32_t keyboard_gpio_status();
 static void keyboard_tick(uint32_t tick);
 
-void keyboard_init()
+void keyboard_init(hid_t *hid_keyboard)
 {
+	hid = hid_keyboard;
+
 	// Initialise GPIOs
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN;
 	// PA6
@@ -91,6 +101,21 @@ uint32_t keyboard_status()
 	return status;
 }
 
+void keyboard_update(uint32_t status)
+{
+	// Clear keyboard status
+	memset(hid->payload, 0, hid->size - 1u);
+	// Modifier keys (0), reserved (1), keycodes (2*)
+	uint8_t *p = &hid->payload[2];
+	// Update report
+	const uint32_t *pm = keyboard_masks;
+	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++)
+		if (status & *pm++)
+			*p++ = keycodes[i];
+	// Send report
+	usb_hid_update(hid);
+}
+
 static void keyboard_irq()
 {
 	// Mutual exclusion interrupt
@@ -111,7 +136,7 @@ static void keyboard_irq()
 
 	// IRQ should be different from here even if reentrant
 	status ^= irq;
-	usb_keyboard_update(status);
+	keyboard_update(status);
 	// Critical section end
 	NVIC_EnableIRQ(EXTI2_IRQn);
 	NVIC_EnableIRQ(EXTI9_5_IRQn);
