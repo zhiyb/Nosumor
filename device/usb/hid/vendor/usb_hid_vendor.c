@@ -8,15 +8,15 @@ static const uint8_t desc_report[] = {
 	0x09, 0xff,		// Usage (Vendor usage)
 	0xa1, 0x03,		// Collection (Report)
 	0x85, 0,		//   Report ID
-	// Type
-	0x75, 32,		//   Report size (32)
-	0x95, 1,		//   Report count (1)
+	// IN type
+	0x75, 16,		//   Report size (16)
+	0x95, 2,		//   Report count (2)
 	0x15, 0x00,		//   Logical minimum (0)
 	0x27,			//   Logical maximum
 	0xff, 0xff, 0x00, 0x00,	//     (65535)
 	0x09, 0xff,		//   Usage (Vendor usage)
 	0x81, 0x02,		//   Input (Data, Var, Abs)
-	// Data
+	// IN data
 	0x75, 16,		//   Report size (16)
 	0x95, 1,		//   Report count (1)
 	0x15, 0x00,		//   Logical minimum (0)
@@ -24,6 +24,22 @@ static const uint8_t desc_report[] = {
 	0xff, 0xff, 0x00, 0x00,	//     (65535)
 	0x09, 0xff,		//   Usage (Vendor usage)
 	0x81, 0x02,		//   Input (Data, Var, Abs)
+	// OUT type
+	0x75, 16,		//   Report size (16)
+	0x95, 2,		//   Report count (2)
+	0x15, 0x00,		//   Logical minimum (0)
+	0x27,			//   Logical maximum
+	0xff, 0xff, 0x00, 0x00,	//     (65535)
+	0x09, 0xff,		//   Usage (Vendor usage)
+	0x91, 0x02,		//   Output (Data, Var, Abs)
+	// OUT data
+	0x75, 16,		//   Report size (16)
+	0x95, 1,		//   Report count (1)
+	0x15, 0x00,		//   Logical minimum (0)
+	0x27,			//   Logical maximum
+	0xff, 0xff, 0x00, 0x00,	//     (65535)
+	0x09, 0xff,		//   Usage (Vendor usage)
+	0x91, 0x02,		//   Output (Data, Var, Abs)
 	0xc0,			// End collection
 };
 

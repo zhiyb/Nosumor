@@ -8,7 +8,9 @@
 #include "../usb_macros.h"
 #include "../usb_setup.h"
 
-#define HID_REPORT_MAX_SIZE	64
+#define HID_IN_MAX_SIZE		16u
+#define HID_OUT_MAX_PKT		4u
+#define HID_OUT_MAX_SIZE	32u
 
 #define SETUP_DESC_TYPE_HID		0x21
 #define SETUP_DESC_TYPE_REPORT		0x22
@@ -46,12 +48,15 @@ typedef struct data_t {
 	hid_t *hid;
 	desc_hid_t desc_hid;
 	desc_t desc_report;
-	int usages, ep_in;
+	int usages, ep_in, ep_out;
+	struct ALIGNED {
+		uint8_t data[HID_OUT_MAX_SIZE];
+	} pktbuf, buf[HID_OUT_MAX_PKT];
 } data_t;
 
 static void epin_init(usb_t *usb, uint32_t n)
 {
-	uint32_t size = HID_REPORT_MAX_SIZE, addr = usb_ram_alloc(usb, &size);
+	uint32_t size = HID_IN_MAX_SIZE, addr = usb_ram_alloc(usb, &size);
 	usb->base->DIEPTXF[n - 1] = DIEPTXF(addr, size);
 	// Unmask interrupts
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
@@ -60,7 +65,7 @@ static void epin_init(usb_t *usb, uint32_t n)
 	dev->DAINTMSK |= DAINTMSK_IN(n);
 	// Configure endpoint
 	ep->DIEPCTL = EP_IN_TYP_INTERRUPT | (n << USB_OTG_DIEPCTL_TXFNUM_Pos) |
-			(HID_REPORT_MAX_SIZE << USB_OTG_DIEPCTL_MPSIZ_Pos);
+			(HID_IN_MAX_SIZE << USB_OTG_DIEPCTL_MPSIZ_Pos);
 }
 
 static void epin_halt(struct usb_t *usb, uint32_t n, int halt)
@@ -95,6 +100,40 @@ static void epin_xfr_cplt(usb_t *usb, uint32_t n)
 		}
 }
 
+static void epout_init(usb_t *usb, uint32_t n)
+{
+	data_t *data = usb->epout[n].data;
+	// Set endpoint type
+	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
+	ep->DOEPCTL = USB_OTG_DOEPCTL_USBAEP_Msk | EP_IN_TYP_INTERRUPT | HID_OUT_MAX_SIZE;
+	// Clear interrupts
+	ep->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk;
+	// Unmask interrupts
+	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
+	dev->DAINTMSK |= DAINTMSK_OUT(n);
+	// Receive packets
+	usb_ep_out_transfer(usb->base, n, data->buf, 0u, HID_OUT_MAX_PKT, HID_OUT_MAX_SIZE);
+}
+
+static void epout_xfr_cplt(usb_t *usb, uint32_t n)
+{
+	data_t *data = usb->epout[n].data;
+	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
+	// Calculate packet size
+	uint32_t siz = ep->DOEPTSIZ;
+	uint32_t pkt_cnt = HID_OUT_MAX_PKT - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
+	uint32_t size = HID_OUT_MAX_SIZE - FIELD(siz, USB_OTG_DOEPTSIZ_XFRSIZ);
+	// Copy packet
+	if (pkt_cnt != 1u)
+		dbgbkpt();
+	memcpy(data->pktbuf.data, data->buf, size);
+	// Receive new packets
+	usb_ep_out_transfer(usb->base, n, data->buf, 0u, HID_OUT_MAX_PKT, HID_OUT_MAX_SIZE);
+	// Process packet
+	dbgprintf("\n" ESC_YELLOW "HID packet received, size %ld, content %02x %02x %02x",
+		  size, data->pktbuf.data[0], data->pktbuf.data[1], data->pktbuf.data[2]);
+}
+
 static void usbif_config(usb_t *usb, void *p)
 {
 	data_t *data = (data_t *)p;
@@ -105,18 +144,22 @@ static void usbif_config(usb_t *usb, void *p)
 		.halt = &epin_halt,
 		.xfr_cplt = &epin_xfr_cplt,
 	};
-	usb_ep_register(usb, &epin, &data->ep_in, 0, 0);
+	const epout_t epout = {
+		.data = data,
+		.init = &epout_init,
+		.xfr_cplt = &epout_xfr_cplt,
+	};
+	usb_ep_register(usb, &epin, &data->ep_in, &epout, &data->ep_out);
 
-	for (hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next) {
-		;
-	}
 	// bInterfaceClass	3: HID class
 	// bInterfaceSubClass	1: Boot interface
 	// bInterfaceProtocol	0: None, 1: Keyboard, 2: Mouse
-	usb_desc_add_interface(usb, 0u, 1u, 3u, 1u, 0u, 0);
+	usb_desc_add_interface(usb, 0u, 2u, 3u, 1u, 0u, 0);
 	usb_desc_add(usb, &data->desc_hid, data->desc_hid.bLength);
 	usb_desc_add_endpoint(usb, EP_DIR_IN | data->ep_in,
-			      EP_INTERRUPT, HID_REPORT_MAX_SIZE, 1u);
+			      EP_INTERRUPT, HID_IN_MAX_SIZE, 1u);
+	usb_desc_add_endpoint(usb, EP_DIR_OUT | data->ep_out,
+			      EP_INTERRUPT, HID_IN_MAX_SIZE, 1u);
 }
 
 static void set_idle(uint8_t duration, uint8_t reportID)

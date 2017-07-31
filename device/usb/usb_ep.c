@@ -103,7 +103,7 @@ void usb_ep_out_transfer(USB_OTG_GlobalTypeDef *usb, int n, void *p,
 	ep->DOEPTSIZ = (scnt << USB_OTG_DOEPTSIZ_STUPCNT_Pos) |
 			(pcnt << USB_OTG_DOEPTSIZ_PKTCNT_Pos) | size;
 	// Enable endpoint OUT
-	ep->DOEPCTL = USB_OTG_DOEPCTL_EPENA_Msk | USB_OTG_DOEPCTL_CNAK_Msk;
+	DOEPCTL_SET(ep->DOEPCTL, USB_OTG_DOEPCTL_EPENA_Msk | USB_OTG_DOEPCTL_CNAK_Msk);
 }
 
 void usb_ep_out_wait(USB_OTG_GlobalTypeDef *usb, int n)
