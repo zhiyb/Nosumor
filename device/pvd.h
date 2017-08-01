@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 void pvd_init();
+void pvd_disable_all();
 
 #ifdef __cplusplus
 }

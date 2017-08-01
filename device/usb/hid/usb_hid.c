@@ -8,9 +8,9 @@
 #include "../usb_macros.h"
 #include "../usb_setup.h"
 
-#define HID_IN_MAX_SIZE		16u
+#define HID_IN_MAX_SIZE		48u
 #define HID_OUT_MAX_PKT		4u
-#define HID_OUT_MAX_SIZE	32u
+#define HID_OUT_MAX_SIZE	48u
 
 #define SETUP_DESC_TYPE_HID		0x21
 #define SETUP_DESC_TYPE_REPORT		0x22

@@ -94,7 +94,7 @@ Project {
         }
 
         Group {
-            name: "System"
+            name: "System modules"
             files: [
                 "STM32F722RETx_FLASH.ld",
                 "clocks.c",
@@ -109,6 +109,17 @@ Project {
                 "systick.h",
                 "fio.c",
                 "fio.h",
+            ]
+        }
+
+        Group {
+            name: "Logic modules"
+            files: [
+                "flash.c",
+                "flash.h",
+                "vendor.c",
+                "vendor.h",
+                "vendor_defs.h",
             ]
         }
 

@@ -28,7 +28,8 @@ typedef struct hid_t {
 	struct data_t *hid_data;
 	void *data;
 	// Report status for IN transfer
-	uint8_t pending, size;
+	volatile uint8_t pending;
+	uint8_t size;
 	report_t report;
 } hid_t;
 

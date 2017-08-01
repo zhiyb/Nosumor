@@ -11,7 +11,10 @@ Project {
         Export {
             Depends {name: "cpp"}
             Depends {name: "hidapi"}
-            cpp.includePaths: ["include"]
+            cpp.includePaths: [
+                "include",
+                "../device",
+            ]
         }
 
         files: [

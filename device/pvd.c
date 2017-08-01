@@ -34,3 +34,8 @@ void PVD_IRQHandler()
 {
 	GPIOB->ODR |= GPIO_ODR_ODR_7;
 }
+
+void pvd_disable_all()
+{
+	;
+}

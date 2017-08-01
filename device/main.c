@@ -25,8 +25,11 @@
 #include "usb/hid/vendor/usb_hid_vendor.h"
 // 3rd party libraries
 #include "fatfs/ff.h"
+// Processing functions
+#include "vendor.h"
 
 static usb_t usb;
+static hid_t *hid_vendor;
 
 static inline void usart6_init()
 {
@@ -63,12 +66,14 @@ static inline void init()
 	       usb_mode(&usb) ? "host" : "device");
 	while (usb_mode(&usb) != 0);
 	usb_init_device(&usb);
+#ifdef DEBUG
 	usb_audio_init(&usb);
+#endif
 
 	puts(ESC_CYAN "Initialising USB HID interface...");
 	void *hid_data = usb_hid_init(&usb);
 	void *hid_keyboard = usb_hid_keyboard_init(hid_data);
-	void *hid_vendor = usb_hid_vendor_init(hid_data);
+	hid_vendor = usb_hid_vendor_init(hid_data);
 
 	puts(ESC_CYAN "Initialising keyboard...");
 	keyboard_init(hid_keyboard);
@@ -188,6 +193,7 @@ int main()
 		__disable_irq();
 		fflush(stdout);
 		__enable_irq();
+		usb_hid_vendor_process(hid_vendor, &vendor_process);
 	}
 	return 0;
 }

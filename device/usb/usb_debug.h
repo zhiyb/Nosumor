@@ -1,18 +1,11 @@
 #ifndef USB_DEBUG_H
 #define USB_DEBUG_H
 
-//#undef DEBUG
-
-#include <stdio.h>
-#include "../escape.h"
 #include "../debug.h"
 
-//#undef DEBUG
-
-#ifdef DEBUG
-#define dbgprintf	printf
-#else	// DEBUG
-#define dbgprintf(...)
-#endif	// DEBUG
+#if 0
+#undef dbgprintf
+#define dbgprintf(...)	((void)0)
+#endif
 
 #endif // USB_DEBUG_H
