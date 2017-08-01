@@ -8,7 +8,8 @@
 extern "C" {
 #endif
 
-#define VENDOR_REPORT_IN_SIZE	6u
+#define VENDOR_REPORT_IN_SIZE	(1u + 6u)
+#define VENDOR_REPORT_OUT_SIZE	(1u + 6u)
 
 typedef struct vendor_in_t {
 	uint32_t timestamp;

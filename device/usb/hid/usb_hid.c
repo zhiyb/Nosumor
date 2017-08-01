@@ -49,7 +49,8 @@ typedef struct data_t {
 	desc_hid_t desc_hid;
 	desc_t desc_report;
 	int usages, ep_in, ep_out;
-	struct ALIGNED {
+	union {
+		report_t report;
 		uint8_t data[HID_OUT_MAX_SIZE];
 	} pktbuf, buf[HID_OUT_MAX_PKT];
 } data_t;
@@ -95,7 +96,7 @@ static void epin_xfr_cplt(usb_t *usb, uint32_t n)
 	for (hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next)
 		if ((*hid)->pending) {
 			(*hid)->pending = 0;
-			usb_ep_in_transfer(usb->base, n, (*hid)->report, (*hid)->size);
+			usb_ep_in_transfer(usb->base, n, (*hid)->report.raw, (*hid)->size);
 			break;
 		}
 }
@@ -130,8 +131,13 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 	// Receive new packets
 	usb_ep_out_transfer(usb->base, n, data->buf, 0u, HID_OUT_MAX_PKT, HID_OUT_MAX_SIZE);
 	// Process packet
-	dbgprintf("\n" ESC_YELLOW "HID packet received, size %ld, content %02x %02x %02x",
-		  size, data->pktbuf.data[0], data->pktbuf.data[1], data->pktbuf.data[2]);
+	for (hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next) {
+		if ((*hid)->report.id == data->pktbuf.report.id) {
+			(*hid)->recv(*hid, &data->pktbuf.report, size);
+			return;
+		}
+	}
+	dbgbkpt();
 }
 
 static void usbif_config(usb_t *usb, void *p)
@@ -190,8 +196,9 @@ static void usb_send_report(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
 	switch (pkt.bType) {
 	case SETUP_REPORT_INPUT:
 		for (hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next)
-			if ((*hid)->id == id) {
-				usb_ep_in_transfer(usb->base, ep, (*hid)->report, (*hid)->size);
+			if ((*hid)->report.id == id) {
+				usb_ep_in_transfer(usb->base, ep,
+						   (*hid)->report.raw, (*hid)->size);
 				return;
 			}
 		usb_ep_in_stall(usb->base, ep);
@@ -316,14 +323,14 @@ void usb_hid_update(hid_t *hid)
 	if (hid->pending)
 		return;
 	// Send report
-	usb_ep_in_transfer(usb->base, ep_in, hid->report, hid->size);
+	usb_ep_in_transfer(usb->base, ep_in, hid->report.raw, hid->size);
 }
 
 void usb_hid_register(hid_t *hid, const_desc_t desc_report)
 {
 	// Allocate report ID
 	data_t *data = hid->hid_data;
-	hid->id = ++data->usages;
+	hid->report.id = ++data->usages;
 	// Append to HID list
 	hid_t **hp;
 	for (hp = &data->hid; *hp != 0; hp = &(*hp)->next);
@@ -339,7 +346,7 @@ void usb_hid_register(hid_t *hid, const_desc_t desc_report)
 	// Update report ID
 	for (uint32_t i = 0; i != desc_report.size; i++)
 		if (*p++ == 0x85) {
-			*p = hid->id;
+			*p = hid->report.id;
 			break;
 		}
 }

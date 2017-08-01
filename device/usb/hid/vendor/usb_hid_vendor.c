@@ -1,5 +1,6 @@
 #include <malloc.h>
 #include <string.h>
+#include <usb/usb_debug.h>
 #include "usb_hid_vendor.h"
 
 static const uint8_t desc_report[] = {
@@ -43,10 +44,19 @@ static const uint8_t desc_report[] = {
 	0xc0,			// End collection
 };
 
+static void hid_report(hid_t *hid, report_t *report, uint32_t size)
+{
+	dbgprintf("\n" ESC_YELLOW "HID vendor OUT report size %ld, content %02x %02x %02x",
+		  size, report->payload[0], report->payload[1], report->payload[2]);
+	if (size != VENDOR_REPORT_OUT_SIZE)
+		dbgbkpt();
+}
+
 hid_t *usb_hid_vendor_init(void *p)
 {
 	hid_t *hid = calloc(1u, sizeof(hid_t));
 	hid->hid_data = (data_t *)p;
+	hid->recv = &hid_report;
 	hid->size = VENDOR_REPORT_IN_SIZE;
 	const_desc_t desc = {
 		.p = desc_report,

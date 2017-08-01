@@ -104,9 +104,9 @@ uint32_t keyboard_status()
 void keyboard_update(uint32_t status)
 {
 	// Clear keyboard status
-	memset(hid->payload, 0, hid->size - 1u);
+	memset(hid->report.payload, 0, hid->size - 1u);
 	// Modifier keys (0), reserved (1), keycodes (2*)
-	uint8_t *p = &hid->payload[2];
+	uint8_t *p = &hid->report.payload[2];
 	// Update report
 	const uint32_t *pm = keyboard_masks;
 	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++)

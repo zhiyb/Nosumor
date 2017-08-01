@@ -11,18 +11,25 @@ extern "C" {
 
 typedef struct data_t data_t;
 
-typedef struct hid_t {
-	struct data_t *hid_data;
-	struct hid_t *next;
-	void *data;
-	uint8_t pending, size;
-	union ALIGNED {
-		struct {
-			uint8_t id;
-			uint8_t payload[];
-		};
-		uint8_t report[1];
+typedef union ALIGNED {
+	struct {
+		uint8_t id;
+		uint8_t payload[];
 	};
+	uint8_t raw[1];
+} report_t;
+
+typedef struct hid_t {
+	// Linked list
+	struct hid_t *next;
+	// Function handlers
+	void (*recv)(struct hid_t *hid, report_t *report, uint32_t size);
+	// Data
+	struct data_t *hid_data;
+	void *data;
+	// Report status for IN transfer
+	uint8_t pending, size;
+	report_t report;
 } hid_t;
 
 data_t *usb_hid_init(usb_t *usb);
