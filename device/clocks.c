@@ -26,6 +26,20 @@ uint32_t clkAPB2()
 	return clkAHB() / (2 << (div & 0b11));
 }
 
+uint32_t clkSDMMC1()
+{
+	if (RCC->DCKCFGR2 & RCC_DCKCFGR2_SDMMC1SEL_Msk)
+		return clkAHB();
+	return 72ul * 1000 * 1000;
+}
+
+uint32_t clkSDMMC2()
+{
+	if (RCC->DCKCFGR2 & RCC_DCKCFGR2_SDMMC1SEL_Msk)
+		return clkAHB();
+	return 72ul * 1000 * 1000;
+}
+
 static inline void mco1_init()
 {
 	// MCO1: HSE / 1
@@ -85,18 +99,4 @@ void rcc_init()
 	SystemCoreClockUpdate();
 	// Enable clock output for other chips
 	mco1_init();
-}
-
-uint32_t clkSDMMC1()
-{
-	if (RCC->DCKCFGR2 & RCC_DCKCFGR2_SDMMC1SEL_Msk)
-		return clkAHB();
-	return 72ul * 1000 * 1000;
-}
-
-uint32_t clkSDMMC2()
-{
-	if (RCC->DCKCFGR2 & RCC_DCKCFGR2_SDMMC1SEL_Msk)
-		return clkAHB();
-	return 72ul * 1000 * 1000;
 }

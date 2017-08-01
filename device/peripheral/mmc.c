@@ -106,7 +106,7 @@ DSTATUS mmc_disk_init()
 	// Disable interrupts
 	MMC->MASK = 0ul;
 	// 1-bit bus, clock enable, 400kHz
-	MMC->CLKCR = SDMMC_CLKCR_CLKEN_Msk | (ROUND(clkSDMMC1(), 400000) - 2ul);
+	MMC->CLKCR = SDMMC_CLKCR_CLKEN_Msk | (CEIL(clkSDMMC1(), 400000ul) - 2ul);
 	// Start card clock
 	MMC->POWER = 0b11ul << SDMMC_POWER_PWRCTRL_Pos;
 	systick_delay(2);
@@ -142,11 +142,8 @@ DSTATUS mmc_disk_init()
 	arg = OCR_HCS | OCR_XPC | (0b11 << 20u);
 	// Wait for busy status
 	while (!((ocr = mmc_app_command(SD_SEND_OP_COND, 0, arg, 0)) & OCR_BUSY));
+	// Version 2.00, standard or extended capacity card
 	ccs = ocr & OCR_CCS;
-	if (!ccs) {
-		// Standard capacity card
-		dbgbkpt();
-	}
 
 	// No need for 1.8V voltage switching
 
@@ -167,12 +164,24 @@ DSTATUS mmc_disk_init()
 	}
 
 	// Initialised, switch to high-speed clock
-	// Flow control, 4-bit bus, power saving, clock enable, 48MHz
+	uint32_t clk;
+	if (!ccs)	// DS, up to 25MHz
+		clk = CEIL(clkSDMMC1(), 25000000ul) - 2ul;
+	else		// HS, up to 50MHz
+		clk = SDMMC_CLKCR_BYPASS_Msk;
+	// Flow control, 4-bit bus, power saving, clock enable
 	MMC->CLKCR = SDMMC_CLKCR_HWFC_EN_Msk | (0b01ul << SDMMC_CLKCR_WIDBUS_Pos) |
-			SDMMC_CLKCR_BYPASS_Msk | SDMMC_CLKCR_CLKEN_Msk;
+			SDMMC_CLKCR_CLKEN_Msk | clk;
 
 	// Select card
 	resp = mmc_command(SELECT_CARD, rca, &sta);
+	if (!(sta & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
+		dbgbkpt();
+		return sta;
+	}
+
+	// Set bus width (4 bits bus)
+	resp = mmc_app_command(SET_BUS_WIDTH, rca, 0b10, &sta);
 	if (!(sta & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
 		dbgbkpt();
 		return sta;
@@ -182,13 +191,6 @@ DSTATUS mmc_disk_init()
 	while (resp & STAT_CARD_IS_LOCKED) {
 		resp = mmc_command(LOCK_UNLOCK, 0, &sta);
 		dbgbkpt();
-	}
-
-	// Set bus width (4 bits bus)
-	resp = mmc_app_command(SET_BUS_WIDTH, rca, 0b10, &sta);
-	if (!(sta & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
-		dbgbkpt();
-		return sta;
 	}
 
 	// Set block length

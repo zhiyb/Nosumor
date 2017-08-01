@@ -14,6 +14,8 @@
 #define SEND_RELATIVE_ADDR	(3u | RESP_SHORT)	// R6
 #define SELECT_CARD		(7u | RESP_SHORT)	// R1b
 #define SEND_IF_COND		(8u | RESP_SHORT)	// R7
+#define SEND_CSD		(9u | RESP_LONG)	// R2
+#define SEND_CID		(10u | RESP_LONG)	// R2
 #define VOLTAGE_SWITCH		(11u | RESP_SHORT)	// R1
 #define SET_BLOCKLEN		(16u | RESP_SHORT)	// R1
 #define READ_SINGLE_BLOCK	(17u | RESP_SHORT)	// R1

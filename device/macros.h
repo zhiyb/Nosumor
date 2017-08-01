@@ -7,7 +7,9 @@
 #define ALIGNED	__attribute__((aligned))
 #define FIELD(r, f)	(((r) & (f##_Msk)) >> (f##_Pos))
 #define ASIZE(a)	(sizeof((a)) / sizeof((a)[0]))
-#define ROUND(a, b)	((a + (b / 2)) / b)
+#define ROUND(a, b)	(((a) + ((b) / 2)) / (b))
+#define CEIL(a, b)	(((a) + (b) - 1) / (b))
+#define FLOOR(a, b)	((a) / (b))
 #define MIN(a, b)	((a) < (b) ? (a) : (b))
 
 #define GPIO_AFRL_AFR0_Msk	GPIO_AFRL_AFRL0_Msk
