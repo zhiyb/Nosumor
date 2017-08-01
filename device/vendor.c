@@ -1,5 +1,7 @@
 #include <malloc.h>
-#include <usb/usb_debug.h>
+#include <stdio.h>
+#include <debug.h>
+#include <escape.h>
 #include <usb/hid/usb_hid.h>
 #include "vendor.h"
 #include "vendor_defs.h"

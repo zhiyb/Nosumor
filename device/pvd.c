@@ -1,7 +1,10 @@
 #include <stm32f7xx.h>
+#include <usb/usb.h>
 #include "pvd.h"
 #include "irq.h"
 #include "macros.h"
+
+extern usb_t usb;
 
 void pvd_init()
 {
@@ -37,5 +40,5 @@ void PVD_IRQHandler()
 
 void pvd_disable_all()
 {
-	;
+	usb_connect(&usb, 0);
 }

@@ -28,7 +28,7 @@
 // Processing functions
 #include "vendor.h"
 
-static usb_t usb;
+usb_t usb;	// Shared with PVD
 static hid_t *hid_vendor;
 
 static inline void usart6_init()

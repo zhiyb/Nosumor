@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <stm32f7xx.h>
 #include <usb/hid/usb_hid.h>
 #include <irq.h>

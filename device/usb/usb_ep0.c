@@ -1,4 +1,5 @@
 #include <malloc.h>
+#include <string.h>
 #include "usb_debug.h"
 #include "usb_ep0.h"
 #include "usb_ep.h"

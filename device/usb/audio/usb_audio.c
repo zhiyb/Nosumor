@@ -1,4 +1,5 @@
 #include <malloc.h>
+#include <string.h>
 #include "usb_audio.h"
 #include "usb_audio_desc.h"
 #include "../usb.h"

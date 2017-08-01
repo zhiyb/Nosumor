@@ -5,10 +5,10 @@
 
 #ifdef DEBUG
 
+#include <stm32f7xx.h>
 #include <stdio.h>
 #include <string.h>
-#include <stm32f7xx.h>
-#include "escape.h"
+#include <escape.h>
 
 #define VARIANT	"DEBUG"
 

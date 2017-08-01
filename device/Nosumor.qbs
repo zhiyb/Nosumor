@@ -10,6 +10,7 @@ Project {
         cpp.commonCompilerFlags: [
             "-Wno-unused-parameter",
             "-Wno-unused-function",
+            "-Wno-unused-variable",
         ]
         cpp.staticLibraries: ["m"]
         cpp.includePaths: ["."]
@@ -114,6 +115,7 @@ Project {
 
         Group {
             name: "Logic modules"
+            cpp.optimization: "fast"
             files: [
                 "flash.c",
                 "flash.h",
