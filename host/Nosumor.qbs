@@ -3,6 +3,22 @@ import qbs
 Project {
     minimumQbsVersion: "1.7.1"
 
+    references: [
+        "console"
+    ]
+
+    Product {
+        Export {
+            Depends {name: "cpp"}
+            Depends {name: "hidapi"}
+            cpp.includePaths: ["include"]
+        }
+
+        files: [
+            "include/dev_defs.h"
+        ]
+    }
+
     StaticLibrary {
         name: "hidapi"
         Depends {name: "cpp"}
@@ -31,18 +47,15 @@ Project {
         }
     }
 
-    CppApplication {
-        consoleApplication: true
-        Depends {name: "hidapi"}
-
-        files: [
-            "hid_defs.h",
-            "main.cpp",
-        ]
-
-        Group {     // Properties for the produced executable
-            fileTagsFilter: product.type
-            qbs.install: true
+    Product {
+        name: "spdlog"
+        Export {
+            Depends {name: "cpp"}
+            cpp.cxxLanguageVersion: "c++11"
+            cpp.includePaths: ["spdlog/include"]
+            cpp.defines: ["SPDLOG_WCHAR_TO_UTF8_SUPPORT"]
         }
+
+        files: ["spdlog/include/**"]
     }
 }

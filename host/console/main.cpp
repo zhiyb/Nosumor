@@ -1,8 +1,12 @@
 #include <iostream>
 #include <stdint.h>
 #include <hidapi.h>
+#include <dev_defs.h>
+#include "logger.h"
 
 using namespace std;
+
+std::shared_ptr<spdlog::logger> logger = spdlog::stdout_color_mt("console");
 
 int refreshDeviceList()
 {
@@ -11,7 +15,7 @@ int refreshDeviceList()
 	for (hid_device_info *info = devs; info; info = info->next) {
 		if (info->usage_page != HID_USAGE_PAGE || info->usage != HID_USAGE)
 			continue;
-		clog << "Nosumor SN " << info->serial_number << ": " << info->path << endl;
+		logger->info(L"Nosumor {}: {}", info->serial_number, info->path);
 		num++;
 		hid_device *dev = hid_open_path(info->path);
 		uint8_t data[7] = {2u, 0x12, 0x34, 0x56, 0x78};
@@ -26,13 +30,16 @@ int refreshDeviceList()
 
 int main()
 {
+	logger->set_pattern("[%T %t/%l]: %v");
+	logger->set_level(spdlog::level::debug);
+
 	int ret;
 	if ((ret = hid_init()) != 0) {
-		cerr << "Error initialising hidapi: " << ret << endl;
+		logger->error("Error initialising hidapi: {}", ret);
 		return 1;
 	}
 	int num = refreshDeviceList();
-	clog << num << " devices found" << endl;
+	logger->info("{} devices found", num);
 	hid_exit();
 	return 0;
 }
