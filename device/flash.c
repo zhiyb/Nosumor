@@ -8,8 +8,6 @@
 #include <pvd.h>
 #include "flash.h"
 
-#define FLASH_SIZE	(*(__IO uint32_t *)0x1ff07a22)
-
 enum FlashInterface {AXI, ICTM};
 
 // Store hex file for programming
@@ -32,13 +30,13 @@ static int hex_invalid = 0;
 
 /* Flash access functions */
 
-SECTION(.iram) static inline void flash_wait()
+SECTION(.iram) STATIC_INLINE void flash_wait()
 {
 	__DSB();
 	while (FLASH->SR & FLASH_SR_BSY_Msk);
 }
 
-SECTION(.iram) static inline int flash_unlock()
+SECTION(.iram) STATIC_INLINE int flash_unlock()
 {
 	flash_wait();
 	if (!(FLASH->CR & FLASH_CR_LOCK_Msk))
@@ -49,7 +47,7 @@ SECTION(.iram) static inline int flash_unlock()
 	return !(FLASH->CR & FLASH_CR_LOCK_Msk);
 }
 
-SECTION(.iram) static void flash_erase(uint32_t addr)
+SECTION(.iram) extern void flash_erase(uint32_t addr)
 {
 	// Flash sector start addresses
 	static uint32_t start_addr[] SECTION(.data) = {
@@ -75,10 +73,10 @@ SECTION(.iram) static void flash_erase(uint32_t addr)
 	sector = sec;
 }
 
-SECTION(.iram) static inline void flash_write(uint32_t addr, uint8_t size, uint8_t *data)
+SECTION(.iram) STATIC_INLINE void flash_write(uint32_t addr, uint8_t size, uint8_t *data)
 {
 	// Only AXI interface has write access
-	uint32_t fsize = FLASH_SIZE;
+	uint32_t fsize = 1024ul * FLASH_SIZE;
 	if (addr >= FLASHAXI_BASE && addr < FLASHAXI_BASE + fsize)
 		// Access using AXI interface
 		;
@@ -243,8 +241,7 @@ int flash_hex_check()
 
 void flash_hex_program()
 {
-	if (hex_invalid) {
-		dbgbkpt();
+	if (hex_invalid || !hex) {
 		NVIC_SystemReset();
 		return;
 	}

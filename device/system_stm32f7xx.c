@@ -89,14 +89,8 @@
   * @{
   */
 
-/************************* Miscellaneous Configuration ************************/
-
-/*!< Uncomment the following line if you need to relocate your vector Table in
-     Internal SRAM. */
-/* #define VECT_TAB_SRAM */
-#define VECT_TAB_OFFSET  0x00 /*!< Vector Table base offset field. 
-                                   This value must be a multiple of 0x200. */
-/******************************************************************************/
+// Vector table base address
+extern const uint32_t g_pfnVectors[];
 
 /**
   * @}
@@ -175,19 +169,7 @@ void SystemInit(void)
   RCC->CIR = 0x00000000;
 
   /* Configure the Vector Table location add offset address ------------------*/
-#ifdef VECT_TAB_SRAM
-  /* Vector Table Relocation in SRAM */
-#define VTOR_BASE RAMDTCM_BASE
-#else
-#ifdef FLASH_USE_ITCM
-  /* Vector Table Relocation in FLASH ITCM interface */
-#define VTOR_BASE FLASHITCM_BASE
-#else
-  /* Vector Table Relocation in FLASH AXI interface */
-#define VTOR_BASE FLASHAXI_BASE
-#endif
-#endif
-  SCB->VTOR = VTOR_BASE | VECT_TAB_OFFSET;
+  SCB->VTOR = (uint32_t)g_pfnVectors;
 }
 
 /**

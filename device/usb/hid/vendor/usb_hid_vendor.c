@@ -111,7 +111,7 @@ void usb_hid_vendor_process(hid_t *hid, vendor_func_t func)
 void usb_hid_vendor_send(hid_t *hid, vendor_report_t *report)
 {
 	report->id = hid->report.id;
+	while (hid->pending);
 	memcpy(&hid->report, report, report->size);
 	usb_hid_update(hid);
-	while (hid->pending);
 }

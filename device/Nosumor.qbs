@@ -12,6 +12,7 @@ Project {
         Depends {name: "gcc-none"}
 
         property bool itcm: false
+        property bool bootloader: false
 
         cpp.commonCompilerFlags: [
             "-Wno-unused-parameter",
@@ -22,19 +23,26 @@ Project {
         cpp.includePaths: ["."]
 
         Properties {
+            condition: bootloader
+            cpp.defines: outer.concat(["BOOTLOADER"])
+            cpp.driverFlags: outer.concat(["--specs=nano.specs"])
+        }
+
+        Properties {
             condition: qbs.buildVariant == "debug"
-            cpp.defines: ["DEBUG"]
+            cpp.defines: outer.concat(["DEBUG"])
         }
 
         Properties {
             condition: qbs.buildVariant == "release"
-            cpp.defines: ["FLASH_USE_ITCM"]
+            cpp.defines: outer.concat(["FLASH_USE_ITCM"])
             cpp.optimization: "small"
             itcm: true
         }
 
         Group {
             name: "FatFS"
+            condition: !bootloader
             cpp.optimization: "small"
             cpp.commonCompilerFlags: outer.concat(["-Wno-comment"])
             files: [
@@ -59,6 +67,7 @@ Project {
 
         Group {
             name: "USB interfaces"
+            condition: !bootloader
             files: [
                 "usb/audio/usb_audio.c",
                 "usb/audio/usb_audio.h",
@@ -121,14 +130,20 @@ Project {
 
         Group {
             name: "Linker script for AXI"
-            condition: itcm == false
+            condition: !itcm
             files: "STM32F722RETx_FLASH_AXIM.ld"
         }
 
         Group {
             name: "Linker script for ITCM"
-            condition: itcm == true
+            condition: itcm && !bootloader
             files: "STM32F722RETx_FLASH_ITCM.ld"
+        }
+
+        Group {
+            name: "Linker script for ITCM BL"
+            condition: itcm && bootloader
+            files: "STM32F722RETx_FLASH_ITCM_BL.ld"
         }
 
         Group {
@@ -148,11 +163,6 @@ Project {
             "macros.h",
             "main.c",
         ]
-
-        FileTagger {
-            patterns: "*.ld"
-            fileTags: ["linkerscript"]
-        }
 
         Group {     // Properties for the produced executable
             fileTagsFilter: ["application", "hex", "bin"]

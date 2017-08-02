@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define SW_VERSION	2
+
 #define VENDOR_REPORT_BASE_SIZE	(3u)
 #define VENDOR_REPORT_SIZE	(VENDOR_REPORT_BASE_SIZE + 32u)
 
@@ -15,6 +17,13 @@ typedef union vendor_report_t {
 	};
 	uint8_t raw[VENDOR_REPORT_SIZE];
 } vendor_report_t;
+
+typedef struct pong_t {
+	uint16_t hw_ver;
+	uint16_t sw_ver;
+	uint32_t uid[3];
+	uint16_t fsize;
+} pong_t;
 
 enum ReportINTypes {Pong = 0, FlashStatus};
 enum ReportOUTTypes {Ping = 0, FlashReset, FlashData, FlashCheck, FlashStart};

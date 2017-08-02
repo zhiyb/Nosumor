@@ -6,6 +6,7 @@
 #define PACKED		__attribute__((packed))
 #define ALIGNED		__attribute__((aligned))
 #define SECTION(s)	__attribute__((section(#s)))
+#define STATIC_INLINE	__attribute__((always_inline)) static inline
 
 #define FIELD(r, f)	(((r) & (f##_Msk)) >> (f##_Pos))
 #define ASIZE(a)	(sizeof((a)) / sizeof((a)[0]))

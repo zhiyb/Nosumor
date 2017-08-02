@@ -1,5 +1,6 @@
 #include <malloc.h>
 #include <stdio.h>
+#include <string.h>
 #include <debug.h>
 #include <escape.h>
 #include <usb/hid/usb_hid.h>
@@ -7,12 +8,44 @@
 #include "vendor_defs.h"
 #include "flash.h"
 
-void vendor_flash_check(hid_t *hid)
-{
-	static vendor_report_t report = {
-		.type = FlashStatus,
-		.size = VENDOR_REPORT_BASE_SIZE + 1u,
+#define UID	((uint32_t *)0x1ff07a10)
+
+typedef struct PACKED {
+	union PACKED {
+		struct PACKED {
+			uint16_t hw_ver;
+		};
+		uint32_t otp[16][8];
 	};
+	uint8_t lock[16];
+} otp_t;
+
+#define OTP	((otp_t *)FLASH_OTP_BASE)
+
+static vendor_report_t report;
+
+static void ping(hid_t *hid)
+{
+	report.type = Pong;
+	pong_t *p = (pong_t *)report.payload;
+	p->sw_ver = SW_VERSION;
+#ifdef DEBUG
+	p->sw_ver |= 0x8000;
+#endif
+#ifdef BOOTLOADER
+	p->sw_ver |= 0x4000;
+#endif
+	p->hw_ver = OTP->hw_ver;
+	memcpy(p->uid, UID, 12u);
+	p->fsize = FLASH_SIZE;
+	report.size = VENDOR_REPORT_BASE_SIZE + sizeof(pong_t);
+	usb_hid_vendor_send(hid, &report);
+}
+
+static void flash_check(hid_t *hid)
+{
+	report.type = FlashStatus;
+	report.size = VENDOR_REPORT_BASE_SIZE + 1u;
 	int valid = flash_hex_check();
 	report.payload[0] = valid;
 	usb_hid_vendor_send(hid, &report);
@@ -34,6 +67,9 @@ void vendor_process(hid_t *hid, vendor_report_t *rp)
 	}
 	uint8_t size = rp->size - VENDOR_REPORT_BASE_SIZE;
 	switch (rp->type) {
+	case Ping:
+		ping(hid);
+		break;
 	case FlashReset:
 		flash_hex_free();
 		break;
@@ -41,7 +77,7 @@ void vendor_process(hid_t *hid, vendor_report_t *rp)
 		flash_hex_data(size, rp->payload);
 		break;
 	case FlashCheck:
-		vendor_flash_check(hid);
+		flash_check(hid);
 		break;
 	case FlashStart:
 		flash_hex_program();

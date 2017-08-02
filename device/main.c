@@ -28,8 +28,29 @@
 // Processing functions
 #include "vendor.h"
 
+#define BOOTLOADER_BASE	0x00260000
+#define BOOTLOADER_FUNC	((void (*)())*(uint32_t *)(BOOTLOADER_BASE + 4u))
+
 usb_t usb;	// Shared with PVD
 static hid_t *hid_vendor;
+
+static inline void bootloader_check()
+{
+	// Initialise GPIOs
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
+	// PC13, PC14, PC15
+	GPIO_MODER(GPIOC, 13, 0b00);
+	GPIO_MODER(GPIOC, 14, 0b00);
+	GPIO_MODER(GPIOC, 15, 0b00);
+	GPIO_PUPDR(GPIOC, 13, GPIO_PUPDR_UP);
+	GPIO_PUPDR(GPIOC, 14, GPIO_PUPDR_UP);
+	GPIO_PUPDR(GPIOC, 15, GPIO_PUPDR_UP);
+	if (!(GPIOC->IDR & (0b111ul << 13u))) {
+		// Set reset vector
+		SCB->VTOR = BOOTLOADER_BASE;
+		BOOTLOADER_FUNC();
+	}
+}
 
 static inline void usart6_init()
 {
@@ -50,12 +71,17 @@ static inline void usart6_init()
 
 static inline void init()
 {
+#ifndef BOOTLOADER
+	bootloader_check();
+#endif
 	rcc_init();
 	NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUPING);
 	__enable_irq();
 	systick_init(1000);
 	usart6_init();
+#ifndef BOOTLOADER
 	pvd_init();
+#endif
 
 	puts(ESC_CLEAR ESC_MAGENTA VARIANT " build @ " __DATE__ " " __TIME__);
 	printf(ESC_YELLOW "Core clock: " ESC_WHITE "%lu\n", clkAHB());
@@ -66,7 +92,7 @@ static inline void init()
 	       usb_mode(&usb) ? "host" : "device");
 	while (usb_mode(&usb) != 0);
 	usb_init_device(&usb);
-#ifdef DEBUG
+#if !defined(BOOTLOADER) && defined(DEBUG)
 	usb_audio_init(&usb);
 #endif
 
@@ -78,8 +104,10 @@ static inline void init()
 	puts(ESC_CYAN "Initialising keyboard...");
 	keyboard_init(hid_keyboard);
 
+#ifndef BOOTLOADER
 	puts(ESC_CYAN "Initialising audio...");
 	audio_init();
+#endif
 
 	puts(ESC_CYAN "Initialising LEDs...");
 	// RGB:	PA0(R), PA1(G), PA2(B)
@@ -151,7 +179,9 @@ static inline void fatfs_test()
 int main()
 {
 	init();
+#ifndef BOOTLOADER
 	fatfs_test();
+#endif
 
 	USB_OTG_GlobalTypeDef *base = usb.base;
 	USB_OTG_DeviceTypeDef *dev = DEVICE(base);

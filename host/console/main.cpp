@@ -8,9 +8,24 @@
 #include <dev_defs.h>
 #include "logger.h"
 
+#define TIMEOUT_MS	5000
+
 using namespace std;
 
 std::shared_ptr<spdlog::logger> logger = spdlog::stdout_color_mt("console");
+
+void read_report(hid_device *dev, void *p)
+{
+	int ret = hid_read_timeout(dev, (uint8_t *)p, VENDOR_REPORT_SIZE, TIMEOUT_MS);
+	if (ret == 0)
+		throw runtime_error("Report IN timed out");
+	else if (ret != VENDOR_REPORT_SIZE) {
+		if (ret > 0)
+			throw runtime_error("Incorrect report size: " + ret);
+		else
+			throw runtime_error("Report IN error: " + ret);
+	}
+}
 
 void flash(hid_device *dev, char *file)
 {
@@ -20,7 +35,7 @@ void flash(hid_device *dev, char *file)
 	// Reset flashing buffer
 	report.size = VENDOR_REPORT_BASE_SIZE;
 	report.type = FlashReset;
-	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
+	hid_write(dev, report.raw, report.size);
 	// Write hex file content
 	ifstream ifs(file);
 	string str;
@@ -34,20 +49,47 @@ void flash(hid_device *dev, char *file)
 			int v = stoul(str.substr(i, 2), 0, 16);
 			*p++ = v;
 		}
-		hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
+		hid_write(dev, report.raw, report.size);
 	}
 	// Check hex validity
 	report.size = VENDOR_REPORT_BASE_SIZE;
 	report.type = FlashCheck;
-	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
-	if (hid_read(dev, report.raw, VENDOR_REPORT_SIZE) != VENDOR_REPORT_SIZE)
-		throw runtime_error("Incorrect FlashCheck report size");
+	hid_write(dev, report.raw, report.size);
+	read_report(dev, report.raw);
 	if (!report.payload[0])
 		throw runtime_error("Received invalid HEX content");
 	// Start flashing
 	report.size = VENDOR_REPORT_BASE_SIZE;
 	report.type = FlashStart;
-	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
+	hid_write(dev, report.raw, report.size);
+}
+
+void ping(hid_device *dev)
+{
+	vendor_report_t report;
+	report.id = HID_REPORT_ID;
+	report.size = VENDOR_REPORT_BASE_SIZE;
+	report.type = Ping;
+	hid_write(dev, report.raw, report.size);
+	read_report(dev, report.raw);
+	pong_t *pong = (pong_t *)report.payload;
+	logger->info("Hardware version: {:04x}, software version: {:04x}",
+		     pong->hw_ver, pong->sw_ver);
+	logger->info("Device UID: {:08x}{:08x}{:08x}",
+		     pong->uid[2], pong->uid[1], pong->uid[0]);
+	logger->info("Flash size: {} KiB", pong->fsize);
+}
+
+void reset(hid_device *dev)
+{
+	logger->info("Resetting device...");
+	vendor_report_t report;
+	report.id = HID_REPORT_ID;
+	report.size = VENDOR_REPORT_BASE_SIZE;
+	report.type = FlashReset;
+	hid_write(dev, report.raw, report.size);
+	report.type = FlashStart;
+	hid_write(dev, report.raw, report.size);
 }
 
 void process(hid_device *dev, int argc, char **argv)
@@ -59,6 +101,10 @@ void process(hid_device *dev, int argc, char **argv)
 		if (argv++, !--argc)
 			return;
 		flash(dev, *argv);
+	} else if (strcmp(*argv, "ping") == 0) {
+		ping(dev);
+	} else if (strcmp(*argv, "reset") == 0) {
+		reset(dev);
 	}
 }
 
@@ -70,6 +116,8 @@ int main(int argc, char **argv)
 	if (argc <= 1) {
 		clog << "Usage: " << basename(argv[0]) << " operation [arguments]" << endl << endl;
 		clog << "Available operations:" << endl;
+		clog << "  ping               | Check device signature and version info" << endl;
+		clog << "  reset              | Reset target device" << endl;
 		clog << "  flash program.hex  | Flash program.hex to target devices" << endl;
 		return 1;
 	}

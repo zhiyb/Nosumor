@@ -1,6 +1,11 @@
 import qbs
 
 Module {
+    FileTagger {
+        patterns: "*.ld"
+        fileTags: ["linkerscript"]
+    }
+
     Rule {
         id: hex
         inputs: ["application"]
@@ -9,7 +14,6 @@ Module {
             filePath: input.fileName + ".hex"
         }
 
-        property string objcopyPath: cpp.toolchainPrefix + "objcopy"
         prepare: {
             var args = ["-O", "ihex", input.filePath, output.filePath];
             var cmd = new Command(product.cpp.objcopyPath, args);
@@ -26,7 +30,6 @@ Module {
             filePath: input.fileName + ".bin"
         }
 
-        property string objcopyPath: cpp.toolchainPrefix + "objcopy"
         prepare: {
             var args = ["-O", "binary", input.filePath, output.filePath];
             var cmd = new Command(product.cpp.objcopyPath, args);
