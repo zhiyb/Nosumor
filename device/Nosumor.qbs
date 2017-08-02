@@ -133,7 +133,6 @@ Project {
 
         Group {
             name: "Logic modules"
-            cpp.optimization: "fast"
             files: [
                 "flash.c",
                 "flash.h",

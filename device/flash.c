@@ -32,23 +32,24 @@ static int hex_invalid = 0;
 
 /* Flash access functions */
 
-SECTION(.ram) static inline void flash_wait()
+SECTION(.iram) static inline void flash_wait()
 {
 	__DSB();
 	while (FLASH->SR & FLASH_SR_BSY_Msk);
 }
 
-SECTION(.ram) static inline int flash_unlock()
+SECTION(.iram) static inline int flash_unlock()
 {
 	flash_wait();
 	if (!(FLASH->CR & FLASH_CR_LOCK_Msk))
 		return 1;
 	FLASH->KEYR = 0x45670123;
 	FLASH->KEYR = 0xcdef89ab;
+	flash_wait();
 	return !(FLASH->CR & FLASH_CR_LOCK_Msk);
 }
 
-SECTION(.ram) static void flash_erase(uint32_t addr)
+SECTION(.iram) static void flash_erase(uint32_t addr)
 {
 	// Flash sector start addresses
 	static uint32_t start_addr[] SECTION(.data) = {
@@ -74,7 +75,7 @@ SECTION(.ram) static void flash_erase(uint32_t addr)
 	sector = sec;
 }
 
-SECTION(.ram) static inline void flash_write(uint32_t addr, uint8_t size, uint8_t *data)
+SECTION(.iram) static inline void flash_write(uint32_t addr, uint8_t size, uint8_t *data)
 {
 	// Only AXI interface has write access
 	uint32_t fsize = FLASH_SIZE;
@@ -100,13 +101,15 @@ SECTION(.ram) static inline void flash_write(uint32_t addr, uint8_t size, uint8_
 	}
 }
 
-// Use extern to force gcc place the code in .ram section
-SECTION(.ram) extern void flash_hex()
+// Use extern to force gcc place the code in RAM
+SECTION(.iram) extern void flash_hex()
 {
 	__disable_irq();
 	// Unlock flash
-	if (!flash_unlock())
-		goto failed;
+	if (!flash_unlock()) {
+		dbgbkpt();
+		goto reset;
+	}
 	// Process HEX content
 	union {
 		struct PACKED {
@@ -114,6 +117,7 @@ SECTION(.ram) extern void flash_hex()
 			uint8_t ext[2];
 		};
 		uint32_t u32;
+		uint8_t u8[4];
 	} addr;
 	for (hex_t *hp = hex; hp; hp = hp->next) {
 		switch (hp->ihex.type) {
@@ -128,17 +132,28 @@ SECTION(.ram) extern void flash_hex()
 			addr.ext[0] = hp->ihex.payload[1];
 			break;
 		case ISLAddr:	// Start Linear Address
+			addr.u8[3] = hp->ihex.payload[0];
+			addr.u8[2] = hp->ihex.payload[1];
+			addr.u8[1] = hp->ihex.payload[2];
+			addr.u8[0] = hp->ihex.payload[3];
+			// Set reset vector
+			SCB->VTOR = RAMDTCM_BASE;
+			*(((uint32_t *)RAMDTCM_BASE) + 1u) = addr.u32;
 			break;
 		default:
 			__BKPT(0);
 		}
 	}
-failed:
-	dbgbkpt();
 reset:
 	flash_wait();
 	FLASH->CR = FLASH_CR_LOCK_Msk;
-	NVIC_SystemReset();
+	// gcc may not inline NVIC_SystemReset();
+	__DSB();
+	SCB->AIRCR = (0x5FAUL << SCB_AIRCR_VECTKEY_Pos) |
+			(SCB->AIRCR & SCB_AIRCR_PRIGROUP_Msk) |
+			SCB_AIRCR_SYSRESETREQ_Msk;
+	__DSB();
+	for (;;);
 }
 
 /* Intel HEX format handling functions */

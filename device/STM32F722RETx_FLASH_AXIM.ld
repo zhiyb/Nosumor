@@ -41,8 +41,9 @@ _Min_Stack_Size = 0x1000; /* required amount of stack */
 /* Specify the memory areas */
 MEMORY
 {
-RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 256K
-FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 512K
+	IRAM (xrw)	: ORIGIN = 0x00000000, LENGTH = 16k
+	RAM (xrw)	: ORIGIN = 0x20000000, LENGTH = 256k
+	FLASH (rx)	: ORIGIN = 0x08000000, LENGTH = 512k
 }
 
 /* Define output sections */
@@ -110,6 +111,19 @@ SECTIONS
     PROVIDE_HIDDEN (__fini_array_end = .);
   } >FLASH
 
+  /* Code segments in ITCM RAM */
+  _siiram = LOADADDR(.iram);
+  .iram :
+  {
+    . = ALIGN(4);
+    _siram = .;
+    *(.iram)
+    *(.iram*)
+
+    . = ALIGN(4);
+    _eiram = .;
+  } >IRAM AT >FLASH
+
   /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);
 
@@ -126,7 +140,7 @@ SECTIONS
 
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
-  } >RAM AT> FLASH
+  } >RAM AT >FLASH
 
   
   /* Uninitialized data section */

@@ -79,6 +79,23 @@ defined in linker script */
 Reset_Handler:  
   ldr   sp, =_estack      /* set stack pointer */
 
+/* Copy the data segment initializers from flash to IRAM */
+  movs  r1, #0
+  b  LoopCopyIRAMInit
+
+CopyIRAMInit:
+  ldr  r3, =_siiram
+  ldr  r3, [r3, r1]
+  str  r3, [r0, r1]
+  adds  r1, r1, #4
+
+LoopCopyIRAMInit:
+  ldr  r0, =_siram
+  ldr  r3, =_eiram
+  adds  r2, r0, r1
+  cmp  r2, r3
+  bcc  CopyIRAMInit
+
 /* Copy the data segment initializers from flash to SRAM */  
   movs  r1, #0
   b  LoopCopyDataInit
@@ -95,9 +112,11 @@ LoopCopyDataInit:
   adds  r2, r0, r1
   cmp  r2, r3
   bcc  CopyDataInit
+
+/* Zero fill the bss segment. */
   ldr  r2, =_sbss
   b  LoopFillZerobss
-/* Zero fill the bss segment. */  
+
 FillZerobss:
   movs  r3, #0
   str  r3, [r2], #4
