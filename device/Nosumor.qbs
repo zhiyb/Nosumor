@@ -7,6 +7,12 @@ Project {
     references: ["CMSIS"]
 
     CppApplication {
+        type: ["application", "hex", "size"]
+        Depends {name: "CMSIS"}
+        Depends {name: "gcc-none"}
+
+        property bool itcm: false
+
         cpp.commonCompilerFlags: [
             "-Wno-unused-parameter",
             "-Wno-unused-function",
@@ -14,7 +20,6 @@ Project {
         ]
         cpp.staticLibraries: ["m"]
         cpp.includePaths: ["."]
-        Depends {name: "CMSIS"}
 
         Properties {
             condition: qbs.buildVariant == "debug"
@@ -23,7 +28,9 @@ Project {
 
         Properties {
             condition: qbs.buildVariant == "release"
+            cpp.defines: ["FLASH_USE_ITCM"]
             cpp.optimization: "small"
+            itcm: true
         }
 
         Group {
@@ -97,20 +104,31 @@ Project {
         Group {
             name: "System modules"
             files: [
-                "STM32F722RETx_FLASH.ld",
+                "startup_stm32f722xx.S",
+                "system_stm32f7xx.c",
                 "clocks.c",
                 "clocks.h",
                 "pvd.c",
                 "pvd.h",
-                "startup_stm32f722xx.S",
                 "syscalls.c",
-                "system_stm32f7xx.c",
                 "debug.h",
                 "systick.c",
                 "systick.h",
                 "fio.c",
                 "fio.h",
             ]
+        }
+
+        Group {
+            name: "Linker script for AXI"
+            condition: itcm == false
+            files: "STM32F722RETx_FLASH_AXIM.ld"
+        }
+
+        Group {
+            name: "Linker script for ITCM"
+            condition: itcm == true
+            files: "STM32F722RETx_FLASH_ITCM.ld"
         }
 
         Group {
@@ -138,7 +156,7 @@ Project {
         }
 
         Group {     // Properties for the produced executable
-            fileTagsFilter: product.type
+            fileTagsFilter: ["application", "hex", "bin"]
             qbs.install: true
         }
     }

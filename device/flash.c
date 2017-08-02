@@ -122,16 +122,7 @@ SECTION(.ram) extern void flash_hex()
 			flash_write(addr.u32, hp->ihex.cnt, hp->ihex.payload);
 			break;
 		case IEOF:	// End Of File
-			flash_wait();
-			FLASH->CR = FLASH_CR_LOCK_Msk;
-			NVIC_SystemReset();
-			break;
-		case IESAddr:	// Extended Segment Address
-			dbgbkpt();
-			break;
-		case ISSAddr:	// Start Segment Address
-			dbgbkpt();
-			break;
+			goto reset;
 		case IELAddr:	// Extended Linear Address
 			addr.ext[1] = hp->ihex.payload[0];
 			addr.ext[0] = hp->ihex.payload[1];
@@ -144,6 +135,9 @@ SECTION(.ram) extern void flash_hex()
 	}
 failed:
 	dbgbkpt();
+reset:
+	flash_wait();
+	FLASH->CR = FLASH_CR_LOCK_Msk;
 	NVIC_SystemReset();
 }
 
@@ -180,12 +174,12 @@ static int hex_verify(uint8_t size, ihex_t *ip)
 	case IESAddr:
 		if (ip->cnt != 2u)
 			goto bcerr;
-		dbgbkpt();
+		__BKPT(0);
 		break;
 	case ISSAddr:
 		if (ip->cnt != 4u)
 			goto bcerr;
-		dbgbkpt();
+		__BKPT(0);
 		break;
 	case IELAddr:
 		if (ip->cnt != 2u)
