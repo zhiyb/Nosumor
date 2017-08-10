@@ -131,8 +131,10 @@ int main(int argc, char **argv)
 	int num = 0;
 	hid_device_info *devs = hid_enumerate(USB_VID, USB_PID);
 	for (hid_device_info *info = devs; info; info = info->next) {
+#if defined(WIN32)
 		if (info->usage_page != HID_USAGE_PAGE || info->usage != HID_USAGE)
 			continue;
+#endif
 		auto mf = info->manufacturer_string ?: L"(null)";
 		auto prod = info->product_string ?: L"(null)";
 		auto sn = info->serial_number ?: L"(null)";

@@ -28,24 +28,33 @@ Project {
         cpp.includePaths: ["hidapi/hidapi"]
         cpp.optimization: "fast"
         cpp.commonCompilerFlags: ["-Wno-unused-parameter"]
-        cpp.dynamicLibraries: ["setupapi"]
 
-        files: ["hidapi/hidapi/hidapi.h"]
+        Properties {
+            condition: qbs.targetOS.contains("linux")
+            cpp.dynamicLibraries: ["udev"]
+        }
+
+        Properties {
+            condition: qbs.targetOS.contains("windows")
+            cpp.dynamicLibraries: ["setupapi"]
+        }
 
         Export {
             Depends {name: "cpp"}
             cpp.includePaths: ["hidapi/hidapi"]
         }
 
+        files: ["hidapi/hidapi/hidapi.h"]
+
         Group {
             name: "Linux"
-            condition: qbs.targetOS == "linux"
+            condition: qbs.targetOS.contains("linux")
             files: ["hidapi/linux/hid.c"]
         }
 
         Group {
             name: "Windows"
-            condition: qbs.targetOS == "windows"
+            condition: qbs.targetOS.contains("windows")
             files: ["hidapi/windows/hid.c"]
         }
     }
@@ -57,6 +66,10 @@ Project {
             cpp.cxxLanguageVersion: "c++11"
             cpp.includePaths: ["spdlog/include"]
             cpp.defines: ["SPDLOG_WCHAR_TO_UTF8_SUPPORT"]
+            Properties {
+                condition: qbs.targetOS.contains("linux")
+                cpp.dynamicLibraries: ["pthread"]
+            }
         }
 
         files: ["spdlog/include/**"]

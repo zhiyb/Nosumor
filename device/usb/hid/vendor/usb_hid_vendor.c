@@ -9,7 +9,7 @@ static const uint8_t desc_report[] = {
 	// Vendor defined HID
 	0x06, 0x39, 0xff,	// Usage page (Vendor defined)
 	0x09, 0xff,		// Usage (Vendor usage)
-	0xa1, 0x03,		// Collection (Report)
+	0xa1, 0x01,		// Collection (Application)
 	0x85, 0,		//   Report ID
 	// IN size, type
 	0x75, 8,		//   Report size (8)
@@ -54,10 +54,6 @@ typedef struct data_t {
 
 static void hid_report(hid_t *hid, report_t *report, uint32_t size)
 {
-	if (size != VENDOR_REPORT_SIZE) {
-		dbgbkpt();
-		return;
-	}
 	vendor_report_t *rp = (vendor_report_t *)report;
 	// Push report to hid buffer at the front
 	data_t *dp = malloc(sizeof(data_t) + rp->size);
