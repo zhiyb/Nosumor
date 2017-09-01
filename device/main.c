@@ -19,7 +19,7 @@
 #include "peripheral/audio.h"
 // USB interfaces
 #include "usb/usb.h"
-#include "usb/audio/usb_audio.h"
+#include "usb/audio2/usb_audio2.h"
 #include "usb/hid/usb_hid.h"
 #include "usb/hid/keyboard/usb_hid_keyboard.h"
 #include "usb/hid/vendor/usb_hid_vendor.h"
@@ -93,7 +93,7 @@ static inline void init()
 	while (usb_mode(&usb) != 0);
 	usb_init_device(&usb);
 #if !defined(BOOTLOADER) && defined(DEBUG)
-	usb_audio_init(&usb);
+	usb_audio2_init(&usb);
 #endif
 
 	puts(ESC_CYAN "Initialising USB HID interface...");

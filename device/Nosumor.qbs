@@ -73,6 +73,12 @@ Project {
                 "usb/audio/usb_audio.h",
                 "usb/audio/usb_audio_defs.h",
                 "usb/audio/usb_audio_desc.h",
+                "usb/audio2/usb_audio2.c",
+                "usb/audio2/usb_audio2.h",
+                "usb/audio2/usb_audio2_defs.h",
+                "usb/audio2/usb_audio2_defs_frmts.h",
+                "usb/audio2/usb_audio2_defs_termt.h",
+                "usb/audio2/usb_audio2_desc.h",
             ]
         }
 
