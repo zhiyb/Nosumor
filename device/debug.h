@@ -2,6 +2,7 @@
 #define DEBUG_H
 
 #define dbgexist()	(CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk)
+#define fatal()		do __BKPT(0); while (1)
 
 #ifdef DEBUG
 

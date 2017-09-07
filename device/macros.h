@@ -4,6 +4,7 @@
 #include <stm32f7xx.h>
 
 #define PACKED		__attribute__((packed))
+#define ALIGN(b)	__attribute__((aligned(b)))
 #define ALIGNED		__attribute__((aligned))
 #define SECTION(s)	__attribute__((section(#s)))
 #define STATIC_INLINE	__attribute__((always_inline)) static inline

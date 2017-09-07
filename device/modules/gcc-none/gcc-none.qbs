@@ -47,7 +47,7 @@ Module {
         }
 
         prepare: {
-            var args = [input.filePath];
+            var args = [input.filePath, '-B'];
             var cmd = new Command(product.cpp.objcopyPath.replace("objcopy", "size"), args);
             cmd.silent = true;
             return cmd;

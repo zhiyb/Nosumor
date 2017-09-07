@@ -63,6 +63,8 @@ uint32_t usb_ep0_max_size(USB_OTG_GlobalTypeDef *usb)
 static void epout_init(usb_t *usb, uint32_t n)
 {
 	void *data = usb->epout[n].data ?: malloc(MAX_SIZE);
+	if (!data)
+		fatal();
 	usb->epout[n].data = data;
 	// Clear interrupts
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);

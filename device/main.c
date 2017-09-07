@@ -92,7 +92,7 @@ static inline void init()
 	       usb_mode(&usb) ? "host" : "device");
 	while (usb_mode(&usb) != 0);
 	usb_init_device(&usb);
-#if !defined(BOOTLOADER) && defined(DEBUG)
+#if !defined(BOOTLOADER)
 	usb_audio2_init(&usb);
 #endif
 

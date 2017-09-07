@@ -227,6 +227,8 @@ void flash_hex_data(uint8_t size, void *payload)
 	if (hex_invalid)
 		return;
 	hex_t *hp = malloc(sizeof(hex_t) + ip->cnt);
+	if (!hp)
+		fatal();
 	ip->addr = __REV16(ip->addr);		// Endianness conversion
 	memcpy(&hp->ihex, ip, size - 1u);	// Remove checksum
 	hp->next = 0;

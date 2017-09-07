@@ -1,4 +1,5 @@
 #include <malloc.h>
+#include "../debug.h"
 #include "usb_ram.h"
 #include "usb_structs.h"
 
@@ -35,6 +36,8 @@ void usb_interface_register(usb_t *usb, const usb_if_t *usbif)
 	usb_if_t **p;
 	for (p = &usb->usbif; *p != 0; p = &(*p)->next);
 	*p = (usb_if_t *)malloc(sizeof(usb_if_t));
+	if (!p)
+		fatal();
 	**p = *usbif;
 	(*p)->next = 0;
 }

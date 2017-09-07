@@ -141,7 +141,7 @@ typedef struct PACKED desc_ep_t {
 } desc_ep_t;
 
 static const desc_ep_t desc_ep[] = {
-	{8u, CS_ENDPOINT, EP_GENERAL, 0u, 0u, 1u, 100u},
+	{8u, CS_ENDPOINT, EP_GENERAL, 0u, 0u, 1u, 0u},
 };
 
 // Type I format descriptor
@@ -155,7 +155,7 @@ typedef struct PACKED desc_type_i_t {
 } desc_type_i_t;
 
 static const desc_type_i_t desc_pcm[] = {
-	{6u, CS_INTERFACE, FORMAT_TYPE, FORMAT_TYPE_I, 4u, 16u},
+	{6u, CS_INTERFACE, FORMAT_TYPE, FORMAT_TYPE_I, 4u, 32u},
 };
 
 #endif // USB_AUDIO2_DESC_H

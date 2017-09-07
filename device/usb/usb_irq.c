@@ -125,7 +125,6 @@ void OTG_HS_IRQHandler()
 		bk = 0;
 	}
 	if (i & USB_OTG_GINTSTS_PXFR_INCOMPISOOUT_Msk) {
-		//dbgbkpt();
 		base->GINTSTS = USB_OTG_GINTSTS_PXFR_INCOMPISOOUT_Msk;
 		//putchar((fn & 1) + '0');
 		bk = 0;

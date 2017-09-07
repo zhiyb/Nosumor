@@ -293,6 +293,8 @@ static void usbif_disable(usb_t *usb, void *p)
 data_t *usb_hid_init(usb_t *usb)
 {
 	data_t *data = (data_t *)calloc(1u, sizeof(data_t));
+	if (!data)
+		fatal();
 	usb_if_t usbif = {
 		.data = data,
 		.config = &usbif_config,

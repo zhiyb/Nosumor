@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdint.h>
+#include <string.h>
 #include <malloc.h>
 #include <math.h>
 #include <stm32f7xx.h>
@@ -14,9 +16,13 @@
 #define STREAM1		DMA2_Stream5
 #define STREAM2		DMA1_Stream3
 
+static struct PACKED {
+	uint8_t data[AUDIO_BUFFER_LENGTH][AUDIO_CHANNELS][AUDIO_SAMPLE_SIZE] ALIGN(AUDIO_FRAME_SIZE);
+} buf;
+
 static int i2c_check(I2C_TypeDef *i2c, uint8_t addr);
 static void audio_reset();
-static void audio_test();
+static void audio_config();
 
 void audio_init()
 {
@@ -57,6 +63,8 @@ void audio_init()
 	audio_reset();
 	// Waiting for reset
 	systick_delay(10);
+	// Reset audio buffer
+	memset(buf.data, 0, AUDIO_BUFFER_SIZE);
 
 	// Initialise I2S GPIO
 	// I2S1 (slave transmit): WS(PA4), DIN(PA7), CK(PB3)
@@ -103,14 +111,20 @@ void audio_init()
 	RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN_Msk;
 	// Disable stream
 	STREAM1->CR = 0ul;
-	// Memory to peripheral, circular, 16bit -> 16bit, very high priority
+	// Memory to peripheral, circular, 32bit -> 16bit, very high priority
 	STREAM1->CR = (3ul << DMA_SxCR_CHSEL_Pos) | (0b11ul << DMA_SxCR_PL_Pos) |
-			(0b10ul << DMA_SxCR_MSIZE_Pos) | (0b01ul << DMA_SxCR_PSIZE_Pos) |
+			(0b11ul << DMA_SxCR_MSIZE_Pos) | (0b01ul << DMA_SxCR_PSIZE_Pos) |
 			(0b01ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk | DMA_SxCR_CIRC_Msk;
 	// Peripheral address
 	STREAM1->PAR = (uint32_t)&SPI1->DR;
 	// FIFO control
 	STREAM1->FCR = DMA_SxFCR_DMDIS_Msk;
+	// Memory address
+	STREAM1->M0AR = (uint32_t)buf.data;
+	// Number of data items
+	STREAM1->NDTR = AUDIO_BUFFER_SIZE >> 1ul;
+	// Enable DMA stream
+	STREAM1->CR |= DMA_SxCR_EN_Msk;
 
 	// DMA1: Channel 0: Stream 3 (SPI2_RX)
 	RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN_Msk;
@@ -125,7 +139,7 @@ void audio_init()
 	GPIO_PUPDR(GPIOC, 4, GPIO_PUPDR_UP);
 
 	// Tests
-	audio_test();
+	audio_config();
 }
 
 static int i2c_check(I2C_TypeDef *i2c, uint8_t addr)
@@ -190,7 +204,7 @@ static void audio_reset()
 	i2c_write_reg(I2C, I2C_ADDR, 0x01, 1u);
 }
 
-static void audio_test()
+static void audio_config()
 {
 	static const uint8_t data[] = {
 		0x00, 0x00,		// Page 0
@@ -219,8 +233,8 @@ static void audio_test()
 		0x3d, 16,		// ADC using PRB_R16
 		0x3f, 0xd4,		// DAC on, data path settings
 		0x40, 0x00,		// DAC not muted, independent volume
-		0x41, 0xd0,		// DAC left volume = -24dB
-		0x42, 0xd0,		// DAC right volume = -24dB
+		0x41, 0x00,		// DAC left volume = 0dB
+		0x42, 0x00,		// DAC right volume = 0dB
 		0x43, 0x80,		// Headset detection enabled
 		0x44, 0x0f,		// DRC disabled
 		0x47, 0x00,		// Left beep disabled
@@ -253,72 +267,43 @@ static void audio_test()
 		0x31, 0x40,		// CM selected for MIC PGA
 	}, *p = data;
 
-#if 0
-	// sin(x) lookup table
-	int32_t lut[2048];
-	for (uint32_t i = 0; i != 2048; i++) {
-		int32_t d = lround(sin(2.0f * M_PI * i / 2048.0) * 0x30000000l);
-		//lut[i] = (d >> 16u) | (d << 16u);
-		lut[i] = d;
-	}
-
-	// Allocate buffer for audio waveform
-	int32_t * const buf = malloc(4ul * 2ul * 2048ul), *ptr = buf;
-	if (!buf) {
-		dbgbkpt();
-		return;
-	}
-
-	// Fill audio buffer with sine wave
-	const uint32_t skip[2] = {8ul, 4ul};
-	int32_t *lp[2] = {lut, lut};
-	for (uint32_t i = 0; i != 2048; i++) {
-		*ptr++ = *lp[0];
-		lp[0] += skip[0];
-		if (lp[0] - lut >= 2048)
-			lp[0] -= 2048;
-
-		*ptr++ = *lp[1];
-		lp[1] += skip[1];
-		if (lp[1] - lut >= 2048)
-			lp[1] -= 2048;
-	}
-	dbgbkpt();
-
-	// Setup transmit DMA
-	// Memory address
-	STREAM1->M0AR = (uint32_t)buf;
-	// Number of data items
-	STREAM1->NDTR = 2ul * 2ul * 2048ul;
-	// Enable DMA stream
-	STREAM1->CR |= DMA_SxCR_EN_Msk;
-#endif
-
 	// Write configration sequence
 	for (uint32_t i = 0; i != sizeof(data) / sizeof(data[0]) / 2; i++) {
 		i2c_write(I2C, I2C_ADDR, p, 2);
 		p += 2;
 	}
-
-#if 0
-	// Read back status
-	systick_delay(1000);
-	audio_page(I2C, 0);
-	static const uint8_t regs[] = {0x05, 0x06, 0x07, 0x08, 0x0b, 0x0c,
-				       0x0d, 0x0e, 0x12, 0x13, 0x14,
-				       0x24, 0x25, 0x26, 0x27, 0x2c, 0x2e, 0x43,};
-	for (uint32_t i = 0; i != sizeof(regs) / sizeof(regs[0]); i++)
-		printf("reg 0x%02x: 0x%02x\n", regs[i], (uint8_t)i2c_read_reg(I2C1, I2C_ADDR, regs[i]));
-#endif
 }
 
 void audio_out_enable(int enable)
 {
 	if (enable) {
+		audio_page(I2C, 0);
 		// DAC not muted, independent volume
 		i2c_write_reg(I2C, I2C_ADDR, 0x40, 0x00);
+		dbgprintf(ESC_BLUE "Audio unmuted\n");
 	} else {
+		audio_page(I2C, 0);
 		// DAC muted
 		i2c_write_reg(I2C, I2C_ADDR, 0x40, 0x0c);
+		dbgprintf(ESC_BLUE "Audio muted\n");
+	}
+}
+
+static uint32_t *next_frame()
+{
+	uint32_t mem = (AUDIO_BUFFER_SIZE) - (STREAM1->NDTR << 1u) + (AUDIO_FRAME_SIZE << 1u);
+	mem &= ~(AUDIO_FRAME_SIZE - 1ul) & (AUDIO_BUFFER_SIZE - 1ul);
+	return (uint32_t *)((void *)buf.data + mem);
+}
+
+void audio_play(void *p, uint32_t size)
+{
+	uint32_t *mem = next_frame(), *ptr = (uint32_t *)p;
+	size >>= 2u;
+	while (size--) {
+		*mem++ = ((*ptr) << 16ul) | ((*ptr) >> 16ul);
+		ptr++;
+		if ((void *)mem == (void *)buf.data + AUDIO_BUFFER_SIZE)
+			mem = (void *)buf.data;
 	}
 }

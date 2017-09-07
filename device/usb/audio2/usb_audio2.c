@@ -10,8 +10,8 @@
 #include "usb_audio2.h"
 #include "usb_audio2_desc.h"
 
-#define EPOUT_MAX_SIZE	1024u
-#define CHANNELS	(1u + 2u)
+#define EPOUT_MAX_SIZE	(AUDIO_BUFFER_SIZE >> 1ul)
+#define CHANNELS	(1u + AUDIO_CHANNELS)
 
 // Parameter block layout types
 typedef uint8_t layout1_cur_t;
@@ -52,7 +52,6 @@ typedef struct {
 			uint8_t raw[16];
 		};
 	} buf;
-	uint8_t ac[1], as[1];
 	int ep_out;
 } data_t;
 
@@ -73,7 +72,7 @@ static void epout_recv(usb_t *usb, uint32_t n)
 	ep->DOEPTSIZ = (1u << USB_OTG_DOEPTSIZ_PKTCNT_Pos) | EPOUT_MAX_SIZE;
 	// Check frame parity
 	uint32_t fn = FIELD(dev->DSTS, USB_OTG_DSTS_FNSOF);
-	fn = (fn & 1) ? USB_OTG_DOEPCTL_SD0PID_SEVNFRM_Msk : USB_OTG_DOEPCTL_SODDFRM;
+	fn = (fn & 1) ? USB_OTG_DOEPCTL_SD0PID_SEVNFRM_Msk : USB_OTG_DOEPCTL_SODDFRM_Msk;
 	// Enable endpoint
 	DOEPCTL_SET(ep->DOEPCTL, fn | USB_OTG_DOEPCTL_EPENA | USB_OTG_DOEPCTL_CNAK);
 }
@@ -95,38 +94,35 @@ static void epout_halt(usb_t *usb, uint32_t n, int halt)
 {
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 	uint32_t ctl = ep->DOEPCTL;
+	audio_out_enable(!halt);
 	if (!(ctl & USB_OTG_DOEPCTL_EPENA_Msk) != !halt)
 		return;
 	if (halt) {
 		DOEPCTL_SET(ep->DOEPCTL, USB_OTG_DOEPCTL_EPDIS);
 		//while (ep->DOEPCTL & USB_OTG_DOEPCTL_EPENA_Msk);
-		dbgprintf(ESC_BLUE "USB Audio out disabled\n");
 	} else {
 		epout_recv(usb, n);
-		dbgprintf(ESC_BLUE "USB Audio out enabled\n");
 	}
 }
 
 static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 {
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
+	epdata_t *epdata = usb->epout[n].data;
 	uint32_t siz = ep->DOEPTSIZ;
 	epout_recv(usb, n);
 	uint32_t pktcnt = 1u - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
 	uint32_t size = EPOUT_MAX_SIZE - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
 	//dbgprintf(ESC_BLUE "<X|%lx|%lx>", pktcnt, size);
-	dbgprintf(".");
+	if (pktcnt) {
+		audio_play(epdata->data[epdata->swap], size);
+	}
 }
 
 static inline uint16_t layout_cur_get(data_t *data, int type, void *p)
 {
 	const unsigned int msize = 1u << (type - 1u);
 	memcpy(data->buf.raw, p, msize);
-#if 0
-	uint32_t v = 0;
-	memcpy(&v, p, msize);
-	dbgprintf("%lx|", v);
-#endif
 	return msize;
 }
 
@@ -145,16 +141,6 @@ static inline uint16_t layout_range_get(data_t *data, int type, void *p, uint16_
 	const uint16_t size = 3u * msize * cnt;
 	data->buf.wNumSubRanges = cnt;
 	memcpy(data->buf.range, p, size);
-#if 0
-	while (cnt--) {
-		for (int i = 0; i != 3; i++) {
-			uint32_t v = 0;
-			memcpy(&v, p, msize);
-			dbgprintf("%lx|", v);
-			p += msize;
-		}
-	}
-#endif
 	return 2u + size;
 }
 
@@ -341,7 +327,7 @@ static void usbif_ac_config(usb_t *usb, void *pdata)
 	usb_desc_add_interface_association(usb, 2u, AUDIO_FUNCTION,
 					   FUNCTION_SUBCLASS_UNDEFINED, AF_VERSION_02_00, s);
 	// Audio control interface
-	data->ac[0] = usb_desc_add_interface(usb, 0u, 0u, AUDIO, AUDIOCONTROL, IP_VERSION_02_00, 0u);
+	usb_desc_add_interface(usb, 0u, 0u, AUDIO, AUDIOCONTROL, IP_VERSION_02_00, 0u);
 	usb_desc_add(usb, &desc_ac, desc_ac.bLength);
 	// Clock sources
 	const desc_csd_t *pcs = desc_csd;
@@ -394,8 +380,13 @@ static void usbif_as_config(usb_t *usb, void *pdata)
 {
 	data_t *data = (data_t *)pdata;
 	epdata_t *epdata = calloc(1u, sizeof(epdata_t));
-	epdata->data[0] = malloc(sizeof(EPOUT_MAX_SIZE));
-	epdata->data[1] = malloc(sizeof(EPOUT_MAX_SIZE));
+	if (!epdata)
+		fatal();
+	epdata->data[0] = malloc(EPOUT_MAX_SIZE);
+	epdata->data[1] = malloc(EPOUT_MAX_SIZE);
+	if (!epdata->data[0] || !epdata->data[1])
+		fatal();
+
 	// Register endpoints
 	const epout_t epout = {
 		.data = epdata,
@@ -408,7 +399,7 @@ static void usbif_as_config(usb_t *usb, void *pdata)
 	// Audio streaming interface
 
 	// Alternate setting 0, zero-bandwidth
-	data->as[0] = usb_desc_add_interface(usb, 0u, 0u, AUDIO, AUDIOSTREAMING, IP_VERSION_02_00, 0u);
+	usb_desc_add_interface(usb, 0u, 0u, AUDIO, AUDIOSTREAMING, IP_VERSION_02_00, 0u);
 
 	// Alternate setting 1, operational
 	usb_desc_add_interface(usb, 1u, 1u, AUDIO, AUDIOSTREAMING, IP_VERSION_02_00, 0u);
@@ -420,8 +411,6 @@ static void usbif_as_config(usb_t *usb, void *pdata)
 			      EP_ISOCHRONOUS | EP_ISO_SYNC | EP_ISO_DATA,
 			      EPOUT_MAX_SIZE, 1u);
 	usb_desc_add(usb, &desc_ep[0], desc_ep[0].bLength);
-
-	// Interface association descriptor
 }
 
 static void usbif_as_enable(usb_t *usb, void *data)
@@ -445,12 +434,10 @@ static void usbif_as_setup_std(usb_t *usb, void *pdata, uint32_t ep, setup_t pkt
 		case SET_INTERFACE:
 			switch (pkt.wValue) {
 			case 0:
-				audio_out_enable(0);
 				epout_halt(usb, data->ep_out, 1);
 				usb_ep_in_transfer(usb->base, ep, 0, 0);
 				break;
 			case 1:
-				audio_out_enable(1);
 				epout_halt(usb, data->ep_out, 0);
 				usb_ep_in_transfer(usb->base, ep, 0, 0);
 				break;
@@ -458,6 +445,7 @@ static void usbif_as_setup_std(usb_t *usb, void *pdata, uint32_t ep, setup_t pkt
 				usb_ep_in_stall(usb->base, ep);
 				dbgbkpt();
 			}
+			dbgprintf(ESC_BLUE "USB Audio setting %x\n", pkt.wValue);
 			break;
 		default:
 			usb_ep_in_stall(usb->base, ep);
@@ -474,9 +462,11 @@ static void usbif_as_setup_std(usb_t *usb, void *pdata, uint32_t ep, setup_t pkt
 void usb_audio2_init(usb_t *usb)
 {
 	data_t *data = calloc(1u, sizeof(data_t));
-	data->cs.freq[0] = 44100;
-	data->cs.range[0].min = 44100;
-	data->cs.range[0].max = 44100;
+	if (!data)
+		fatal();
+	data->cs.freq[0] = 192000;
+	data->cs.range[0].min = 192000;
+	data->cs.range[0].max = 192000;
 	data->cs.range[0].res = 0;
 	for (int i = 0; i != CHANNELS; i++) {
 		data->fu.mute[i] = 0x00;

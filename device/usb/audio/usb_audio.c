@@ -286,6 +286,8 @@ static void usbif_as_config(usb_t *usb, void *data)
 		.halt = &epout_halt,
 		.xfr_cplt = &epout_xfr_cplt,
 	};
+	if (!epout.data)
+		fatal();
 	usb_ep_register(usb, 0, 0, &epout, &p->ep_out);
 
 	// Audio streaming interface
