@@ -35,7 +35,7 @@ void flash(hid_device *dev, char *file)
 	// Reset flashing buffer
 	report.size = VENDOR_REPORT_BASE_SIZE;
 	report.type = FlashReset;
-	hid_write(dev, report.raw, report.size);
+	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
 	// Write hex file content
 	ifstream ifs(file);
 	string str;
@@ -49,19 +49,19 @@ void flash(hid_device *dev, char *file)
 			int v = stoul(str.substr(i, 2), 0, 16);
 			*p++ = v;
 		}
-		hid_write(dev, report.raw, report.size);
+		hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
 	}
 	// Check hex validity
 	report.size = VENDOR_REPORT_BASE_SIZE;
 	report.type = FlashCheck;
-	hid_write(dev, report.raw, report.size);
+	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
 	read_report(dev, report.raw);
 	if (!report.payload[0])
 		throw runtime_error("Received invalid HEX content");
 	// Start flashing
 	report.size = VENDOR_REPORT_BASE_SIZE;
 	report.type = FlashStart;
-	hid_write(dev, report.raw, report.size);
+	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
 }
 
 void ping(hid_device *dev)
@@ -70,7 +70,7 @@ void ping(hid_device *dev)
 	report.id = HID_REPORT_ID;
 	report.size = VENDOR_REPORT_BASE_SIZE;
 	report.type = Ping;
-	hid_write(dev, report.raw, report.size);
+	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
 	read_report(dev, report.raw);
 	pong_t *pong = (pong_t *)report.payload;
 	logger->info("Hardware version: {:04x}, software version: {:04x}",
@@ -87,9 +87,9 @@ void reset(hid_device *dev)
 	report.id = HID_REPORT_ID;
 	report.size = VENDOR_REPORT_BASE_SIZE;
 	report.type = FlashReset;
-	hid_write(dev, report.raw, report.size);
+	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
 	report.type = FlashStart;
-	hid_write(dev, report.raw, report.size);
+	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
 }
 
 void process(hid_device *dev, int argc, char **argv)
