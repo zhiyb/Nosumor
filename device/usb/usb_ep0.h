@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 #include <stm32f7xx.h>
-#include "usb.h"
+
+typedef struct usb_t usb_t;
 
 void usb_ep0_register(usb_t *usb);
 void usb_ep0_init(usb_t *usb);

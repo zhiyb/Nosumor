@@ -184,7 +184,7 @@ int main()
 #endif
 
 	USB_OTG_GlobalTypeDef *base = usb.base;
-	USB_OTG_DeviceTypeDef *dev = DEVICE(base);
+	USB_OTG_DeviceTypeDef *dev = DEV(base);
 	USB_OTG_INEndpointTypeDef *epi0 = EP_IN(base, 0);
 	USB_OTG_OUTEndpointTypeDef *epo0 = EP_OUT(base, 0);
 	USB_OTG_OUTEndpointTypeDef *epo1 = EP_OUT(base, 1);

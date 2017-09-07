@@ -1,13 +1,10 @@
-#include <stdio.h>
 #include <stm32f7xx.h>
-#include "usb_debug.h"
+#include "../debug.h"
 #include "usb_macros.h"
 #include "usb_ep.h"
 #include "usb_ep0.h"
 #include "usb_ram.h"
-#include "usb_setup.h"
-#include "usb_desc.h"
-#include "usb.h"
+#include "usb_structs.h"
 
 usb_t *usb_hs = 0;
 
@@ -21,7 +18,7 @@ void usb_hs_irq_init(usb_t *usb)
 
 static void usb_reset(usb_t *usb)
 {
-	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
+	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
 	// Reset USB device address
 	dev->DCFG &= ~USB_OTG_DCFG_DAD_Msk;
 	dev->DAINTMSK = 0;
@@ -54,7 +51,7 @@ void usb_disable(usb_t *usb)
 static inline void usb_endpoint_irq(usb_t *usb)
 {
 	USB_OTG_GlobalTypeDef *base = usb->base;
-	USB_OTG_DeviceTypeDef *dev = DEVICE(base);
+	USB_OTG_DeviceTypeDef *dev = DEV(base);
 	uint32_t daint = dev->DAINT;
 	uint32_t mask = daint >> 16;
 	for (uint32_t n = 0u; n != USB_EPOUT_CNT; n++, mask >>= 1u) {
@@ -98,7 +95,7 @@ void OTG_HS_IRQHandler()
 {
 	usb_t *usb = usb_hs;
 	USB_OTG_GlobalTypeDef *base = usb->base;
-	USB_OTG_DeviceTypeDef *dev = DEVICE(base);
+	USB_OTG_DeviceTypeDef *dev = DEV(base);
 	uint32_t i = base->GINTSTS, bk = 1, fn = FIELD(dev->DSTS, USB_OTG_DSTS_FNSOF);
 	i &= base->GINTMSK;
 	if (!i)
@@ -130,7 +127,7 @@ void OTG_HS_IRQHandler()
 	if (i & USB_OTG_GINTSTS_PXFR_INCOMPISOOUT_Msk) {
 		//dbgbkpt();
 		base->GINTSTS = USB_OTG_GINTSTS_PXFR_INCOMPISOOUT_Msk;
-		putchar((fn & 1) + '0');
+		//putchar((fn & 1) + '0');
 		bk = 0;
 	}
 	if (bk)

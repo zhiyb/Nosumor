@@ -3,10 +3,11 @@
 #include "../macros.h"
 #include "../systick.h"
 #include "../irq.h"
-#include "usb_debug.h"
+#include "../debug.h"
 #include "usb_macros.h"
 #include "usb_irq.h"
 #include "usb_ep0.h"
+#include "usb_structs.h"
 #include "usb.h"
 
 static inline void usb_hs_init_gpio();
@@ -135,13 +136,16 @@ int usb_mode(usb_t *usb)
 void usb_init_device(usb_t *usb)
 {
 	USB_OTG_GlobalTypeDef *base = usb->base;
-	USB_OTG_DeviceTypeDef *dev = DEVICE(base);
+	USB_OTG_DeviceTypeDef *dev = DEV(base);
 	// Disconnect USB
 	usb_connect(usb, 0);
 	usb_ep0_register(usb);
 	// Enable transceiver delay
 	dev->DCFG = (0b10 << USB_OTG_DCFG_PERSCHIVL_Pos) | (1ul << 14u) |
 			USB_OTG_DCFG_NZLSOHSK_Msk;
+	// DMA threshold
+	dev->DTHRCTL = (32u << USB_OTG_DTHRCTL_RXTHRLEN_Pos) | (32u << USB_OTG_DTHRCTL_TXTHRLEN_Pos) |
+			USB_OTG_DTHRCTL_RXTHREN_Msk | USB_OTG_DTHRCTL_ISOTHREN_Msk | USB_OTG_DTHRCTL_NONISOTHREN_Msk;
 	dev->DOEPMSK = USB_OTG_DOEPMSK_XFRCM_Msk | USB_OTG_DOEPMSK_STUPM_Msk;
 	dev->DIEPMSK = USB_OTG_DIEPMSK_XFRCM_Msk | USB_OTG_DIEPMSK_TOM_Msk;
 	base->GINTMSK |= USB_OTG_GINTMSK_USBRST_Msk | USB_OTG_GINTMSK_USBSUSPM_Msk |
@@ -151,7 +155,7 @@ void usb_init_device(usb_t *usb)
 
 void usb_connect(usb_t *usb, int e)
 {
-	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
+	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
 	if (!e)	{
 		// Disconnect device
 		dev->DCTL = USB_OTG_DCTL_SDIS_Msk;

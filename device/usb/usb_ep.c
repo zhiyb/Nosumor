@@ -1,9 +1,7 @@
-#include "../escape.h"
-#include "usb_debug.h"
 #include "usb_ep.h"
 #include "usb_ep0.h"
-#include "usb_setup.h"
 #include "usb_macros.h"
+#include "usb_structs.h"
 
 void usb_ep_register(usb_t *usb, const epin_t *epin, int *in, const epout_t *epout, int *out)
 {

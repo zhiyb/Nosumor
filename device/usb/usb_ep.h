@@ -3,7 +3,11 @@
 
 #include <stm32f7xx.h>
 #include <stdint.h>
-#include "usb.h"
+#include "usb_desc.h"
+
+typedef struct usb_t usb_t;
+typedef struct epin_t epin_t;
+typedef struct epout_t epout_t;
 
 void usb_ep_register(usb_t *usb, const epin_t *epin, int *in, const epout_t *epout, int *out);
 

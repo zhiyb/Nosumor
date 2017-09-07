@@ -7,9 +7,9 @@
 extern "C" {
 #endif
 
-struct usb_t;
+typedef struct usb_t usb_t;
 
-void usb_audio_init(struct usb_t *usb);
+void usb_audio_init(usb_t *usb);
 
 #ifdef __cplusplus
 }

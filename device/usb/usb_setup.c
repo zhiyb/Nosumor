@@ -1,46 +1,39 @@
-#include "usb_debug.h"
+#include "../debug.h"
 #include "usb_setup.h"
 #include "usb_ep.h"
 #include "usb_macros.h"
-#include "usb_desc.h"
-#include "usb_ram.h"
-#include "usb.h"
+#include "usb_structs.h"
 
-static void usb_get_descriptor(usb_t *usb, uint32_t ep, setup_t pkt)
-{
-	desc_t desc;
-	switch (pkt.bType) {
-	case SETUP_DESC_TYPE_DEVICE:
-		desc = usb_desc_device(usb);
-		break;
-	case SETUP_DESC_TYPE_CONFIGURATION:
-		desc = usb_desc_config(usb);
-		break;
-	case SETUP_DESC_TYPE_DEVICE_QUALIFIER:
-		desc = usb_desc_device_qualifier(usb);
-		break;
-	case SETUP_DESC_TYPE_STRING:
-		desc = usb_desc_string(usb, pkt.bIndex, pkt.wIndex);
-		break;
-	default:
-		dbgprintf(ESC_MAGENTA "<D%x>", pkt.bType);
-		usb_ep_in_stall(usb->base, ep);
-		//dbgbkpt();
-		return;
-	}
-	desc.size = desc.size > pkt.wLength ? pkt.wLength : desc.size;
-	usb_ep_in_descriptor(usb->base, ep, desc);
-}
+#define TYPE_Pos	5u
+#define TYPE_Msk	(3ul << TYPE_Pos)
+#define TYPE_STD	(0ul << TYPE_Pos)
+#define TYPE_CLASS	(1ul << TYPE_Pos)
+#define TYPE_VENDOR	(2ul << TYPE_Pos)
+
+#define RCPT_Pos	0u
+#define RCPT_Msk	(0x1ful << RCPT_Pos)
+#define RCPT_DEVICE	(0ul << RCPT_Pos)
+#define RCPT_INTERFACE	(1ul << RCPT_Pos)
+#define RCPT_ENDPOINT	(2ul << RCPT_Pos)
+#define RCPT_OTHER	(3ul << RCPT_Pos)
 
 static void usb_setup_standard_device(usb_t *usb, uint32_t ep, setup_t pkt)
 {
-	switch (pkt.bmRequestType & SETUP_TYPE_DIR_Msk) {
-	case SETUP_TYPE_DIR_D2H:
+	switch (pkt.bmRequestType & DIR_Msk) {
+	case DIR_D2H:
 		switch (pkt.bRequest) {
-		case SETUP_REQ_GET_DESCRIPTOR:
-			usb_get_descriptor(usb, ep, pkt);
+		case GET_DESCRIPTOR: {
+			desc_t desc = usb_get_descriptor(usb, pkt);
+			if (desc.size != 0) {
+				desc.size = desc.size > pkt.wLength ? pkt.wLength : desc.size;
+				usb_ep_in_descriptor(usb->base, ep, desc);
+			} else {
+				dbgprintf(ESC_MAGENTA "<D%x>", pkt.bType);
+				usb_ep_in_stall(usb->base, ep);
+			}
 			break;
-		case SETUP_REQ_GET_STATUS:
+		}
+		case GET_STATUS:
 			if (pkt.wValue != 0 || pkt.wIndex != 0 || pkt.wLength != 2) {
 				usb_ep_in_stall(usb->base, ep);
 				dbgbkpt();
@@ -53,15 +46,15 @@ static void usb_setup_standard_device(usb_t *usb, uint32_t ep, setup_t pkt)
 			dbgbkpt();
 		}
 		break;
-	case SETUP_TYPE_DIR_H2D:
+	case DIR_H2D:
 		switch (pkt.bRequest) {
-		case SETUP_REQ_SET_ADDRESS:
+		case SET_ADDRESS:
 			//usb->addr = pkt.wValue;
-			DEVICE(usb->base)->DCFG = (DEVICE(usb->base)->DCFG & ~USB_OTG_DCFG_DAD_Msk) |
+			DEV(usb->base)->DCFG = (DEV(usb->base)->DCFG & ~USB_OTG_DCFG_DAD_Msk) |
 					((pkt.wValue << USB_OTG_DCFG_DAD_Pos) & USB_OTG_DCFG_DAD_Msk);
 			usb_ep_in_transfer(usb->base, ep, 0, 0);
 			break;
-		case SETUP_REQ_SET_CONFIGURATION:
+		case SET_CONFIGURATION:
 			if (pkt.wValue == 1) {
 				usb_ep_in_transfer(usb->base, ep, 0, 0);
 				for (usb_if_t **ip = &usb->usbif; *ip != 0; ip = &(*ip)->next)
@@ -121,12 +114,12 @@ static int usb_setup_endpoint_halt(usb_t *usb, uint32_t ep, int halt)
 
 static void usb_setup_standard_endpoint(usb_t *usb, uint32_t ep, setup_t pkt)
 {
-	switch (pkt.bmRequestType & SETUP_TYPE_DIR_Msk) {
-	case SETUP_TYPE_DIR_H2D:
+	switch (pkt.bmRequestType & DIR_Msk) {
+	case DIR_H2D:
 		switch (pkt.bRequest) {
-		case SETUP_REQ_CLEAR_FEATURE:
+		case CLEAR_FEATURE:
 			switch (pkt.wValue) {
-			case SETUP_FEATURE_ENDPOINT_HALT:
+			case FEATURE_ENDPOINT_HALT:
 				if (usb_setup_endpoint_halt(usb, pkt.wIndex, 0))
 					usb_ep_in_transfer(usb->base, ep, 0, 0);
 				else
@@ -163,16 +156,16 @@ static void usb_setup_class_interface(usb_t *usb, uint32_t ep, setup_t pkt)
 void usb_setup(usb_t *usb, uint32_t n, setup_t pkt)
 {
 	// Process setup packet
-	switch (pkt.bmRequestType & SETUP_TYPE_TYPE_Msk) {
-	case SETUP_TYPE_TYPE_STD:
-		switch (pkt.bmRequestType & SETUP_TYPE_RCPT_Msk) {
-		case SETUP_TYPE_RCPT_DEVICE:
+	switch (pkt.bmRequestType & TYPE_Msk) {
+	case TYPE_STD:
+		switch (pkt.bmRequestType & RCPT_Msk) {
+		case RCPT_DEVICE:
 			usb_setup_standard_device(usb, n, pkt);
 			break;
-		case SETUP_TYPE_RCPT_INTERFACE:
+		case RCPT_INTERFACE:
 			usb_setup_standard_interface(usb, n, pkt);
 			break;
-		case SETUP_TYPE_RCPT_ENDPOINT:
+		case RCPT_ENDPOINT:
 			usb_setup_standard_endpoint(usb, n, pkt);
 			break;
 		default:
@@ -180,9 +173,9 @@ void usb_setup(usb_t *usb, uint32_t n, setup_t pkt)
 			dbgbkpt();
 		}
 		break;
-	case SETUP_TYPE_TYPE_CLASS:
-		switch (pkt.bmRequestType & SETUP_TYPE_RCPT_Msk) {
-		case SETUP_TYPE_RCPT_INTERFACE:
+	case TYPE_CLASS:
+		switch (pkt.bmRequestType & RCPT_Msk) {
+		case RCPT_INTERFACE:
 			usb_setup_class_interface(usb, n, pkt);
 			break;
 		default:

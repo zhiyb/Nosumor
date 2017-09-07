@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <macros.h>
 #include "../usb.h"
+#include "../usb_structs.h"
 
 #ifdef __cplusplus
 extern "C" {

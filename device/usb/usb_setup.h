@@ -2,51 +2,64 @@
 #define USB_SETUP_H
 
 #include <stm32f7xx.h>
-#include "usb.h"
+#include "../macros.h"
 
-#define SETUP_TYPE_DIR_Pos	7u
-#define SETUP_TYPE_DIR_Msk	(1ul << SETUP_TYPE_DIR_Pos)
-#define SETUP_TYPE_DIR_H2D	(0ul << SETUP_TYPE_DIR_Pos)
-#define SETUP_TYPE_DIR_D2H	(1ul << SETUP_TYPE_DIR_Pos)
+#define DIR_Pos	7u
+#define DIR_Msk	(1ul << DIR_Pos)
+#define DIR_H2D	(0ul << DIR_Pos)
+#define DIR_D2H	(1ul << DIR_Pos)
 
-#define SETUP_TYPE_TYPE_Pos	5u
-#define SETUP_TYPE_TYPE_Msk	(3ul << SETUP_TYPE_TYPE_Pos)
-#define SETUP_TYPE_TYPE_STD	(0ul << SETUP_TYPE_TYPE_Pos)
-#define SETUP_TYPE_TYPE_CLASS	(1ul << SETUP_TYPE_TYPE_Pos)
-#define SETUP_TYPE_TYPE_VENDOR	(2ul << SETUP_TYPE_TYPE_Pos)
+#define GET_STATUS		0u
+#define CLEAR_FEATURE		1u
+#define SET_FEATURE		3u
+#define SET_ADDRESS		5u
+#define GET_DESCRIPTOR		6u
+#define SET_DESCRIPTOR		7u
+#define GET_CONFIGURATION	8u
+#define SET_CONFIGURATION	9u
+#define GET_INTERFACE		10u
+#define SET_INTERFACE		11u
+#define SYNCH_FRAME		12u
 
-#define SETUP_TYPE_RCPT_Pos	0u
-#define SETUP_TYPE_RCPT_Msk	(0x1ful << SETUP_TYPE_RCPT_Pos)
-#define SETUP_TYPE_RCPT_DEVICE	(0ul << SETUP_TYPE_RCPT_Pos)
-#define SETUP_TYPE_RCPT_INTERFACE	(1ul << SETUP_TYPE_RCPT_Pos)
-#define SETUP_TYPE_RCPT_ENDPOINT	(2ul << SETUP_TYPE_RCPT_Pos)
-#define SETUP_TYPE_RCPT_OTHER	(3ul << SETUP_TYPE_RCPT_Pos)
+#define FEATURE_ENDPOINT_HALT		0u
+#define FEATURE_DEVICE_REMOTE_WAKEUP	1u
+#define FEATURE_TEST_MODE		2u
 
-#define SETUP_REQ_GET_STATUS		0u
-#define SETUP_REQ_CLEAR_FEATURE		1u
-#define SETUP_REQ_SET_FEATURE		3u
-#define SETUP_REQ_SET_ADDRESS		5u
-#define SETUP_REQ_GET_DESCRIPTOR	6u
-#define SETUP_REQ_SET_DESCRIPTOR	7u
-#define SETUP_REQ_GET_CONFIGURATION	8u
-#define SETUP_REQ_SET_CONFIGURATION	9u
-#define SETUP_REQ_GET_INTERFACE		10u
-#define SETUP_REQ_SET_INTERFACE		11u
-#define SETUP_REQ_SYNCH_FRAME		12u
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#define SETUP_DESC_TYPE_DEVICE		1u
-#define SETUP_DESC_TYPE_CONFIGURATION	2u
-#define SETUP_DESC_TYPE_STRING		3u
-#define SETUP_DESC_TYPE_INTERFACE	4u
-#define SETUP_DESC_TYPE_ENDPOINT	5u
-#define SETUP_DESC_TYPE_DEVICE_QUALIFIER		6u
-#define SETUP_DESC_TYPE_OTHER_SPEED_CONFIGURATION	7u
-#define SETUP_DESC_TYPE_INTERFACE_POWER	8u
+typedef struct usb_t usb_t;
 
-#define SETUP_FEATURE_ENDPOINT_HALT		0u
-#define SETUP_FEATURE_DEVICE_REMOTE_WAKEUP	1u
-#define SETUP_FEATURE_TEST_MODE			2u
+// Setup packet
+typedef union PACKED setup_t {
+	struct {
+		uint8_t bmRequestType;
+		uint8_t bRequest;
+		union {
+			uint16_t wValue;
+			struct {
+				uint8_t bIndex;
+				uint8_t bType;
+			};
+		};
+		union {
+			uint16_t wIndex;
+			struct {
+				uint8_t bID;
+				uint8_t bEntityID;
+			};
+		};
+		uint16_t wLength;
+	};
+	uint32_t raw[2];
+} setup_t;
 
+// Standard setup handler
 void usb_setup(usb_t *usb, uint32_t n, setup_t pkt);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // USB_SETUP_H

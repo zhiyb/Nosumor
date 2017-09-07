@@ -1,12 +1,12 @@
 #include <malloc.h>
 #include <string.h>
-#include "usb_hid.h"
-#include "../usb_debug.h"
+#include "../../debug.h"
 #include "../usb_ram.h"
 #include "../usb_desc.h"
 #include "../usb_ep.h"
 #include "../usb_macros.h"
 #include "../usb_setup.h"
+#include "usb_hid.h"
 
 #define HID_IN_MAX_SIZE		48u
 #define HID_OUT_MAX_PKT		4u
@@ -62,10 +62,10 @@ static void epin_init(usb_t *usb, uint32_t n)
 	// Unmask interrupts
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
 	ep->DIEPINT = USB_OTG_DIEPINT_XFRC_Msk;
-	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
+	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
 	dev->DAINTMSK |= DAINTMSK_IN(n);
 	// Configure endpoint
-	ep->DIEPCTL = EP_IN_TYP_INTERRUPT | (n << USB_OTG_DIEPCTL_TXFNUM_Pos) |
+	ep->DIEPCTL = EP_TYP_INTERRUPT | (n << USB_OTG_DIEPCTL_TXFNUM_Pos) |
 			(HID_IN_MAX_SIZE << USB_OTG_DIEPCTL_MPSIZ_Pos);
 }
 
@@ -106,11 +106,11 @@ static void epout_init(usb_t *usb, uint32_t n)
 	data_t *data = usb->epout[n].data;
 	// Set endpoint type
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
-	ep->DOEPCTL = USB_OTG_DOEPCTL_USBAEP_Msk | EP_IN_TYP_INTERRUPT | HID_OUT_MAX_SIZE;
+	ep->DOEPCTL = USB_OTG_DOEPCTL_USBAEP_Msk | EP_TYP_INTERRUPT | HID_OUT_MAX_SIZE;
 	// Clear interrupts
 	ep->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk;
 	// Unmask interrupts
-	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
+	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
 	dev->DAINTMSK |= DAINTMSK_OUT(n);
 	// Receive packets
 	usb_ep_out_transfer(usb->base, n, data->buf, 0u, HID_OUT_MAX_PKT, HID_OUT_MAX_SIZE);
@@ -214,10 +214,10 @@ static void usb_send_report(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
 static void usbif_setup_std(usb_t *usb, void *p, uint32_t ep, setup_t pkt)
 {
 	data_t *data = (data_t *)p;
-	switch (pkt.bmRequestType & SETUP_TYPE_DIR_Msk) {
-	case SETUP_TYPE_DIR_D2H:
+	switch (pkt.bmRequestType & DIR_Msk) {
+	case DIR_D2H:
 		switch (pkt.bRequest) {
-		case SETUP_REQ_GET_DESCRIPTOR:
+		case GET_DESCRIPTOR:
 			usb_send_descriptor(usb, data, ep, pkt);
 			break;
 		default:
@@ -225,7 +225,7 @@ static void usbif_setup_std(usb_t *usb, void *p, uint32_t ep, setup_t pkt)
 			dbgbkpt();
 		}
 		break;
-	case SETUP_TYPE_DIR_H2D:
+	case DIR_H2D:
 		switch (pkt.bRequest) {
 		default:
 			usb_ep_in_stall(usb->base, ep);
@@ -241,8 +241,8 @@ static void usbif_setup_std(usb_t *usb, void *p, uint32_t ep, setup_t pkt)
 static void usbif_setup_class(usb_t *usb, void *p, uint32_t ep, setup_t pkt)
 {
 	data_t *data = (data_t *)p;
-	switch (pkt.bmRequestType & SETUP_TYPE_DIR_Msk) {
-	case SETUP_TYPE_DIR_D2H:
+	switch (pkt.bmRequestType & DIR_Msk) {
+	case DIR_D2H:
 		switch (pkt.bRequest) {
 		case SETUP_REQ_GET_REPORT:
 			usb_send_report(usb, data, ep, pkt);
@@ -252,7 +252,7 @@ static void usbif_setup_class(usb_t *usb, void *p, uint32_t ep, setup_t pkt)
 			dbgbkpt();
 		}
 		break;
-	case SETUP_TYPE_DIR_H2D:
+	case DIR_H2D:
 		switch (pkt.bRequest) {
 		case SETUP_REQ_SET_REPORT:
 			usb_ep_in_stall(usb->base, ep);

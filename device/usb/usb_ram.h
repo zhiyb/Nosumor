@@ -2,8 +2,9 @@
 #define USB_RAM_H
 
 #include <stdint.h>
-#include <stm32f7xx.h>
-#include "usb.h"
+
+typedef struct usb_t usb_t;
+typedef struct usb_if_t usb_if_t;
 
 void usb_ram_reset(usb_t *usb);
 uint32_t usb_ram_size(usb_t *usb);

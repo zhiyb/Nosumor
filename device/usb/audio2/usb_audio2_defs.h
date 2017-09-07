@@ -320,7 +320,20 @@
 #define EP_DATA_OVERRUN_CONTROL		0x02
 #define EP_DATA_UNDERRUN_CONTROL	0x03
 
+#include "usb_audio2_defs_spatial.h"
 #include "usb_audio2_defs_frmts.h"
 #include "usb_audio2_defs_termt.h"
+
+#define BIT(b)	(1ul << (b))
+
+// bmControls
+#define BM_NA	0b00
+#define BM_RO	0b01
+#define BM_RW	0b11
+
+// Feature Unit bmaControls
+// f: A.17.7 Feature Unit Control Selectors
+// e: bmControls
+#define FU_CTRL(f, e)	((e) << (((f) - 1u) << 1u))
 
 #endif // USB_AUDIO2_DEFS_H

@@ -1,9 +1,9 @@
 #include <malloc.h>
 #include <string.h>
 #include <vendor_defs.h>
-#include <usb/usb_debug.h>
 #include "usb_hid_vendor.h"
 #include "../usb_hid.h"
+#include "../../debug.h"
 
 static const uint8_t desc_report[] = {
 	// Vendor defined HID

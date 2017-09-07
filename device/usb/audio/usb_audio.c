@@ -1,14 +1,14 @@
 #include <malloc.h>
 #include <string.h>
-#include "usb_audio.h"
-#include "usb_audio_desc.h"
+#include "../../debug.h"
+#include "../../peripheral/audio.h"
 #include "../usb.h"
-#include "../usb_debug.h"
-#include "../usb_desc.h"
+#include "../usb_structs.h"
 #include "../usb_setup.h"
 #include "../usb_ram.h"
 #include "../usb_ep.h"
-#include "../../peripheral/audio.h"
+#include "usb_audio.h"
+#include "usb_audio_desc.h"
 
 #define EPOUT_MAX_SIZE	200u
 #define CHANNELS	(1u + 2u)
@@ -33,17 +33,17 @@ static void epout_init(usb_t *usb, uint32_t n)
 	// Reset packet counter
 	ep->DOEPTSIZ = (1u << USB_OTG_DOEPTSIZ_PKTCNT_Pos) | EPOUT_MAX_SIZE;
 	// Set endpoint type
-	ep->DOEPCTL = USB_OTG_DOEPCTL_USBAEP_Msk | EP_IN_TYP_ISOCHRONOUS | EPOUT_MAX_SIZE;
+	ep->DOEPCTL = USB_OTG_DOEPCTL_USBAEP_Msk | EP_TYP_ISOCHRONOUS | EPOUT_MAX_SIZE;
 	// Clear interrupts
 	ep->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk;
 	// Unmask interrupts
-	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
+	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
 	dev->DAINTMSK |= DAINTMSK_OUT(n);
 }
 
 static void epout_halt(usb_t *usb, uint32_t n, int halt)
 {
-	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
+	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 	uint32_t ctl = ep->DOEPCTL;
 	if (!(ctl & USB_OTG_DOEPCTL_EPENA_Msk) != !halt)
@@ -243,8 +243,8 @@ static void usbif_ac_config(usb_t *usb, void *data)
 
 static void usbif_ac_setup_class(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
 {
-	switch (pkt.bmRequestType & SETUP_TYPE_DIR_Msk) {
-	case SETUP_TYPE_DIR_D2H:
+	switch (pkt.bmRequestType & DIR_Msk) {
+	case DIR_D2H:
 		switch (pkt.bRequest) {
 		case GET_RES:
 		case GET_MIN:
@@ -257,7 +257,7 @@ static void usbif_ac_setup_class(usb_t *usb, void *data, uint32_t ep, setup_t pk
 			dbgbkpt();
 		}
 		break;
-	case SETUP_TYPE_DIR_H2D:
+	case DIR_H2D:
 		switch (pkt.bRequest) {
 		case SET_RES:
 		case SET_MIN:
@@ -320,10 +320,10 @@ static void usbif_as_disable(usb_t *usb, void *data)
 static void usbif_as_setup_std(usb_t *usb, void *p, uint32_t ep, setup_t pkt)
 {
 	data_t *data = p;
-	switch (pkt.bmRequestType & SETUP_TYPE_DIR_H2D) {
-	case SETUP_TYPE_DIR_H2D:
+	switch (pkt.bmRequestType & DIR_H2D) {
+	case DIR_H2D:
 		switch (pkt.bRequest) {
-		case SETUP_REQ_SET_INTERFACE:
+		case SET_INTERFACE:
 			switch (pkt.wValue) {
 			case 0:
 				audio_out_enable(0);

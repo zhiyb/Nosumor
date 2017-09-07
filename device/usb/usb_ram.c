@@ -1,7 +1,6 @@
 #include <malloc.h>
-#include <stm32f7xx.h>
 #include "usb_ram.h"
-#include "usb_macros.h"
+#include "usb_structs.h"
 
 uint32_t usb_ram_alloc(usb_t *usb, uint32_t *size)
 {

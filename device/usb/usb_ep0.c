@@ -1,12 +1,11 @@
 #include <malloc.h>
 #include <string.h>
-#include "usb_debug.h"
+#include "../debug.h"
 #include "usb_ep0.h"
 #include "usb_ep.h"
 #include "usb_ram.h"
 #include "usb_macros.h"
-#include "usb_setup.h"
-#include "usb_desc.h"
+#include "usb_structs.h"
 
 #define MAX_SETUP_CNT	3u
 #define MAX_PKT_CNT	1u
@@ -24,7 +23,7 @@ static void epin_init(usb_t *usb, uint32_t n)
 	// Unmask interrupts
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
 	ep->DIEPINT = 0;
-	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
+	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
 	dev->DAINTMSK |= DAINTMSK_IN(n);
 }
 
@@ -69,7 +68,7 @@ static void epout_init(usb_t *usb, uint32_t n)
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 	ep->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk | USB_OTG_DOEPINT_STUP_Msk;
 	// Unmask interrupts
-	USB_OTG_DeviceTypeDef *dev = DEVICE(usb->base);
+	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
 	dev->DAINTMSK |= DAINTMSK_OUT(n);
 	// Receive setup packets
 	usb_ep_out_transfer(usb->base, n, data,
@@ -119,7 +118,7 @@ static void epout_setup_cplt(usb_t *usb, uint32_t n)
 		dbgbkpt();
 		return;
 	}
-	if ((usb->setup.bmRequestType & SETUP_TYPE_DIR_Msk) == SETUP_TYPE_DIR_H2D &&
+	if ((usb->setup.bmRequestType & DIR_Msk) == DIR_H2D &&
 			usb->setup.wLength)
 		// Setup packet require a data OUT stage
 		return;

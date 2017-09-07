@@ -77,6 +77,7 @@ Project {
                 "usb/audio2/usb_audio2.h",
                 "usb/audio2/usb_audio2_defs.h",
                 "usb/audio2/usb_audio2_defs_frmts.h",
+                "usb/audio2/usb_audio2_defs_spatial.h",
                 "usb/audio2/usb_audio2_defs_termt.h",
                 "usb/audio2/usb_audio2_desc.h",
             ]
@@ -99,7 +100,6 @@ Project {
             files: [
                 "usb/usb.c",
                 "usb/usb.h",
-                "usb/usb_debug.h",
                 "usb/usb_desc.c",
                 "usb/usb_desc.h",
                 "usb/usb_ep.c",
@@ -113,6 +113,7 @@ Project {
                 "usb/usb_ram.h",
                 "usb/usb_setup.c",
                 "usb/usb_setup.h",
+                "usb/usb_structs.h",
             ]
         }
 
