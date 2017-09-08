@@ -29,7 +29,7 @@ enum {
 };
 
 // Input terminal
-typedef struct PACKED desc_itd_t {
+typedef struct PACKED desc_it_t {
 	uint8_t bLength;
 	uint8_t bDescriptorType;
 	uint8_t bDescriptorSubtype;
@@ -40,14 +40,14 @@ typedef struct PACKED desc_itd_t {
 	uint16_t wChannelConfig;
 	uint8_t iChannelNames;
 	uint8_t iTerminal;
-} desc_itd_t;
+} desc_it_t;
 
-static const desc_itd_t desc_itd[] = {
+static const desc_it_t desc_itd[] = {
 	{12u, CS_INTERFACE, INPUT_TERMINAL, IT_USB, USB_streaming, 0u, 2u, 0b11, 0u, 0u},
 };
 
 // Output terminal
-typedef struct PACKED desc_otd_t {
+typedef struct PACKED desc_ot_t {
 	uint8_t bLength;
 	uint8_t bDescriptorType;
 	uint8_t bDescriptorSubtype;
@@ -56,9 +56,9 @@ typedef struct PACKED desc_otd_t {
 	uint8_t bAssocTerminal;
 	uint8_t bSourceID;
 	uint8_t iTerminal;
-} desc_otd_t;
+} desc_ot_t;
 
-static const desc_otd_t desc_otd[] = {
+static const desc_ot_t desc_otd[] = {
 	{9u, CS_INTERFACE, OUTPUT_TERMINAL, OT_Speaker, Speaker, 0u, FU_Out, 0u},
 };
 

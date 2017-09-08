@@ -24,13 +24,14 @@ static desc_ac_t desc_ac = {
 // Units
 enum {
 	CS_USB = 1,
+	CX_IN,
 	IT_USB,
 	FU_Out,
 	OT_Speaker,
 };
 
 // Clock source
-typedef struct PACKED desc_csd_t {
+typedef struct PACKED desc_cs_t {
 	uint8_t bLength;
 	uint8_t bDescriptorType;
 	uint8_t bDescriptorSubtype;
@@ -47,14 +48,31 @@ typedef struct PACKED desc_csd_t {
 	uint8_t bmControls;
 	uint8_t bAssocTerminal;
 	uint8_t iClockSource;
-} desc_csd_t;
+} desc_cs_t;
 
-static const desc_csd_t desc_csd[] = {
+static const desc_cs_t desc_cs[] = {
 	{8u, CS_INTERFACE, CLOCK_SOURCE, CS_USB, 0b101, 0b0001u, IT_USB, 0u},
 };
 
+// Clock selector
+typedef struct PACKED desc_cx_t {
+	uint8_t bLength;		// 7 + p
+	uint8_t bDescriptorType;	// CS_INTERFACE
+	uint8_t bDescriptorSubtype;	// CLOCK_SELECTOR
+	uint8_t bClockID;
+	uint8_t bNrInPins;		// p
+	uint8_t baCSourceID[];		// 1 ... p
+	// D1..0: Clock Selector Control
+	//uint8_t bmControls;
+	//uint8_t iClockSelector;
+} desc_cx_t;
+
+static const desc_cx_t desc_cx_in = {
+	7u + 1u, CS_INTERFACE, CLOCK_SELECTOR, CX_IN, 1u, {CS_USB, 0b01u, 0u}
+};
+
 // Input terminal
-typedef struct PACKED desc_itd_t {
+typedef struct PACKED desc_it_t {
 	uint8_t bLength;
 	uint8_t bDescriptorType;
 	uint8_t bDescriptorSubtype;
@@ -67,15 +85,15 @@ typedef struct PACKED desc_itd_t {
 	uint8_t iChannelNames;
 	uint16_t bmControls;
 	uint8_t iTerminal;
-} desc_itd_t;
+} desc_it_t;
 
-static const desc_itd_t desc_itd[] = {
-	{17u, CS_INTERFACE, INPUT_TERMINAL, IT_USB, USB_streaming, 0u, CS_USB,
+static const desc_it_t desc_it[] = {
+	{17u, CS_INTERFACE, INPUT_TERMINAL, IT_USB, USB_streaming, 0u, CX_IN,
 	 2u, SP_FL | SP_FR, 0u, 0u, 0u},
 };
 
 // Output terminal
-typedef struct PACKED desc_otd_t {
+typedef struct PACKED desc_ot_t {
 	uint8_t bLength;
 	uint8_t bDescriptorType;
 	uint8_t bDescriptorSubtype;
@@ -86,10 +104,10 @@ typedef struct PACKED desc_otd_t {
 	uint8_t bCSourceID;
 	uint16_t bmControls;
 	uint8_t iTerminal;
-} desc_otd_t;
+} desc_ot_t;
 
-static const desc_otd_t desc_otd[] = {
-	{12u, CS_INTERFACE, OUTPUT_TERMINAL, OT_Speaker, Speaker, 0u, FU_Out, CS_USB, 0u, 0u},
+static const desc_ot_t desc_ot[] = {
+	{12u, CS_INTERFACE, OUTPUT_TERMINAL, OT_Speaker, Speaker, 0u, FU_Out, CX_IN, 0u, 0u},
 };
 
 // Feature unit

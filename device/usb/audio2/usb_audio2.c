@@ -1,7 +1,6 @@
 #include <malloc.h>
 #include <string.h>
 #include "../../debug.h"
-#include "../../peripheral/audio.h"
 #include "../usb.h"
 #include "../usb_structs.h"
 #include "../usb_setup.h"
@@ -9,56 +8,8 @@
 #include "../usb_ep.h"
 #include "usb_audio2.h"
 #include "usb_audio2_desc.h"
-
-#define EPOUT_MAX_SIZE	(AUDIO_BUFFER_SIZE >> 1ul)
-#define CHANNELS	(1u + AUDIO_CHANNELS)
-
-// Parameter block layout types
-typedef uint8_t layout1_cur_t;
-
-typedef struct PACKED {
-	uint8_t min, max, res;
-} layout1_range_t;
-
-typedef uint16_t layout2_cur_t;
-
-typedef struct PACKED {
-	uint16_t min, max, res;
-} layout2_range_t;
-
-typedef uint32_t layout3_cur_t;
-
-typedef struct PACKED {
-	uint32_t min, max, res;
-} layout3_range_t;
-
-// Private data types
-typedef struct {
-	struct {
-		layout3_cur_t freq[1];
-		layout3_range_t range[1];
-	} cs;
-	struct {
-		layout2_cur_t vol[CHANNELS];
-		layout2_range_t range[CHANNELS];
-		layout1_cur_t mute[CHANNELS];
-	} fu;
-	struct PACKED {
-		union {
-			struct {
-				uint16_t wNumSubRanges;
-				uint8_t range[];
-			};
-			uint8_t raw[16];
-		};
-	} buf;
-	int ep_out;
-} data_t;
-
-typedef struct {
-	void *data[2];
-	int swap;
-} epdata_t;
+#include "usb_audio2_structs.h"
+#include "usb_audio2_entities.h"
 
 static void epout_recv(usb_t *usb, uint32_t n)
 {
@@ -119,207 +70,26 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 	}
 }
 
-static inline uint16_t layout_cur_get(data_t *data, int type, void *p)
-{
-	const unsigned int msize = 1u << (type - 1u);
-	memcpy(data->buf.raw, p, msize);
-	return msize;
-}
-
-static inline uint32_t layout_cur(int type, void *p)
-{
-	uint32_t v = 0;
-	const unsigned int msize = 1u << (type - 1u);
-	memcpy(&v, p, msize);
-	dbgprintf("%lx|", v);
-	return v;
-}
-
-static inline uint16_t layout_range_get(data_t *data, int type, void *p, uint16_t cnt)
-{
-	const unsigned int msize = 1u << (type - 1u);
-	const uint16_t size = 3u * msize * cnt;
-	data->buf.wNumSubRanges = cnt;
-	memcpy(data->buf.range, p, size);
-	return 2u + size;
-}
-
-static inline desc_t cs_get(data_t *data, setup_t pkt)
-{
-	desc_t desc = {0, data->buf.raw};
-	uint8_t cs = pkt.bType, cn = pkt.bIndex;
-	dbgprintf(ESC_GREEN "(CS_");
-	switch (cs) {
-	case CS_SAM_FREQ_CONTROL:
-		// Layout 3 parameter block
-		if (cn != 0) {
-			dbgbkpt();
-			break;
-		}
-		switch (pkt.bRequest) {
-		case CUR:
-			dbgprintf("f");
-			desc.size = layout_cur_get(data, 3, &data->cs.freq[0]);
-			break;
-		case RANGE:
-			dbgprintf("fr");
-			desc.size = layout_range_get(data, 3, &data->cs.range[0], 1u);
-			break;
-		default:
-			dbgbkpt();
-		}
-		break;
-	default:
-		dbgbkpt();
-	}
-	dbgprintf("%u/%lu@%u)", cn, desc.size, pkt.wLength);
-	return desc;
-}
-
-static inline desc_t fu_get(data_t *data, setup_t pkt)
-{
-	desc_t desc = {0, data->buf.raw};
-	uint8_t cs = pkt.bType, cn = pkt.bIndex;
-	dbgprintf(ESC_GREEN "(FU_");
-	switch (cs) {
-	case FU_MUTE_CONTROL:
-		// Layout 1 parameter block
-		if (cn >= ASIZE(data->fu.mute)) {
-			dbgbkpt();
-			break;
-		}
-		switch (pkt.bRequest) {
-		case CUR:
-			dbgprintf("m");
-			desc.size = layout_cur_get(data, 1, &data->fu.mute[cn]);
-			break;
-		default:
-			dbgbkpt();
-		}
-		break;
-	case FU_VOLUME_CONTROL:
-		// Layout 2 parameter block
-		if (cn >= ASIZE(data->fu.vol)) {
-			dbgbkpt();
-			break;
-		}
-		switch (pkt.bRequest) {
-		case CUR:
-			dbgprintf("v");
-			desc.size = layout_cur_get(data, 2, &data->fu.vol[cn]);
-			break;
-		case RANGE:
-			dbgprintf("vr");
-			desc.size = layout_range_get(data, 2, &data->fu.range[cn], 1u);
-			break;
-		default:
-			dbgbkpt();
-		}
-		break;
-	default:
-		dbgbkpt();
-	}
-	dbgprintf("%u/%lu@%u)", cn, desc.size, pkt.wLength);
-	return desc;
-}
-
-static inline int fu_set(data_t *data, setup_t pkt, void *buf)
-{
-	uint16_t v;
-	uint8_t cs = pkt.bType, cn = pkt.bIndex;
-	dbgprintf(ESC_RED "(FU_");
-	switch (cs) {
-	case FU_MUTE_CONTROL:
-		// Layout 1 parameter block
-		if (cn >= ASIZE(data->fu.mute)) {
-			dbgbkpt();
-			break;
-		}
-		switch (pkt.bRequest) {
-		case CUR:
-			dbgprintf("M");
-			data->fu.mute[cn] = layout_cur(1, buf);
-			dbgprintf("%u)", cn);
-			return 1;
-		default:
-			dbgbkpt();
-		}
-	case FU_VOLUME_CONTROL:
-		// Layout 2 parameter block
-		if (cn >= ASIZE(data->fu.vol)) {
-			dbgbkpt();
-			break;
-		}
-		switch (pkt.bRequest) {
-		case CUR:
-			dbgprintf("V");
-			data->fu.vol[cn] = layout_cur(2, buf);
-			dbgprintf("%u)", cn);
-			return 1;
-		default:
-			dbgbkpt();
-		}
-		break;
-	default:
-		dbgbkpt();
-	}
-	return 0;
-}
-
-static inline void usb_get(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
-{
-	desc_t desc = {0, 0};
-	switch (pkt.bEntityID) {
-	case CS_USB:
-		desc = cs_get(data, pkt);
-		break;
-	case FU_Out:
-		desc = fu_get(data, pkt);
-		break;
-	}
-	if (desc.size == 0) {
-		usb_ep_in_stall(usb->base, ep);
-		dbgbkpt();
-	} else {
-		if (desc.size > pkt.wLength)
-			desc.size = pkt.wLength;
-		usb_ep_in_transfer(usb->base, ep, desc.p, desc.size);
-	}
-}
-
-static inline void usb_set(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
-{
-	switch (pkt.bEntityID) {
-	case FU_Out:
-		if (fu_set(data, pkt, usb->setup_buf))
-			usb_ep_in_transfer(usb->base, ep, 0, 0);
-		else
-			usb_ep_in_stall(usb->base, ep);
-		break;
-	default:
-		usb_ep_in_stall(usb->base, ep);
-		dbgbkpt();
-	}
-}
-
 static void usbif_ac_config(usb_t *usb, void *pdata)
 {
 	data_t *data = (data_t *)pdata;
 	if (!desc_ac.wTotalLength) {
 		desc_ac.wTotalLength = desc_ac.bLength;
 		// Clock sources
-		const desc_csd_t *pcs = desc_csd;
-		for (uint32_t i = 0; i != ASIZE(desc_csd); i++, pcs++)
+		const desc_cs_t *pcs = desc_cs;
+		for (uint32_t i = 0; i != ASIZE(desc_cs); i++, pcs++)
 			desc_ac.wTotalLength += pcs->bLength;
+		// Clock selectors
+		desc_ac.wTotalLength += desc_cx_in.bLength;
 		// Input terminals
-		const desc_itd_t *pit = desc_itd;
-		for (uint32_t i = 0; i != ASIZE(desc_itd); i++, pit++)
+		const desc_it_t *pit = desc_it;
+		for (uint32_t i = 0; i != ASIZE(desc_it); i++, pit++)
 			desc_ac.wTotalLength += pit->bLength;
 		// Feature units
 		desc_ac.wTotalLength += desc_fu_out.bLength;
 		// Output terminals
-		const desc_otd_t *pot = desc_otd;
-		for (uint32_t i = 0; i != ASIZE(desc_otd); i++, pot++)
+		const desc_ot_t *pot = desc_ot;
+		for (uint32_t i = 0; i != ASIZE(desc_ot); i++, pot++)
 			desc_ac.wTotalLength += pot->bLength;
 	}
 	// Audio interface association
@@ -330,18 +100,20 @@ static void usbif_ac_config(usb_t *usb, void *pdata)
 	usb_desc_add_interface(usb, 0u, 0u, AUDIO, AUDIOCONTROL, IP_VERSION_02_00, 0u);
 	usb_desc_add(usb, &desc_ac, desc_ac.bLength);
 	// Clock sources
-	const desc_csd_t *pcs = desc_csd;
-	for (uint32_t i = 0; i != ASIZE(desc_csd); i++, pcs++)
+	const desc_cs_t *pcs = desc_cs;
+	for (uint32_t i = 0; i != ASIZE(desc_cs); i++, pcs++)
 		usb_desc_add(usb, pcs, pcs->bLength);
+	// Clock selectors
+	usb_desc_add(usb, &desc_cx_in, desc_cx_in.bLength);
 	// Input terminals
-	const desc_itd_t *pit = desc_itd;
-	for (uint32_t i = 0; i != ASIZE(desc_itd); i++, pit++)
+	const desc_it_t *pit = desc_it;
+	for (uint32_t i = 0; i != ASIZE(desc_it); i++, pit++)
 		usb_desc_add(usb, pit, pit->bLength);
 	// Feature units
 	usb_desc_add(usb, &desc_fu_out, desc_fu_out.bLength);
 	// Output terminals
-	const desc_otd_t *pot = desc_otd;
-	for (uint32_t i = 0; i != ASIZE(desc_otd); i++, pot++)
+	const desc_ot_t *pot = desc_ot;
+	for (uint32_t i = 0; i != ASIZE(desc_ot); i++, pot++)
 		usb_desc_add(usb, pot, pot->bLength);
 }
 
@@ -464,10 +236,10 @@ void usb_audio2_init(usb_t *usb)
 	data_t *data = calloc(1u, sizeof(data_t));
 	if (!data)
 		fatal();
-	data->cs.freq[0] = 192000;
-	data->cs.range[0].min = 192000;
-	data->cs.range[0].max = 192000;
-	data->cs.range[0].res = 0;
+	data->clk.freq[0] = 192000;
+	data->clk.range[0].min = 192000;
+	data->clk.range[0].max = 192000;
+	data->clk.range[0].res = 0;
 	for (int i = 0; i != CHANNELS; i++) {
 		data->fu.mute[i] = 0x00;
 		data->fu.vol[i] = 0x0000;

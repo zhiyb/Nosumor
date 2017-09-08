@@ -66,25 +66,40 @@ Project {
         }
 
         Group {
-            name: "USB interfaces"
-            condition: !bootloader
+            name: "USB Audio Class 1"
+            // Not working yet
+            condition: false && !bootloader
             files: [
                 "usb/audio/usb_audio.c",
                 "usb/audio/usb_audio.h",
                 "usb/audio/usb_audio_defs.h",
                 "usb/audio/usb_audio_desc.h",
+            ]
+        }
+
+        Group {
+            name: "USB Audio Class 2"
+            condition: !bootloader
+            files: [
                 "usb/audio2/usb_audio2.c",
                 "usb/audio2/usb_audio2.h",
+                "usb/audio2/usb_audio2_cs.c",
+                "usb/audio2/usb_audio2_cx.c",
                 "usb/audio2/usb_audio2_defs.h",
                 "usb/audio2/usb_audio2_defs_frmts.h",
                 "usb/audio2/usb_audio2_defs_spatial.h",
                 "usb/audio2/usb_audio2_defs_termt.h",
                 "usb/audio2/usb_audio2_desc.h",
+                "usb/audio2/usb_audio2_entities.c",
+                "usb/audio2/usb_audio2_entities.h",
+                "usb/audio2/usb_audio2_fu.c",
+                "usb/audio2/usb_audio2_structs.h",
             ]
         }
 
         Group {
             name: "USB HID interface"
+            cpp.optimization: "fast"
             files: [
                 "usb/hid/usb_hid.c",
                 "usb/hid/usb_hid.h",
@@ -97,6 +112,7 @@ Project {
 
         Group {
             name: "USB"
+            cpp.optimization: "fast"
             files: [
                 "usb/usb.c",
                 "usb/usb.h",

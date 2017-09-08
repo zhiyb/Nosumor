@@ -216,10 +216,10 @@ static void usbif_ac_config(usb_t *usb, void *data)
 {
 	if (!desc_ac.wTotalLength) {
 		desc_ac.wTotalLength = desc_ac.bLength;
-		const desc_itd_t *pit = desc_itd;
+		const desc_it_t *pit = desc_itd;
 		for (uint32_t i = 0; i != ASIZE(desc_itd); i++)
 			desc_ac.wTotalLength += (pit++)->bLength;
-		const desc_otd_t *pot = desc_otd;
+		const desc_ot_t *pot = desc_otd;
 		for (uint32_t i = 0; i != ASIZE(desc_otd); i++)
 			desc_ac.wTotalLength += (pot++)->bLength;
 		desc_ac.wTotalLength += desc_fu_out.bLength;
@@ -230,13 +230,13 @@ static void usbif_ac_config(usb_t *usb, void *data)
 	desc_ac.baInterfaceNr[0] = iface + 1;
 	usb_desc_add(usb, &desc_ac, desc_ac.bLength);
 	// Input terminals
-	const desc_itd_t *pit = desc_itd;
+	const desc_it_t *pit = desc_itd;
 	for (uint32_t i = 0; i != ASIZE(desc_itd); i++, pit++)
 		usb_desc_add(usb, pit, pit->bLength);
 	// Feature units
 	usb_desc_add(usb, &desc_fu_out, desc_fu_out.bLength);
 	// Output terminals
-	const desc_otd_t *pot = desc_otd;
+	const desc_ot_t *pot = desc_otd;
 	for (uint32_t i = 0; i != ASIZE(desc_otd); i++, pot++)
 		usb_desc_add(usb, pot, pot->bLength);
 }
