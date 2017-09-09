@@ -32,7 +32,7 @@
 #define BOOTLOADER_FUNC	((void (*)())*(uint32_t *)(BOOTLOADER_BASE + 4u))
 
 usb_t usb;	// Shared with PVD
-static hid_t *hid_vendor;
+static usb_hid_t *hid_vendor;
 
 static inline void bootloader_check()
 {
@@ -175,7 +175,6 @@ static inline void fatfs_test()
 	puts(ESC_GREEN "FatFS tests completed");
 }
 
-#include "usb/usb_macros.h"
 int main()
 {
 	init();
@@ -183,14 +182,10 @@ int main()
 	fatfs_test();
 #endif
 
-	USB_OTG_GlobalTypeDef *base = usb.base;
-	USB_OTG_DeviceTypeDef *dev = DEV(base);
-	USB_OTG_INEndpointTypeDef *epi0 = EP_IN(base, 0);
-	USB_OTG_OUTEndpointTypeDef *epo0 = EP_OUT(base, 0);
-	USB_OTG_OUTEndpointTypeDef *epo1 = EP_OUT(base, 1);
 #ifdef DEBUG
 	uint32_t mask = keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4];
 #endif
+	uint32_t prev_tick = systick_cnt(), prev_cnt = audio_transfer_cnt();
 	for (;;) {
 		uint32_t s = keyboard_status();
 		if (s & keyboard_masks[0])
@@ -218,6 +213,20 @@ int main()
 			usb_connect(&usb, 0);
 			while (keyboard_status());
 			usb_connect(&usb, 1);
+		}
+
+		// Every 1024 systick ticks
+		uint32_t tick = systick_cnt();
+		if ((tick - prev_tick) & ~(1023ul)) {
+			prev_tick += 1024ul;
+			// Compute audio frequency
+			uint32_t cnt = audio_transfer_cnt();
+			uint32_t diff = cnt - prev_cnt;
+			prev_cnt = cnt;
+			diff *= 1000ul;
+			static const uint32_t div = 1024ul * AUDIO_FRAME_TRANSFER;
+			printf(ESC_YELLOW "Audio freq: " ESC_WHITE "%lu+%lu\n",
+			       diff / div, diff & (div - 1u));
 		}
 #endif
 		__disable_irq();

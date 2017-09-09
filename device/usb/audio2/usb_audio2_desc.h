@@ -23,7 +23,7 @@ static desc_ac_t desc_ac = {
 
 // Units
 enum {
-	CS_USB = 1,
+	CS_PLL = 1,
 	CX_IN,
 	IT_USB,
 	FU_Out,
@@ -51,7 +51,7 @@ typedef struct PACKED desc_cs_t {
 } desc_cs_t;
 
 static const desc_cs_t desc_cs[] = {
-	{8u, CS_INTERFACE, CLOCK_SOURCE, CS_USB, 0b101, 0b0001u, IT_USB, 0u},
+	{8u, CS_INTERFACE, CLOCK_SOURCE, CS_PLL, 0b000, 0b0111u, 0u, 0u},
 };
 
 // Clock selector
@@ -68,7 +68,7 @@ typedef struct PACKED desc_cx_t {
 } desc_cx_t;
 
 static const desc_cx_t desc_cx_in = {
-	7u + 1u, CS_INTERFACE, CLOCK_SELECTOR, CX_IN, 1u, {CS_USB, 0b01u, 0u}
+	7u + 1u, CS_INTERFACE, CLOCK_SELECTOR, CX_IN, 1u, {CS_PLL, 0b01u, 0u}
 };
 
 // Input terminal
@@ -143,8 +143,8 @@ typedef struct PACKED desc_as_t {
 } desc_as_t;
 
 static const desc_as_t desc_as[] = {
-	{16u, CS_INTERFACE, AS_GENERAL, IT_USB, 0u,
-	 FORMAT_TYPE_I, BIT(FRMT_I_PCM), 2u, SP_FL | SP_FR, 0u},
+	{16u, CS_INTERFACE, AS_GENERAL, IT_USB, 0b0000,
+	 FORMAT_TYPE_I, FRMT_I_PCM, 2u, SP_FL | SP_FR, 0u},
 };
 
 // Class specific endpoint descriptor

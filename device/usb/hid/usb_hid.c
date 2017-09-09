@@ -43,17 +43,17 @@ static const desc_hid_t desc_hid = {
 	9u, 0x21u, 0x0111u, 0x00u, 1u, 0x22u, 0u,
 };
 
-typedef struct data_t {
+typedef struct usb_hid_data_t {
 	usb_t *usb;
-	hid_t *hid;
+	usb_hid_t *hid;
 	desc_hid_t desc_hid;
 	desc_t desc_report;
 	int usages, ep_in, ep_out;
 	union {
-		report_t report;
+		usb_hid_report_t report;
 		uint8_t data[HID_OUT_MAX_SIZE];
 	} pktbuf, buf[HID_OUT_MAX_PKT];
-} data_t;
+} usb_hid_data_t;
 
 static void epin_init(usb_t *usb, uint32_t n)
 {
@@ -92,8 +92,8 @@ static void epin_halt(struct usb_t *usb, uint32_t n, int halt)
 
 static void epin_xfr_cplt(usb_t *usb, uint32_t n)
 {
-	data_t *data = (data_t *)usb->epin[n].data;
-	for (hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next)
+	usb_hid_data_t *data = (usb_hid_data_t *)usb->epin[n].data;
+	for (usb_hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next)
 		if ((*hid)->pending) {
 			(*hid)->pending = 0;
 			usb_ep_in_transfer(usb->base, n, (*hid)->report.raw, (*hid)->size);
@@ -103,7 +103,7 @@ static void epin_xfr_cplt(usb_t *usb, uint32_t n)
 
 static void epout_init(usb_t *usb, uint32_t n)
 {
-	data_t *data = usb->epout[n].data;
+	usb_hid_data_t *data = usb->epout[n].data;
 	// Set endpoint type
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 	ep->DOEPCTL = USB_OTG_DOEPCTL_USBAEP_Msk | EP_TYP_INTERRUPT | HID_OUT_MAX_SIZE;
@@ -118,7 +118,7 @@ static void epout_init(usb_t *usb, uint32_t n)
 
 static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 {
-	data_t *data = usb->epout[n].data;
+	usb_hid_data_t *data = usb->epout[n].data;
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 	// Calculate packet size
 	uint32_t siz = ep->DOEPTSIZ;
@@ -131,7 +131,7 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 	// Receive new packets
 	usb_ep_out_transfer(usb->base, n, data->buf, 0u, HID_OUT_MAX_PKT, HID_OUT_MAX_SIZE);
 	// Process packet
-	for (hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next) {
+	for (usb_hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next) {
 		if ((*hid)->report.id == data->pktbuf.report.id) {
 			(*hid)->recv(*hid, &data->pktbuf.report, size);
 			return;
@@ -142,7 +142,7 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 
 static void usbif_config(usb_t *usb, void *p)
 {
-	data_t *data = (data_t *)p;
+	usb_hid_data_t *data = (usb_hid_data_t *)p;
 	// Register endpoints
 	const epin_t epin = {
 		.data = data,
@@ -174,7 +174,7 @@ static void set_idle(uint8_t duration, uint8_t reportID)
 		dbgbkpt();
 }
 
-static void usb_send_descriptor(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
+static void usb_send_descriptor(usb_t *usb, usb_hid_data_t *data, uint32_t ep, setup_t pkt)
 {
 	desc_t desc;
 	switch (pkt.bType) {
@@ -190,12 +190,12 @@ static void usb_send_descriptor(usb_t *usb, data_t *data, uint32_t ep, setup_t p
 	usb_ep_in_descriptor(usb->base, ep, desc);
 }
 
-static void usb_send_report(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
+static void usb_send_report(usb_t *usb, usb_hid_data_t *data, uint32_t ep, setup_t pkt)
 {
 	uint8_t id = pkt.bIndex;
 	switch (pkt.bType) {
 	case SETUP_REPORT_INPUT:
-		for (hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next)
+		for (usb_hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next)
 			if ((*hid)->report.id == id) {
 				usb_ep_in_transfer(usb->base, ep,
 						   (*hid)->report.raw, (*hid)->size);
@@ -213,7 +213,7 @@ static void usb_send_report(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
 
 static void usbif_setup_std(usb_t *usb, void *p, uint32_t ep, setup_t pkt)
 {
-	data_t *data = (data_t *)p;
+	usb_hid_data_t *data = (usb_hid_data_t *)p;
 	switch (pkt.bmRequestType & DIR_Msk) {
 	case DIR_D2H:
 		switch (pkt.bRequest) {
@@ -240,7 +240,7 @@ static void usbif_setup_std(usb_t *usb, void *p, uint32_t ep, setup_t pkt)
 
 static void usbif_setup_class(usb_t *usb, void *p, uint32_t ep, setup_t pkt)
 {
-	data_t *data = (data_t *)p;
+	usb_hid_data_t *data = (usb_hid_data_t *)p;
 	switch (pkt.bmRequestType & DIR_Msk) {
 	case DIR_D2H:
 		switch (pkt.bRequest) {
@@ -276,23 +276,23 @@ static void usbif_setup_class(usb_t *usb, void *p, uint32_t ep, setup_t pkt)
 
 static void usbif_enable(usb_t *usb, void *p)
 {
-	data_t *data = (data_t *)p;
+	usb_hid_data_t *data = (usb_hid_data_t *)p;
 	data->usb = usb;
 	epin_halt(usb, data->ep_in, 0);
 }
 
 static void usbif_disable(usb_t *usb, void *p)
 {
-	data_t *data = (data_t *)p;
+	usb_hid_data_t *data = (usb_hid_data_t *)p;
 	data->usb = 0;
-	for (hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next)
+	for (usb_hid_t **hid = &data->hid; *hid != 0; hid = &(*hid)->next)
 		(*hid)->pending = 0;
 	epin_halt(usb, data->ep_in, 1);
 }
 
-data_t *usb_hid_init(usb_t *usb)
+usb_hid_data_t *usb_hid_init(usb_t *usb)
 {
-	data_t *data = (data_t *)calloc(1u, sizeof(data_t));
+	usb_hid_data_t *data = (usb_hid_data_t *)calloc(1u, sizeof(usb_hid_data_t));
 	if (!data)
 		fatal();
 	usb_if_t usbif = {
@@ -310,7 +310,7 @@ data_t *usb_hid_init(usb_t *usb)
 	return usbif.data;
 }
 
-void usb_hid_update(hid_t *hid)
+void usb_hid_update(usb_hid_t *hid)
 {
 	int ep_in = hid->hid_data->ep_in;
 	usb_t *usb = hid->hid_data->usb;
@@ -328,13 +328,13 @@ void usb_hid_update(hid_t *hid)
 	usb_ep_in_transfer(usb->base, ep_in, hid->report.raw, hid->size);
 }
 
-void usb_hid_register(hid_t *hid, const_desc_t desc_report)
+void usb_hid_register(usb_hid_t *hid, const_desc_t desc_report)
 {
 	// Allocate report ID
-	data_t *data = hid->hid_data;
+	usb_hid_data_t *data = hid->hid_data;
 	hid->report.id = ++data->usages;
 	// Append to HID list
-	hid_t **hp;
+	usb_hid_t **hp;
 	for (hp = &data->hid; *hp != 0; hp = &(*hp)->next);
 	*hp = hid;
 	// Allocate additional report descriptor space

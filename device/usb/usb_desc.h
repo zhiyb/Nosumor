@@ -24,7 +24,7 @@
 // Iso mode usage type
 #define EP_ISO_DATA	0x00
 #define EP_ISO_FEEDBACK	0x10
-#define EP_ISO_EXPLICIT	0x20
+#define EP_ISO_IMPLICIT	0x20
 
 // Language IDs
 #define LANG_ZH_CN	0x0804

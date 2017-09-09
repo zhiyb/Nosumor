@@ -53,8 +53,8 @@ static inline void usb_endpoint_irq(usb_t *usb)
 	USB_OTG_GlobalTypeDef *base = usb->base;
 	USB_OTG_DeviceTypeDef *dev = DEV(base);
 	uint32_t daint = dev->DAINT;
-	uint32_t mask = daint >> 16;
-	for (uint32_t n = 0u; n != USB_EPOUT_CNT; n++, mask >>= 1u) {
+	uint32_t mask = FIELD(daint, USB_OTG_DAINT_OEPINT);
+	for (uint32_t n = 0u; mask; n++, mask >>= 1u) {
 		if (!(mask & 1u))
 			continue;
 		USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(base, n);
@@ -68,8 +68,8 @@ static inline void usb_endpoint_irq(usb_t *usb)
 			FUNC(usb->epout[n].setup_cplt)(usb, n);
 		}
 	}
-	mask = daint;
-	for (uint32_t n = 0u; n != USB_EPIN_CNT; n++, mask >>= 1u) {
+	mask = FIELD(daint, USB_OTG_DAINT_IEPINT);
+	for (uint32_t n = 0u; mask; n++, mask >>= 1u) {
 		if (!(mask & 1u))
 			continue;
 		USB_OTG_INEndpointTypeDef *ep = EP_IN(base, n);

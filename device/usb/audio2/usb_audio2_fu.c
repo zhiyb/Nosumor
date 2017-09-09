@@ -3,7 +3,7 @@
 #include "usb_audio2_structs.h"
 #include "usb_audio2_entities.h"
 
-desc_t fu_get(data_t *data, setup_t pkt)
+desc_t usb_audio2_fu_get(data_t *data, setup_t pkt)
 {
 	desc_t desc = {0, data->buf.raw};
 	uint8_t cs = pkt.bType, cn = pkt.bIndex;
@@ -50,7 +50,7 @@ desc_t fu_get(data_t *data, setup_t pkt)
 	return desc;
 }
 
-int fu_set(data_t *data, setup_t pkt, void *buf)
+int usb_audio2_fu_set(data_t *data, setup_t pkt, void *buf)
 {
 	uint16_t v;
 	uint8_t cs = pkt.bType, cn = pkt.bIndex;

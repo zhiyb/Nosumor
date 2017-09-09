@@ -13,16 +13,18 @@
 #define I2C		I2C1
 #define I2C_ADDR	0b0011000u
 
-#define STREAM1		DMA2_Stream5
-#define STREAM2		DMA1_Stream3
+#define STREAM_TX	DMA2_Stream5
+#define STREAM_RX	DMA1_Stream3
 
-static struct PACKED {
+static struct {
 	uint8_t data[AUDIO_BUFFER_LENGTH][AUDIO_CHANNELS][AUDIO_SAMPLE_SIZE] ALIGN(AUDIO_FRAME_SIZE);
+	uint32_t cnt;
 } buf;
 
 static int i2c_check(I2C_TypeDef *i2c, uint8_t addr);
 static void audio_reset();
 static void audio_config();
+static void audio_tick(uint32_t tick);
 
 void audio_init()
 {
@@ -61,10 +63,10 @@ void audio_init()
 
 	// Software reset
 	audio_reset();
+	// Reset audio buffer
+	memset(&buf, 0, sizeof(buf));
 	// Waiting for reset
 	systick_delay(10);
-	// Reset audio buffer
-	memset(buf.data, 0, AUDIO_BUFFER_SIZE);
 
 	// Initialise I2S GPIO
 	// I2S1 (slave transmit): WS(PA4), DIN(PA7), CK(PB3)
@@ -110,21 +112,21 @@ void audio_init()
 	// DMA2: Channel 3: Stream 5 (SPI1_TX)
 	RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN_Msk;
 	// Disable stream
-	STREAM1->CR = 0ul;
+	STREAM_TX->CR = 0ul;
 	// Memory to peripheral, circular, 32bit -> 16bit, very high priority
-	STREAM1->CR = (3ul << DMA_SxCR_CHSEL_Pos) | (0b11ul << DMA_SxCR_PL_Pos) |
+	STREAM_TX->CR = (3ul << DMA_SxCR_CHSEL_Pos) | (0b11ul << DMA_SxCR_PL_Pos) |
 			(0b11ul << DMA_SxCR_MSIZE_Pos) | (0b01ul << DMA_SxCR_PSIZE_Pos) |
 			(0b01ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk | DMA_SxCR_CIRC_Msk;
 	// Peripheral address
-	STREAM1->PAR = (uint32_t)&SPI1->DR;
+	STREAM_TX->PAR = (uint32_t)&SPI1->DR;
 	// FIFO control
-	STREAM1->FCR = DMA_SxFCR_DMDIS_Msk;
+	STREAM_TX->FCR = DMA_SxFCR_DMDIS_Msk;
 	// Memory address
-	STREAM1->M0AR = (uint32_t)buf.data;
+	STREAM_TX->M0AR = (uint32_t)buf.data;
 	// Number of data items
-	STREAM1->NDTR = AUDIO_BUFFER_SIZE >> 1ul;
+	STREAM_TX->NDTR = AUDIO_TRANSFER_SIZE;
 	// Enable DMA stream
-	STREAM1->CR |= DMA_SxCR_EN_Msk;
+	STREAM_TX->CR |= DMA_SxCR_EN_Msk;
 
 	// DMA1: Channel 0: Stream 3 (SPI2_RX)
 	RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN_Msk;
@@ -138,8 +140,25 @@ void audio_init()
 	GPIO_MODER(GPIOC, 4, 0b00);	// 00: Input mode
 	GPIO_PUPDR(GPIOC, 4, GPIO_PUPDR_UP);
 
-	// Tests
+	// Start
 	audio_config();
+	systick_register_handler(audio_tick);
+}
+
+static void audio_tick(uint32_t tick)
+{
+	static uint32_t prev = AUDIO_TRANSFER_SIZE;
+	// Data transferred
+	uint16_t ndtr = STREAM_TX->NDTR;
+	// Size increment: (prev - NDTR + size) % size
+	uint32_t n = (prev - ndtr) & (AUDIO_TRANSFER_SIZE - 1ul);
+	prev = ndtr;
+	buf.cnt += n;
+}
+
+uint32_t audio_transfer_cnt()
+{
+	return buf.cnt;
 }
 
 static int i2c_check(I2C_TypeDef *i2c, uint8_t addr)
@@ -286,12 +305,13 @@ void audio_out_enable(int enable)
 		// DAC muted
 		i2c_write_reg(I2C, I2C_ADDR, 0x40, 0x0c);
 		dbgprintf(ESC_BLUE "Audio muted\n");
+		memset(buf.data, 0, sizeof(buf.data));
 	}
 }
 
 static uint32_t *next_frame()
 {
-	uint32_t mem = (AUDIO_BUFFER_SIZE) - (STREAM1->NDTR << 1u) + (AUDIO_FRAME_SIZE << 0u);
+	uint32_t mem = (AUDIO_BUFFER_SIZE) - (STREAM_TX->NDTR << 1u) + (AUDIO_FRAME_SIZE << 0u);
 	mem &= ~(AUDIO_FRAME_SIZE - 1ul) & (AUDIO_BUFFER_SIZE - 1ul);
 	return (uint32_t *)((void *)buf.data + mem);
 }

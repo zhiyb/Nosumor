@@ -16,18 +16,18 @@ extern "C" {
 // Endpoint handlers
 typedef struct epin_t {
 	void *data;
-	void (*init)(struct usb_t *usb, uint32_t ep);
-	void (*halt)(struct usb_t *usb, uint32_t ep, int halt);
-	void (*timeout)(struct usb_t *usb, uint32_t ep);
-	void (*xfr_cplt)(struct usb_t *usb, uint32_t ep);
+	void (*init)(usb_t *usb, uint32_t ep);
+	void (*halt)(usb_t *usb, uint32_t ep, int halt);
+	void (*timeout)(usb_t *usb, uint32_t ep);
+	void (*xfr_cplt)(usb_t *usb, uint32_t ep);
 } epin_t;
 
 typedef struct epout_t {
 	void *data;
-	void (*init)(struct usb_t *usb, uint32_t ep);
-	void (*halt)(struct usb_t *usb, uint32_t ep, int halt);
-	void (*setup_cplt)(struct usb_t *usb, uint32_t ep);
-	void (*xfr_cplt)(struct usb_t *usb, uint32_t ep);
+	void (*init)(usb_t *usb, uint32_t ep);
+	void (*halt)(usb_t *usb, uint32_t ep, int halt);
+	void (*setup_cplt)(usb_t *usb, uint32_t ep);
+	void (*xfr_cplt)(usb_t *usb, uint32_t ep);
 } epout_t;
 
 // Interface handlers
@@ -39,13 +39,11 @@ typedef struct usb_if_t {
 	// Private data
 	void *data;
 	// Function handlers
-	void (*config)(struct usb_t *usb, void *data);
-	void (*enable)(struct usb_t *usb, void *data);
-	void (*disable)(struct usb_t *usb, void *data);
-	void (*setup_std)(struct usb_t *usb, void *data,
-			  uint32_t ep, setup_t pkt);
-	void (*setup_class)(struct usb_t *usb, void *data,
-			    uint32_t ep, setup_t pkt);
+	void (*config)(usb_t *usb, void *data);
+	void (*enable)(usb_t *usb, void *data);
+	void (*disable)(usb_t *usb, void *data);
+	void (*setup_std)(usb_t *usb, void *data, uint32_t ep, setup_t pkt);
+	void (*setup_class)(usb_t *usb, void *data, uint32_t ep, setup_t pkt);
 } usb_if_t;
 
 typedef enum {

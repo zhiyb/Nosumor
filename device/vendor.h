@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-void vendor_process(hid_t *hid, vendor_report_t *rp);
+void vendor_process(usb_hid_t *hid, vendor_report_t *rp);
 
 #ifdef __cplusplus
 }

@@ -3,7 +3,7 @@
 #include "usb_audio2_structs.h"
 #include "usb_audio2_entities.h"
 
-desc_t cx_get(data_t *data, setup_t pkt)
+desc_t usb_audio2_cx_get(data_t *data, setup_t pkt)
 {
 	desc_t desc = {0, data->buf.raw};
 	uint8_t cs = pkt.bType, cn = pkt.bIndex;

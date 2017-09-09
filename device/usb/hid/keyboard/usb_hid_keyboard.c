@@ -49,12 +49,12 @@ static const uint8_t desc_report[] = {
 
 #define KEYBOARD_REPORT_SIZE	9u
 
-hid_t *usb_hid_keyboard_init(void *p)
+usb_hid_t *usb_hid_keyboard_init(usb_hid_data_t *p)
 {
-	hid_t *hid = calloc(1u, sizeof(hid_t) + KEYBOARD_REPORT_SIZE - 1u);
+	usb_hid_t *hid = calloc(1u, sizeof(usb_hid_t) + KEYBOARD_REPORT_SIZE - 1u);
 	if (!hid)
 		fatal();
-	hid->hid_data = (data_t *)p;
+	hid->hid_data = (usb_hid_data_t *)p;
 	hid->size = KEYBOARD_REPORT_SIZE;
 	const_desc_t desc = {
 		.p = desc_report,

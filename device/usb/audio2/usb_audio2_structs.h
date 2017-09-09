@@ -6,7 +6,7 @@
 #include <macros.h>
 #include <peripheral/audio.h>
 
-#define EPOUT_MAX_SIZE	(AUDIO_BUFFER_SIZE >> 1ul)
+#define DATA_MAX_SIZE	(AUDIO_BUFFER_SIZE >> 1ul)
 #define CHANNELS	(1u + AUDIO_CHANNELS)
 
 #ifdef __cplusplus
@@ -37,12 +37,16 @@ typedef struct PACKED {
 
 typedef struct data_t {
 	struct {
-		layout3_cur_t freq[1];
-		layout3_range_t range[1];
-	} clk;
+		layout3_cur_t freq;
+		struct PACKED {
+			layout3_range_t range[1];
+		};
+	} cs;
 	struct {
 		layout2_cur_t vol[CHANNELS];
-		layout2_range_t range[CHANNELS];
+		struct PACKED {
+			layout2_range_t range[CHANNELS];
+		};
 		layout1_cur_t mute[CHANNELS];
 	} fu;
 	struct PACKED {
@@ -51,16 +55,11 @@ typedef struct data_t {
 				uint16_t wNumSubRanges;
 				uint8_t range[];
 			};
-			uint8_t raw[16];
+			uint8_t raw[48];
 		};
 	} buf;
-	int ep_out;
+	int ep_data, ep_feedback;
 } data_t;
-
-typedef struct epdata_t {
-	void *data[2];
-	int swap;
-} epdata_t;
 
 // Parameter block operations
 

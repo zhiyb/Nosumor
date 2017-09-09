@@ -320,11 +320,11 @@
 #define EP_DATA_OVERRUN_CONTROL		0x02
 #define EP_DATA_UNDERRUN_CONTROL	0x03
 
+#define BIT(b)	(1ul << (b))
+
 #include "usb_audio2_defs_spatial.h"
 #include "usb_audio2_defs_frmts.h"
 #include "usb_audio2_defs_termt.h"
-
-#define BIT(b)	(1ul << (b))
 
 // bmControls
 #define BM_NA	0b00

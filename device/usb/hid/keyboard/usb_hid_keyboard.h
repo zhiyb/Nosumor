@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-hid_t *usb_hid_keyboard_init(void *hid);
+usb_hid_t *usb_hid_keyboard_init(usb_hid_data_t *hid);
 
 #ifdef __cplusplus
 }

@@ -92,6 +92,10 @@ Project {
                 "usb/audio2/usb_audio2_desc.h",
                 "usb/audio2/usb_audio2_entities.c",
                 "usb/audio2/usb_audio2_entities.h",
+                "usb/audio2/usb_audio2_ep_data.c",
+                "usb/audio2/usb_audio2_ep_data.h",
+                "usb/audio2/usb_audio2_ep_feedback.c",
+                "usb/audio2/usb_audio2_ep_feedback.h",
                 "usb/audio2/usb_audio2_fu.c",
                 "usb/audio2/usb_audio2_structs.h",
             ]
@@ -99,7 +103,6 @@ Project {
 
         Group {
             name: "USB HID interface"
-            cpp.optimization: "fast"
             files: [
                 "usb/hid/usb_hid.c",
                 "usb/hid/usb_hid.h",
@@ -112,7 +115,6 @@ Project {
 
         Group {
             name: "USB"
-            cpp.optimization: "fast"
             files: [
                 "usb/usb.c",
                 "usb/usb.h",
