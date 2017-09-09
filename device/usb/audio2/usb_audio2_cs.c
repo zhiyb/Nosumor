@@ -76,7 +76,7 @@ int usb_audio2_cs_set(data_t *data, setup_t pkt, void *buf)
 			dbgprintf("F");
 			// TODO: Check frequency validity
 			data->cs.freq = layout_cur(3, buf);
-			dbgprintf("%lu)", data->cs.freq);
+			dbgprintf(")");
 			return 1;
 		default:
 			dbgbkpt();

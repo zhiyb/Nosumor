@@ -18,14 +18,22 @@
 #define STREAM_RX	DMA1_Stream3
 
 static struct {
-	uint8_t data[AUDIO_BUFFER_LENGTH][AUDIO_CHANNELS][AUDIO_SAMPLE_SIZE] ALIGN(AUDIO_FRAME_SIZE);
+	uint8_t buf[AUDIO_BUFFER_LENGTH][AUDIO_CHANNELS][AUDIO_SAMPLE_SIZE] ALIGN(AUDIO_FRAME_SIZE);
 	uint32_t cnt_transfer, cnt_data;
 	void *ptr;
 	volatile struct {
 		void *data;
 		uint32_t size;
 	} cmd;
-} buf;
+	volatile struct {
+		struct {
+			int32_t vol;
+		} ch[2];
+		struct {
+			int32_t vol;
+		} sp[2];
+	} cfg;
+} data;
 
 static void audio_reset();
 static void audio_config();
@@ -59,7 +67,7 @@ void audio_init()
 	// Software reset
 	audio_reset();
 	// Reset audio buffer
-	memset(&buf, 0, sizeof(buf));
+	memset(&data, 0, sizeof(data));
 	// Waiting for reset
 	systick_delay(10);
 
@@ -117,7 +125,7 @@ void audio_init()
 	// FIFO control
 	STREAM_TX->FCR = DMA_SxFCR_DMDIS_Msk;
 	// Memory address
-	STREAM_TX->M0AR = (uint32_t)buf.data;
+	STREAM_TX->M0AR = (uint32_t)data.buf;
 	// Number of data items
 	STREAM_TX->NDTR = AUDIO_TRANSFER_SIZE;
 	// Enable DMA stream
@@ -148,7 +156,7 @@ static void audio_tick(uint32_t tick)
 	// Size increment: (prev - NDTR + size) % size
 	uint32_t n = (prev - ndtr) & (AUDIO_TRANSFER_SIZE - 1ul);
 	prev = ndtr;
-	buf.cnt_transfer += n;
+	data.cnt_transfer += n;
 }
 
 static void audio_cmd_enqueue(const void *p, uint32_t size)
@@ -156,23 +164,23 @@ static void audio_cmd_enqueue(const void *p, uint32_t size)
 	if (!size)
 		return;
 	__disable_irq();
-	buf.cmd.data = realloc(buf.cmd.data, buf.cmd.size + size);
-	memcpy(buf.cmd.data + buf.cmd.size, p, size);
-	buf.cmd.size += size;
+	data.cmd.data = realloc(data.cmd.data, data.cmd.size + size);
+	memcpy(data.cmd.data + data.cmd.size, p, size);
+	data.cmd.size += size;
 	__enable_irq();
 }
 
 void audio_process()
 {
-	if (!buf.cmd.size)
+	if (!data.cmd.size)
 		return;
 	__disable_irq();
-	void *data = buf.cmd.data;
-	uint32_t size = buf.cmd.size;
-	buf.cmd.data = 0;
-	buf.cmd.size = 0;
+	void *cmd = data.cmd.data;
+	uint32_t size = data.cmd.size;
+	data.cmd.data = 0;
+	data.cmd.size = 0;
 	__enable_irq();
-	uint8_t *p = data;
+	uint8_t *p = cmd;
 	while (size) {
 		uint8_t i = *p++;
 		size -= 1u + i * 2u;
@@ -182,18 +190,18 @@ void audio_process()
 		}
 	}
 	__disable_irq();
-	free(data);
+	free(cmd);
 	__enable_irq();
 }
 
 uint32_t audio_transfer_cnt()
 {
-	return buf.cnt_transfer;
+	return data.cnt_transfer;
 }
 
 uint32_t audio_data_cnt()
 {
-	return buf.cnt_data;
+	return data.cnt_data;
 }
 
 static void audio_page(I2C_TypeDef *i2c, uint8_t page)
@@ -209,7 +217,7 @@ static void audio_reset()
 
 static void audio_config()
 {
-	static const uint8_t data[] = {
+	static const uint8_t cfg[] = {
 		0x00, 0x00,		// Page 0
 		0x04, 0x03,		// MCLK => PLL => CODEC
 		0x05, 0x91,		// PLL enabled, P = 1, R = 1
@@ -268,10 +276,15 @@ static void audio_config()
 		//0x2f, 0x00,		// MIC PGA 0dB
 		0x30, 0x10,		// MIC1RP selected for MIC PGA
 		0x31, 0x40,		// CM selected fvoidor MIC PGA
-	}, *p = data;
+	}, *p = cfg;
+
+	data.cfg.ch[0].vol = 0 * 256;
+	data.cfg.ch[1].vol = 0 * 256;
+	data.cfg.sp[0].vol = 6 * 256;
+	data.cfg.sp[1].vol = 6 * 256;
 
 	// Write configration sequence
-	for (uint32_t i = 0; i != sizeof(data) / sizeof(data[0]) / 2; i++) {
+	for (uint32_t i = 0; i != sizeof(cfg) / sizeof(cfg[0]) / 2; i++) {
 		i2c_write(I2C, I2C_ADDR, p, 2);
 		p += 2;
 	}
@@ -289,8 +302,8 @@ void audio_out_enable(int enable)
 		// DAC muted
 		i2c_write_reg(I2C, I2C_ADDR, 0x40, 0x0c);
 		dbgprintf(ESC_BLUE "Audio muted\n");
-		memset(buf.data, 0, sizeof(buf.data));
-		buf.ptr = 0;
+		memset(data.buf, 0, sizeof(data.buf));
+		data.ptr = 0;
 	}
 }
 
@@ -298,25 +311,41 @@ static uint32_t *next_frame()
 {
 	uint32_t mem = (AUDIO_BUFFER_SIZE) - (STREAM_TX->NDTR << 1u) + (AUDIO_FRAME_SIZE << 3u);
 	mem &= ~(AUDIO_FRAME_SIZE - 1ul) & (AUDIO_BUFFER_SIZE - 1ul);
-	return (uint32_t *)((void *)buf.data + mem);
+	return (uint32_t *)((void *)data.buf + mem);
 }
 
 void audio_play(void *p, uint32_t size)
 {
 	uint32_t *mem = next_frame(), *ptr = (uint32_t *)p;
 	size >>= 2u;
-	buf.cnt_data += size >> 1u;
+	data.cnt_data += size >> 1u;
 	while (size--) {
 		*mem++ = ((*ptr) << 16ul) | ((*ptr) >> 16ul);
 		ptr++;
-		if ((void *)mem == (void *)buf.data + AUDIO_BUFFER_SIZE)
-			mem = (void *)buf.data;
+		if ((void *)mem == (void *)data.buf + AUDIO_BUFFER_SIZE)
+			mem = (void *)data.buf;
 	}
-	buf.ptr = mem;
+	data.ptr = mem;
+}
+
+/* Speaker */
+
+int32_t audio_sp_vol(uint32_t ch)
+{
+	if (ch >= 2u) {
+		dbgbkpt();
+		return 0;
+	}
+	return data.cfg.sp[ch].vol;
 }
 
 void audio_sp_vol_set_async(uint32_t ch, int32_t v)
 {
+	if (ch >= 2u) {
+		dbgbkpt();
+		return;
+	}
+	data.cfg.sp[ch].vol = v;
 	v /= audio_sp_vol_res();
 	const uint8_t cmd[] = {
 		3u,			// Command group size
@@ -327,12 +356,24 @@ void audio_sp_vol_set_async(uint32_t ch, int32_t v)
 	audio_cmd_enqueue(cmd, sizeof(cmd));
 }
 
+/* DAC */
+
+int32_t audio_ch_vol(uint32_t ch)
+{
+	if (ch >= 2u) {
+		dbgbkpt();
+		return 0;
+	}
+	return data.cfg.ch[ch].vol;
+}
+
 void audio_ch_vol_set_async(uint32_t ch, int32_t v)
 {
 	if (ch >= 2u) {
 		dbgbkpt();
 		return;
 	}
+	data.cfg.ch[ch].vol = v;
 	v /= audio_ch_vol_res();
 	const uint8_t cmd[] = {
 		3u,			// Command group size

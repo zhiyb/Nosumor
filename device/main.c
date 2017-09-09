@@ -92,9 +92,6 @@ static inline void init()
 	       usb_mode(&usb) ? "host" : "device");
 	while (usb_mode(&usb) != 0);
 	usb_init_device(&usb);
-#if !defined(BOOTLOADER)
-	usb_audio2_init(&usb);
-#endif
 
 	puts(ESC_CYAN "Initialising USB HID interface...");
 	void *hid_data = usb_hid_init(&usb);
@@ -107,6 +104,7 @@ static inline void init()
 #ifndef BOOTLOADER
 	puts(ESC_CYAN "Initialising audio...");
 	audio_init();
+	usb_audio2_init(&usb);
 #endif
 
 	puts(ESC_CYAN "Initialising LEDs...");
@@ -236,9 +234,14 @@ int main()
 			div = 1024ul;
 			printf(ESC_YELLOW " / " ESC_WHITE "%lu+%lu\n",
 			       diff / div, diff & (div - 1u));
+			// Audio volume settings
+			printf(ESC_YELLOW "SP_L %ld | SP_R %ld | DAC_L %ld | DAC_R %ld\n",
+			       audio_sp_vol(0), audio_sp_vol(1), audio_ch_vol(0), audio_ch_vol(1));
 		}
-#endif
+		__disable_irq();
 		fflush(stdout);
+		__enable_irq();
+#endif
 		audio_process();
 		usb_hid_vendor_process(hid_vendor, &vendor_process);
 	}
