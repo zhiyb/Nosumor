@@ -8,6 +8,7 @@
 #include "../escape.h"
 #include "../debug.h"
 #include "../systick.h"
+#include "i2c.h"
 #include "audio.h"
 
 #define I2C		I2C1
@@ -20,9 +21,12 @@ static struct {
 	uint8_t data[AUDIO_BUFFER_LENGTH][AUDIO_CHANNELS][AUDIO_SAMPLE_SIZE] ALIGN(AUDIO_FRAME_SIZE);
 	uint32_t cnt_transfer, cnt_data;
 	void *ptr;
+	volatile struct {
+		void *data;
+		uint32_t size;
+	} cmd;
 } buf;
 
-static int i2c_check(I2C_TypeDef *i2c, uint8_t addr);
 static void audio_reset();
 static void audio_config();
 static void audio_tick(uint32_t tick);
@@ -45,17 +49,7 @@ void audio_init()
 
 	// Initialise I2C module
 	RCC->APB1ENR |= RCC_APB1ENR_I2C1EN_Msk;
-	I2C->CR1 = 0;	// Disable I2C, clear interrupts
-	I2C->CR2 = 0;
-	// I2C at 400kHz (using 54MHz input clock)
-	// 100ns SU:DAT, 0us HD:DAT, 0.8us high period, 1.3us low period
-	I2C->TIMINGR = (0u << I2C_TIMINGR_PRESC_Pos) |
-			(6u << I2C_TIMINGR_SCLDEL_Pos) | (0u << I2C_TIMINGR_SDADEL_Pos) |
-			(44u << I2C_TIMINGR_SCLH_Pos) | (71u << I2C_TIMINGR_SCLL_Pos);
-	// No timeouts
-	I2C->TIMEOUTR = 0;
-	// Enable I2C
-	I2C->CR1 = I2C_CR1_PE_Msk;
+	i2c_init(I2C);
 
 	if (!i2c_check(I2C, I2C_ADDR)) {
 		dbgbkpt();
@@ -157,6 +151,41 @@ static void audio_tick(uint32_t tick)
 	buf.cnt_transfer += n;
 }
 
+static void audio_cmd_enqueue(const void *p, uint32_t size)
+{
+	if (!size)
+		return;
+	__disable_irq();
+	buf.cmd.data = realloc(buf.cmd.data, buf.cmd.size + size);
+	memcpy(buf.cmd.data + buf.cmd.size, p, size);
+	buf.cmd.size += size;
+	__enable_irq();
+}
+
+void audio_process()
+{
+	if (!buf.cmd.size)
+		return;
+	__disable_irq();
+	void *data = buf.cmd.data;
+	uint32_t size = buf.cmd.size;
+	buf.cmd.data = 0;
+	buf.cmd.size = 0;
+	__enable_irq();
+	uint8_t *p = data;
+	while (size) {
+		uint8_t i = *p++;
+		size -= 1u + i * 2u;
+		while (i--) {
+			i2c_write(I2C, I2C_ADDR, p, 2u);
+			p += 2u;
+		}
+	}
+	__disable_irq();
+	free(data);
+	__enable_irq();
+}
+
 uint32_t audio_transfer_cnt()
 {
 	return buf.cnt_transfer;
@@ -165,57 +194,6 @@ uint32_t audio_transfer_cnt()
 uint32_t audio_data_cnt()
 {
 	return buf.cnt_data;
-}
-
-static int i2c_check(I2C_TypeDef *i2c, uint8_t addr)
-{
-	i2c->ICR = I2C_ICR_NACKCF_Msk;
-	i2c->CR2 = I2C_CR2_AUTOEND_Msk | I2C_CR2_START_Msk |
-			(0u << I2C_CR2_NBYTES_Pos) |
-			((addr << 1u) << I2C_CR2_SADD_Pos);
-	while (i2c->CR2 & I2C_CR2_START_Msk);
-	return !(i2c->ISR & I2C_ISR_NACKF_Msk);
-}
-
-static int i2c_write(I2C_TypeDef *i2c, uint8_t addr, const uint8_t *p, uint32_t cnt)
-{
-	i2c->CR2 = I2C_CR2_AUTOEND_Msk | I2C_CR2_START_Msk |
-			(cnt << I2C_CR2_NBYTES_Pos) |
-			((addr << 1u) << I2C_CR2_SADD_Pos);
-	while (cnt--) {
-		while (!(i2c->ISR & I2C_ISR_TXE_Msk));
-		i2c->TXDR = *p++;
-	}
-	while (i2c->ISR & I2C_ISR_BUSY_Msk);
-	return !(i2c->ISR & I2C_ISR_NACKF_Msk);
-}
-
-static int i2c_write_reg(I2C_TypeDef *i2c, uint8_t addr, uint8_t reg, uint8_t val)
-{
-	i2c->CR2 = I2C_CR2_AUTOEND_Msk | I2C_CR2_START_Msk |
-			(2u << I2C_CR2_NBYTES_Pos) |
-			((addr << 1u) << I2C_CR2_SADD_Pos);
-	while (!(i2c->ISR & I2C_ISR_TXE_Msk));
-	i2c->TXDR = reg;
-	while (!(i2c->ISR & I2C_ISR_TXE_Msk));
-	i2c->TXDR = val;
-	while (i2c->ISR & I2C_ISR_BUSY_Msk);
-	return !(i2c->ISR & I2C_ISR_NACKF_Msk);
-}
-
-static int i2c_read_reg(I2C_TypeDef *i2c, uint8_t addr, uint8_t reg)
-{
-	i2c->CR2 = I2C_CR2_START_Msk |
-			(1u << I2C_CR2_NBYTES_Pos) |
-			((addr << 1u) << I2C_CR2_SADD_Pos);
-	while (!(i2c->ISR & I2C_ISR_TXE_Msk));
-	i2c->TXDR = reg;
-	while (i2c->CR2 & I2C_CR2_START_Msk);
-	i2c->CR2 = I2C_CR2_AUTOEND_Msk | I2C_CR2_START_Msk | I2C_CR2_RD_WRN_Msk |
-			(1u << I2C_CR2_NBYTES_Pos) |
-			((addr << 1u) << I2C_CR2_SADD_Pos);
-	while (!(i2c->ISR & I2C_ISR_RXNE_Msk));
-	return i2c->RXDR;
 }
 
 static void audio_page(I2C_TypeDef *i2c, uint8_t page)
@@ -257,7 +235,7 @@ static void audio_config()
 		0x3c, 17,		// DAC using PRB_P17
 		0x3d, 16,		// ADC using PRB_R16
 		0x3f, 0xd4,		// DAC on, data path settings
-		0x40, 0x00,		// DAC not muted, independent volume
+		0x40, 0x0c,		// DAC muted, independent volume
 		0x41, 0x00,		// DAC left volume = 0dB
 		0x42, 0x00,		// DAC right volume = 0dB
 		0x43, 0x80,		// Headset detection enabled
@@ -335,4 +313,32 @@ void audio_play(void *p, uint32_t size)
 			mem = (void *)buf.data;
 	}
 	buf.ptr = mem;
+}
+
+void audio_sp_vol_set_async(uint32_t ch, int32_t v)
+{
+	v /= audio_sp_vol_res();
+	const uint8_t cmd[] = {
+		3u,			// Command group size
+		0x00, 0x01,		// Page 1
+		0x2a, (v << 3u) | 0x04,	// SPL driver PGA = 6dB, not muted
+		0x2b, (v << 3u) | 0x04,	// SPR driver PGA = 6dB, not muted
+	};
+	audio_cmd_enqueue(cmd, sizeof(cmd));
+}
+
+void audio_ch_vol_set_async(uint32_t ch, int32_t v)
+{
+	if (ch >= 2u) {
+		dbgbkpt();
+		return;
+	}
+	v /= audio_ch_vol_res();
+	const uint8_t cmd[] = {
+		3u,			// Command group size
+		0x00, 0x00,		// Page 0
+		0x41, v,		// DAC left volume = 0dB
+		0x42, v,		// DAC right volume = 0dB
+	};
+	audio_cmd_enqueue(cmd, sizeof(cmd));
 }

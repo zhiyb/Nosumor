@@ -10,6 +10,7 @@ extern "C" {
 void audio_init();
 void audio_out_enable(int enable);
 void audio_play(void *p, uint32_t size);
+void audio_process();
 uint32_t audio_transfer_cnt();
 uint32_t audio_data_cnt();
 
@@ -23,10 +24,18 @@ uint32_t audio_data_cnt();
 #define AUDIO_TRANSFER_SIZE	(AUDIO_TRANSFER_CNT(AUDIO_BUFFER_SIZE))
 #define AUDIO_FRAME_TRANSFER	(AUDIO_TRANSFER_CNT(AUDIO_FRAME_SIZE))
 
-// Audio device information, unit: 1/256 dB
-static inline int32_t audio_vol_min() {return -63.5 * 256;}
-static inline int32_t audio_vol_max() {return 24 * 256;}
-static inline int32_t audio_vol_res() {return 0.5 * 256;}
+// Audio device specification, unit: 1/256 dB
+static inline int32_t audio_sp_vol_min() {return 6 * 256;}
+static inline int32_t audio_sp_vol_max() {return 24 * 256;}
+static inline int32_t audio_sp_vol_res() {return 6 * 256;}
+
+static inline int32_t audio_ch_vol_min() {return -63.5 * 256;}
+static inline int32_t audio_ch_vol_max() {return 24 * 256;}
+static inline int32_t audio_ch_vol_res() {return 0.5 * 256;}
+
+// Audio device settings
+void audio_sp_vol_set_async(uint32_t ch, int32_t v);
+void audio_ch_vol_set_async(uint32_t ch, int32_t v);
 
 #ifdef __cplusplus
 }

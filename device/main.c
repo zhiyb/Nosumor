@@ -239,6 +239,7 @@ int main()
 		}
 #endif
 		fflush(stdout);
+		audio_process();
 		usb_hid_vendor_process(hid_vendor, &vendor_process);
 	}
 	return 0;

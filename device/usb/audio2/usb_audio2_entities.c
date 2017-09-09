@@ -17,6 +17,7 @@ int usb_audio2_cs_set(data_t *data, setup_t pkt, void *buf);
 desc_t usb_audio2_cx_get(data_t *data, setup_t pkt);
 
 // Feature unit
+void usb_audio2_fu_init(data_t *data);
 desc_t usb_audio2_fu_get(data_t *data, setup_t pkt);
 int usb_audio2_fu_set(data_t *data, setup_t pkt, void *buf);
 
@@ -74,11 +75,5 @@ void usb_audio2_set(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
 void usb_audio2_entities_init(data_t *data)
 {
 	usb_audio2_cs_init(data);
-	for (int i = 0; i != CHANNELS; i++) {
-		data->fu.mute[i] = 0x00;
-		data->fu.vol[i] = 0x0000;
-		data->fu.range[i].min = audio_vol_min();
-		data->fu.range[i].max = audio_vol_max();
-		data->fu.range[i].res = audio_vol_res();
-	}
+	usb_audio2_fu_init(data);
 }

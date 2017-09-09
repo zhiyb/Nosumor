@@ -1,7 +1,24 @@
+#include <peripheral/audio.h>
 #include "../usb_desc.h"
 #include "usb_audio2_defs.h"
 #include "usb_audio2_structs.h"
 #include "usb_audio2_entities.h"
+
+void usb_audio2_fu_init(data_t *data)
+{
+	data->fu.mute[0] = 0x00;
+	data->fu.vol[0] = audio_sp_vol_min();
+	data->fu.range[0].min = audio_sp_vol_min();
+	data->fu.range[0].max = audio_sp_vol_max();
+	data->fu.range[0].res = audio_sp_vol_res();
+	for (int i = 1; i != CHANNELS; i++) {
+		data->fu.mute[i] = 0x00;
+		data->fu.vol[i] = audio_ch_vol_min();
+		data->fu.range[i].min = audio_ch_vol_min();
+		data->fu.range[i].max = audio_ch_vol_max();
+		data->fu.range[i].res = audio_ch_vol_res();
+	}
+}
 
 desc_t usb_audio2_fu_get(data_t *data, setup_t pkt)
 {
@@ -52,7 +69,6 @@ desc_t usb_audio2_fu_get(data_t *data, setup_t pkt)
 
 int usb_audio2_fu_set(data_t *data, setup_t pkt, void *buf)
 {
-	uint16_t v;
 	uint8_t cs = pkt.bType, cn = pkt.bIndex;
 	dbgprintf(ESC_RED "(FU_");
 	switch (cs) {
@@ -78,11 +94,19 @@ int usb_audio2_fu_set(data_t *data, setup_t pkt, void *buf)
 			break;
 		}
 		switch (pkt.bRequest) {
-		case CUR:
+		case CUR: {
 			dbgprintf("V");
-			data->fu.vol[cn] = layout_cur(2, buf);
+			int16_t v = layout_cur(2, buf);
+			data->fu.vol[cn] = v;
+			if (cn == 0) {
+				audio_sp_vol_set_async(0u, v);
+				audio_sp_vol_set_async(1u, v);
+			} else {
+				audio_ch_vol_set_async(cn - 1u, v);
+			}
 			dbgprintf("%u)", cn);
 			return 1;
+		}
 		default:
 			dbgbkpt();
 		}

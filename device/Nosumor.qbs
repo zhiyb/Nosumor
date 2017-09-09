@@ -55,6 +55,8 @@ Project {
             files: [
                 "peripheral/audio.c",
                 "peripheral/audio.h",
+                "peripheral/i2c.c",
+                "peripheral/i2c.h",
                 "peripheral/mmc_defs.h",
                 "peripheral/mmc.c",
                 "peripheral/mmc.h",

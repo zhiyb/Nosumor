@@ -114,9 +114,9 @@ static void usbif_as_config(usb_t *usb, void *pdata)
 			      DATA_MAX_SIZE, 1u);
 	usb_desc_add(usb, &desc_ep[0], desc_ep[0].bLength);
 	// Feedback endpoint descriptor
-	/*usb_desc_add_endpoint(usb, EP_DIR_IN | data->ep_feedback,
+	usb_desc_add_endpoint(usb, EP_DIR_IN | data->ep_feedback,
 			      EP_ISOCHRONOUS | EP_ISO_NONE | EP_ISO_FEEDBACK,
-			      4u, 1u);*/
+			      4u, 1u);
 }
 
 static void usbif_as_enable(usb_t *usb, void *pdata)

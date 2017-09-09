@@ -6,7 +6,7 @@
 #include <macros.h>
 #include <peripheral/audio.h>
 
-#define DATA_MAX_SIZE	(AUDIO_BUFFER_SIZE >> 1ul)
+#define DATA_MAX_SIZE	(256u)
 #define CHANNELS	(1u + AUDIO_CHANNELS)
 
 #ifdef __cplusplus
