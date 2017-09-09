@@ -17,22 +17,26 @@
 #define STREAM_TX	DMA2_Stream5
 #define STREAM_RX	DMA1_Stream3
 
+typedef struct {
+	struct {
+		int8_t vol;	// 0: 0x41, 0x42
+	} ch[2];
+	uint8_t dac;		// 0: 0x40
+	struct {
+		uint8_t gain;	// 1: 0x2a, 0x2b
+	} sp[2];
+} cfg_t;
+
 static struct {
+	// Audio buffer
 	uint8_t buf[AUDIO_BUFFER_LENGTH][AUDIO_CHANNELS][AUDIO_SAMPLE_SIZE] ALIGN(AUDIO_FRAME_SIZE);
-	uint32_t cnt_transfer, cnt_data;
+	// Buffer write data pointer
 	void *ptr;
-	volatile struct {
-		void *data;
-		uint32_t size;
-	} cmd;
-	volatile struct {
-		struct {
-			int32_t vol;
-		} ch[2];
-		struct {
-			int32_t vol;
-		} sp[2];
-	} cfg;
+	// Data counter
+	uint32_t cnt_transfer, cnt_data;
+	// Configurations
+	volatile cfg_t cfg;
+	volatile int update;
 } data;
 
 static void audio_reset();
@@ -159,39 +163,32 @@ static void audio_tick(uint32_t tick)
 	data.cnt_transfer += n;
 }
 
-static void audio_cmd_enqueue(const void *p, uint32_t size)
-{
-	if (!size)
-		return;
-	__disable_irq();
-	data.cmd.data = realloc(data.cmd.data, data.cmd.size + size);
-	memcpy(data.cmd.data + data.cmd.size, p, size);
-	data.cmd.size += size;
-	__enable_irq();
-}
-
 void audio_process()
 {
-	if (!data.cmd.size)
+	// Copy configurations to local storage
+	if (!data.update)
 		return;
 	__disable_irq();
-	void *cmd = data.cmd.data;
-	uint32_t size = data.cmd.size;
-	data.cmd.data = 0;
-	data.cmd.size = 0;
+	cfg_t cfg = data.cfg;
+	data.update = 0;
 	__enable_irq();
-	uint8_t *p = cmd;
-	while (size) {
-		uint8_t i = *p++;
-		size -= 1u + i * 2u;
-		while (i--) {
-			i2c_write(I2C, I2C_ADDR, p, 2u);
-			p += 2u;
-		}
+
+	// Commands
+	const uint8_t cmd[] = {
+		0x00, 0x00,		// Page 0
+		0x40, cfg.dac,		// DAC configuration
+		0x41, cfg.ch[0].vol,	// DAC left volume
+		0x42, cfg.ch[1].vol,	// DAC right volume
+		0x00, 0x01,		// Page 1
+		0x2a, cfg.sp[0].gain,	// SPL driver PGA = 6dB, not muted
+		0x2b, cfg.sp[1].gain,	// SPR driver PGA = 6dB, not muted
+	}, *p = cmd;
+
+	// Write configration sequence
+	for (uint32_t i = 0; i != sizeof(cmd) / sizeof(cmd[0]) / 2; i++) {
+		i2c_write(I2C, I2C_ADDR, p, 2);
+		p += 2;
 	}
-	__disable_irq();
-	free(cmd);
-	__enable_irq();
 }
 
 uint32_t audio_transfer_cnt()
@@ -217,7 +214,7 @@ static void audio_reset()
 
 static void audio_config()
 {
-	static const uint8_t cfg[] = {
+	static const uint8_t cmd[] = {
 		0x00, 0x00,		// Page 0
 		0x04, 0x03,		// MCLK => PLL => CODEC
 		0x05, 0x91,		// PLL enabled, P = 1, R = 1
@@ -244,8 +241,6 @@ static void audio_config()
 		0x3d, 16,		// ADC using PRB_R16
 		0x3f, 0xd4,		// DAC on, data path settings
 		0x40, 0x0c,		// DAC muted, independent volume
-		0x41, 0x00,		// DAC left volume = 0dB
-		0x42, 0x00,		// DAC right volume = 0dB
 		0x43, 0x80,		// Headset detection enabled
 		0x44, 0x0f,		// DRC disabled
 		0x47, 0x00,		// Left beep disabled
@@ -276,15 +271,18 @@ static void audio_config()
 		//0x2f, 0x00,		// MIC PGA 0dB
 		0x30, 0x10,		// MIC1RP selected for MIC PGA
 		0x31, 0x40,		// CM selected fvoidor MIC PGA
-	}, *p = cfg;
+	}, *p = cmd;
 
-	data.cfg.ch[0].vol = 0 * 256;
-	data.cfg.ch[1].vol = 0 * 256;
-	data.cfg.sp[0].vol = 6 * 256;
-	data.cfg.sp[1].vol = 6 * 256;
+	data.cfg.ch[0].vol = 0x00;	// DAC left volume = 0dB
+	data.cfg.ch[1].vol = 0x00;	// DAC right volume = 0dB
+	data.cfg.sp[0].gain = 0x14;	// SPL driver PGA = 6dB, not muted
+	data.cfg.sp[1].gain = 0x14;	// SPR driver PGA = 6dB, not muted
+	data.cfg.dac = 0x0c;		// DAC muted, independent volume
+	data.update = 1;
+	audio_process();
 
 	// Write configration sequence
-	for (uint32_t i = 0; i != sizeof(cfg) / sizeof(cfg[0]) / 2; i++) {
+	for (uint32_t i = 0; i != sizeof(cmd) / sizeof(cmd[0]) / 2; i++) {
 		i2c_write(I2C, I2C_ADDR, p, 2);
 		p += 2;
 	}
@@ -292,19 +290,12 @@ static void audio_config()
 
 void audio_out_enable(int enable)
 {
-	if (enable) {
-		audio_page(I2C, 0);
-		// DAC not muted, independent volume
-		i2c_write_reg(I2C, I2C_ADDR, 0x40, 0x00);
+	data.cfg.dac = enable ? 0x00 : 0x0c;
+	data.update = 1;
+	if (enable)
 		dbgprintf(ESC_BLUE "Audio unmuted\n");
-	} else {
-		audio_page(I2C, 0);
-		// DAC muted
-		i2c_write_reg(I2C, I2C_ADDR, 0x40, 0x0c);
+	else
 		dbgprintf(ESC_BLUE "Audio muted\n");
-		memset(data.buf, 0, sizeof(data.buf));
-		data.ptr = 0;
-	}
 }
 
 static uint32_t *next_frame()
@@ -336,7 +327,10 @@ int32_t audio_sp_vol(uint32_t ch)
 		dbgbkpt();
 		return 0;
 	}
-	return data.cfg.sp[ch].vol;
+	int32_t v = (data.cfg.sp[ch].gain >> 3u) & 0x03u;
+	v *= audio_sp_vol_res();
+	v += audio_sp_vol_min();
+	return v;
 }
 
 void audio_sp_vol_set_async(uint32_t ch, int32_t v)
@@ -345,15 +339,10 @@ void audio_sp_vol_set_async(uint32_t ch, int32_t v)
 		dbgbkpt();
 		return;
 	}
-	data.cfg.sp[ch].vol = v;
+	v -= audio_sp_vol_min();
 	v /= audio_sp_vol_res();
-	const uint8_t cmd[] = {
-		3u,			// Command group size
-		0x00, 0x01,		// Page 1
-		0x2a, (v << 3u) | 0x04,	// SPL driver PGA = 6dB, not muted
-		0x2b, (v << 3u) | 0x04,	// SPR driver PGA = 6dB, not muted
-	};
-	audio_cmd_enqueue(cmd, sizeof(cmd));
+	data.cfg.sp[ch].gain = (v << 3u) | 0x04;
+	data.update = 1;
 }
 
 /* DAC */
@@ -364,7 +353,7 @@ int32_t audio_ch_vol(uint32_t ch)
 		dbgbkpt();
 		return 0;
 	}
-	return data.cfg.ch[ch].vol;
+	return data.cfg.ch[ch].vol * audio_ch_vol_res();
 }
 
 void audio_ch_vol_set_async(uint32_t ch, int32_t v)
@@ -373,13 +362,6 @@ void audio_ch_vol_set_async(uint32_t ch, int32_t v)
 		dbgbkpt();
 		return;
 	}
-	data.cfg.ch[ch].vol = v;
-	v /= audio_ch_vol_res();
-	const uint8_t cmd[] = {
-		3u,			// Command group size
-		0x00, 0x00,		// Page 0
-		0x41, v,		// DAC left volume = 0dB
-		0x42, v,		// DAC right volume = 0dB
-	};
-	audio_cmd_enqueue(cmd, sizeof(cmd));
+	data.cfg.ch[ch].vol = v / audio_ch_vol_res();
+	data.update = 1;
 }
