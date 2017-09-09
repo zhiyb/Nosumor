@@ -9,6 +9,7 @@
 /* External functions */
 
 // Clock source
+void usb_audio2_cs_init(data_t *data);
 desc_t usb_audio2_cs_get(data_t *data, setup_t pkt);
 int usb_audio2_cs_set(data_t *data, setup_t pkt, void *buf);
 
@@ -72,10 +73,7 @@ void usb_audio2_set(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
 
 void usb_audio2_entities_init(data_t *data)
 {
-	data->cs.freq = 192000;
-	data->cs.range[0].min = 192000;
-	data->cs.range[0].max = 192000;
-	data->cs.range[0].res = 0;
+	usb_audio2_cs_init(data);
 	for (int i = 0; i != CHANNELS; i++) {
 		data->fu.mute[i] = 0x00;
 		data->fu.vol[i] = 0x0000;

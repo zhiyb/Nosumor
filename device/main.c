@@ -185,7 +185,8 @@ int main()
 #ifdef DEBUG
 	uint32_t mask = keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4];
 #endif
-	uint32_t prev_tick = systick_cnt(), prev_cnt = audio_transfer_cnt();
+	uint32_t prev_tick = systick_cnt();
+	uint32_t prev_cnt = audio_transfer_cnt(), prev_data = audio_data_cnt();
 	for (;;) {
 		uint32_t s = keyboard_status();
 		if (s & keyboard_masks[0])
@@ -219,19 +220,25 @@ int main()
 		uint32_t tick = systick_cnt();
 		if ((tick - prev_tick) & ~(1023ul)) {
 			prev_tick += 1024ul;
-			// Compute audio frequency
+			// Calculate audio frequency
 			uint32_t cnt = audio_transfer_cnt();
 			uint32_t diff = cnt - prev_cnt;
 			prev_cnt = cnt;
 			diff *= 1000ul;
-			static const uint32_t div = 1024ul * AUDIO_FRAME_TRANSFER;
-			printf(ESC_YELLOW "Audio freq: " ESC_WHITE "%lu+%lu\n",
+			uint32_t div = 1024ul * AUDIO_FRAME_TRANSFER;
+			printf(ESC_YELLOW "Audio freq: " ESC_WHITE "%lu+%lu",
+			       diff / div, diff & (div - 1u));
+			// Calculate audio data frequency
+			cnt = audio_data_cnt();
+			diff = cnt - prev_data;
+			prev_data = cnt;
+			diff *= 1000ul;
+			div = 1024ul;
+			printf(ESC_YELLOW " / " ESC_WHITE "%lu+%lu\n",
 			       diff / div, diff & (div - 1u));
 		}
 #endif
-		__disable_irq();
 		fflush(stdout);
-		__enable_irq();
 		usb_hid_vendor_process(hid_vendor, &vendor_process);
 	}
 	return 0;

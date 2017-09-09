@@ -41,6 +41,7 @@ typedef struct data_t {
 		struct PACKED {
 			layout3_range_t range[1];
 		};
+		layout1_cur_t valid;
 	} cs;
 	struct {
 		layout2_cur_t vol[CHANNELS];

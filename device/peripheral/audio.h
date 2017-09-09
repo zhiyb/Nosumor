@@ -11,6 +11,7 @@ void audio_init();
 void audio_out_enable(int enable);
 void audio_play(void *p, uint32_t size);
 uint32_t audio_transfer_cnt();
+uint32_t audio_data_cnt();
 
 // Audio buffer information
 #define AUDIO_CHANNELS		2ul

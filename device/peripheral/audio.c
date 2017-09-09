@@ -18,7 +18,8 @@
 
 static struct {
 	uint8_t data[AUDIO_BUFFER_LENGTH][AUDIO_CHANNELS][AUDIO_SAMPLE_SIZE] ALIGN(AUDIO_FRAME_SIZE);
-	uint32_t cnt;
+	uint32_t cnt_transfer, cnt_data;
+	void *ptr;
 } buf;
 
 static int i2c_check(I2C_TypeDef *i2c, uint8_t addr);
@@ -153,12 +154,17 @@ static void audio_tick(uint32_t tick)
 	// Size increment: (prev - NDTR + size) % size
 	uint32_t n = (prev - ndtr) & (AUDIO_TRANSFER_SIZE - 1ul);
 	prev = ndtr;
-	buf.cnt += n;
+	buf.cnt_transfer += n;
 }
 
 uint32_t audio_transfer_cnt()
 {
-	return buf.cnt;
+	return buf.cnt_transfer;
+}
+
+uint32_t audio_data_cnt()
+{
+	return buf.cnt_data;
 }
 
 static int i2c_check(I2C_TypeDef *i2c, uint8_t addr)
@@ -283,7 +289,7 @@ static void audio_config()
 		0x2e, 0x0a,		// MICBIAS force on, MICBIAS = 2.5V
 		//0x2f, 0x00,		// MIC PGA 0dB
 		0x30, 0x10,		// MIC1RP selected for MIC PGA
-		0x31, 0x40,		// CM selected for MIC PGA
+		0x31, 0x40,		// CM selected fvoidor MIC PGA
 	}, *p = data;
 
 	// Write configration sequence
@@ -306,12 +312,13 @@ void audio_out_enable(int enable)
 		i2c_write_reg(I2C, I2C_ADDR, 0x40, 0x0c);
 		dbgprintf(ESC_BLUE "Audio muted\n");
 		memset(buf.data, 0, sizeof(buf.data));
+		buf.ptr = 0;
 	}
 }
 
 static uint32_t *next_frame()
 {
-	uint32_t mem = (AUDIO_BUFFER_SIZE) - (STREAM_TX->NDTR << 1u) + (AUDIO_FRAME_SIZE << 0u);
+	uint32_t mem = (AUDIO_BUFFER_SIZE) - (STREAM_TX->NDTR << 1u) + (AUDIO_FRAME_SIZE << 3u);
 	mem &= ~(AUDIO_FRAME_SIZE - 1ul) & (AUDIO_BUFFER_SIZE - 1ul);
 	return (uint32_t *)((void *)buf.data + mem);
 }
@@ -320,10 +327,12 @@ void audio_play(void *p, uint32_t size)
 {
 	uint32_t *mem = next_frame(), *ptr = (uint32_t *)p;
 	size >>= 2u;
+	buf.cnt_data += size >> 1u;
 	while (size--) {
 		*mem++ = ((*ptr) << 16ul) | ((*ptr) >> 16ul);
 		ptr++;
 		if ((void *)mem == (void *)buf.data + AUDIO_BUFFER_SIZE)
 			mem = (void *)buf.data;
 	}
+	buf.ptr = mem;
 }
