@@ -32,27 +32,30 @@ extern "C" {
 typedef struct usb_t usb_t;
 
 // Setup packet
-typedef union PACKED setup_t {
-	struct {
-		uint8_t bmRequestType;
-		uint8_t bRequest;
-		union {
-			uint16_t wValue;
-			struct {
-				uint8_t bIndex;
-				uint8_t bType;
+typedef struct setup_t {
+	union PACKED {
+		struct {
+			uint8_t bmRequestType;
+			uint8_t bRequest;
+			union {
+				uint16_t wValue;
+				struct {
+					uint8_t bIndex;
+					uint8_t bType;
+				};
 			};
-		};
-		union {
-			uint16_t wIndex;
-			struct {
-				uint8_t bID;
-				uint8_t bEntityID;
+			union {
+				uint16_t wIndex;
+				struct {
+					uint8_t bID;
+					uint8_t bEntityID;
+				};
 			};
+			uint16_t wLength;
 		};
-		uint16_t wLength;
+		uint32_t raw[2];
 	};
-	uint32_t raw[2];
+	void *data ALIGNED;
 } setup_t;
 
 // Standard setup handler

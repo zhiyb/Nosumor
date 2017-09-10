@@ -171,7 +171,7 @@ void usb_audio2_init(usb_t *usb)
 {
 	data_t *data = calloc(1u, sizeof(data_t));
 	if (!data)
-		fatal();
+		panic();
 	usb_audio2_entities_init(data);
 	// Audio control interface
 	const usb_if_t usbif_ac = {

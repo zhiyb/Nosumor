@@ -53,7 +53,7 @@ static desc_t usb_desc_device(usb_t *usb)
 		return usb->desc.dev;
 	desc_dev_t *pd = (desc_dev_t *)malloc(desc_dev.bLength);
 	if (!pd)
-		fatal();
+		panic();
 	memcpy(pd, &desc_dev, desc_dev.bLength);
 	pd->bMaxPacketSize0 = usb_ep0_max_size(usb->base);
 	pd->iManufacturer = usb_desc_add_string(usb, 0, LANG_EN_US, "zhiyb");
@@ -88,7 +88,7 @@ static desc_t usb_desc_device_qualifier(usb_t *usb)
 		return usb->desc.dev_qua;
 	desc_dev_qua_t *pd = (desc_dev_qua_t *)malloc(desc_dev_qua.bLength);
 	if (!pd)
-		fatal();
+		panic();
 	memcpy(pd, &desc_dev_qua, desc_dev_qua.bLength);
 	pd->bMaxPacketSize0 = usb_ep0_max_size(usb->base);
 	usb->desc.dev_qua.p = pd;
@@ -123,7 +123,7 @@ static desc_t usb_desc_config(usb_t *usb)
 		return usb->desc.config;
 	desc_config_t *cp = (desc_config_t *)malloc(desc_config.bLength);
 	if (!cp)
-		fatal();
+		panic();
 	memcpy(cp, &desc_config, desc_config.bLength);
 	usb->desc.config.p = cp;
 	usb->desc.config.size = cp->bLength;
@@ -178,7 +178,7 @@ uint32_t usb_desc_add_string(usb_t *usb, uint16_t id, uint16_t lang, const char 
 		// New language list
 		desc_string_t *pl = (desc_string_t *)malloc(desc_string.bLength + 2u);
 		if (!pl)
-			fatal();
+			panic();
 		memcpy(pl, &desc_string, desc_string.bLength);
 		pl->wPayload[0] = lang;
 		pl->bLength += 2;
@@ -220,14 +220,14 @@ add:	// Add string to string lists
 	// Add new string entry
 	*psl = (desc_string_list_t *)malloc(sizeof(desc_string_list_t));
 	if (!psl)
-		fatal();
+		panic();
 	(*psl)->next = 0;
 	(*psl)->lang = lang;
 	// Allocate string descriptor
 	uint32_t len = strlen(str);
 	desc_string_t *ps = (desc_string_t *)malloc(desc_string.bLength + (len << 1u));
 	if (!ps)
-		fatal();
+		panic();
 	memcpy(ps, &desc_string, desc_string.bLength);
 	ps->bLength += (len << 1u);
 	uint16_t *ppl = ps->wPayload;

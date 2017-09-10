@@ -63,8 +63,8 @@ static inline void usb_endpoint_irq(usb_t *usb)
 			ep->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk;
 			FUNC(usb->epout[n].xfr_cplt)(usb, n);
 		}
-		if (intr & USB_OTG_DOEPINT_STUP_Msk) {
-			ep->DOEPINT = USB_OTG_DOEPINT_STUP_Msk;
+		if (intr & (USB_OTG_DOEPINT_STUP_Msk | USB_OTG_DOEPINT_OTEPSPR_Msk)) {
+			ep->DOEPINT = USB_OTG_DOEPINT_STUP_Msk | USB_OTG_DOEPINT_OTEPSPR_Msk;
 			FUNC(usb->epout[n].setup_cplt)(usb, n);
 		}
 	}

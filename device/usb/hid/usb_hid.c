@@ -294,7 +294,7 @@ usb_hid_data_t *usb_hid_init(usb_t *usb)
 {
 	usb_hid_data_t *data = (usb_hid_data_t *)calloc(1u, sizeof(usb_hid_data_t));
 	if (!data)
-		fatal();
+		panic();
 	usb_if_t usbif = {
 		.data = data,
 		.config = &usbif_config,

@@ -58,7 +58,7 @@ static void hid_report(usb_hid_t *hid, usb_hid_report_t *report, uint32_t size)
 	// Push report to hid buffer at the front
 	data_t *dp = malloc(sizeof(data_t) + rp->size);
 	if (!dp)
-		fatal();
+		panic();
 	memcpy(&dp->report, rp->raw, rp->size);
 	dp->next = hid->data;
 	dp->prev = 0;
@@ -71,7 +71,7 @@ usb_hid_t *usb_hid_vendor_init(usb_hid_data_t *hid_data)
 {
 	usb_hid_t *hid = calloc(1u, sizeof(usb_hid_t) + VENDOR_REPORT_SIZE - 1u);
 	if (!hid)
-		fatal();
+		panic();
 	hid->hid_data = (usb_hid_data_t *)hid_data;
 	hid->recv = &hid_report;
 	hid->size = VENDOR_REPORT_SIZE;

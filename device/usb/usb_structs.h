@@ -59,9 +59,6 @@ typedef struct usb_t {
 	USB_OTG_GlobalTypeDef *base;
 	usb_speed_t speed;
 	usb_status_t status;
-	// Setup packet buffers
-	setup_t setup;
-	void *setup_buf;
 	// USB RAM & FIFO allocation
 	struct {
 		uint32_t top, max;

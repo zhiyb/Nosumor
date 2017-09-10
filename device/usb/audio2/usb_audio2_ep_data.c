@@ -74,11 +74,11 @@ int usb_audio2_ep_data_register(usb_t *usb)
 {
 	epdata_t *epdata = calloc(1u, sizeof(epdata_t));
 	if (!epdata)
-		fatal();
+		panic();
 	epdata->data[0] = malloc(DATA_MAX_SIZE);
 	epdata->data[1] = malloc(DATA_MAX_SIZE);
 	if (!epdata->data[0] || !epdata->data[1])
-		fatal();
+		panic();
 
 	const epout_t epout = {
 		.data = epdata,

@@ -146,7 +146,8 @@ void usb_init_device(usb_t *usb)
 	// DMA threshold
 	dev->DTHRCTL = (32u << USB_OTG_DTHRCTL_RXTHRLEN_Pos) | (32u << USB_OTG_DTHRCTL_TXTHRLEN_Pos) |
 			USB_OTG_DTHRCTL_RXTHREN_Msk | USB_OTG_DTHRCTL_ISOTHREN_Msk | USB_OTG_DTHRCTL_NONISOTHREN_Msk;
-	dev->DOEPMSK = USB_OTG_DOEPMSK_XFRCM_Msk | USB_OTG_DOEPMSK_STUPM_Msk;
+	dev->DOEPMSK = USB_OTG_DOEPMSK_XFRCM_Msk |
+			USB_OTG_DOEPMSK_STUPM_Msk | USB_OTG_DOEPMSK_OTEPSPRM_Msk;
 	dev->DIEPMSK = USB_OTG_DIEPMSK_XFRCM_Msk | USB_OTG_DIEPMSK_TOM_Msk;
 	base->GINTMSK |= USB_OTG_GINTMSK_USBRST_Msk | USB_OTG_GINTMSK_USBSUSPM_Msk |
 			USB_OTG_GINTMSK_ENUMDNEM_Msk | USB_OTG_GINTMSK_PXFRM_IISOOXFRM_Msk |
@@ -163,4 +164,9 @@ void usb_connect(usb_t *usb, int e)
 		systick_delay(100);
 	} else
 		dev->DCTL = 0;	// Connect device
+}
+
+void usb_process(usb_t *usb)
+{
+	usb_ep0_process(usb);
 }

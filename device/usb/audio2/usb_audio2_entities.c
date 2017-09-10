@@ -65,7 +65,7 @@ void usb_audio2_set(usb_t *usb, data_t *data, uint32_t ep, setup_t pkt)
 		dbgbkpt();
 	}
 	if (func) {
-		if (func(data, pkt, usb->setup_buf))
+		if (func(data, pkt, pkt.data))
 			usb_ep_in_transfer(usb->base, ep, 0, 0);
 		else
 			usb_ep_in_stall(usb->base, ep);

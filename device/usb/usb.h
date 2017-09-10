@@ -13,6 +13,7 @@ void usb_init(usb_t *usb, USB_OTG_GlobalTypeDef *base);
 int usb_mode(usb_t *usb);	// 0: Device; 1: Host
 void usb_init_device(usb_t *usb);
 void usb_connect(usb_t *usb, int e);
+void usb_process(usb_t *usb);
 
 #ifdef __cplusplus
 }

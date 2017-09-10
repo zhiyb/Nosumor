@@ -53,7 +53,7 @@ usb_hid_t *usb_hid_keyboard_init(usb_hid_data_t *p)
 {
 	usb_hid_t *hid = calloc(1u, sizeof(usb_hid_t) + KEYBOARD_REPORT_SIZE - 1u);
 	if (!hid)
-		fatal();
+		panic();
 	hid->hid_data = (usb_hid_data_t *)p;
 	hid->size = KEYBOARD_REPORT_SIZE;
 	const_desc_t desc = {

@@ -37,7 +37,7 @@ void usb_interface_register(usb_t *usb, const usb_if_t *usbif)
 	for (p = &usb->usbif; *p != 0; p = &(*p)->next);
 	*p = (usb_if_t *)malloc(sizeof(usb_if_t));
 	if (!p)
-		fatal();
+		panic();
 	**p = *usbif;
 	(*p)->next = 0;
 }

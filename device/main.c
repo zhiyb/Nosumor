@@ -207,6 +207,12 @@ int main()
 			GPIOA->ODR &= ~GPIO_ODR_ODR_1;
 		else
 			GPIOA->ODR |= GPIO_ODR_ODR_1;
+
+		// Process time consuming tasks
+		usb_process(&usb);
+		audio_process();
+		usb_hid_vendor_process(hid_vendor, &vendor_process);
+		fflush(stdout);
 #ifdef DEBUG
 		if ((s & mask) == mask) {
 			usb_connect(&usb, 0);
@@ -238,10 +244,7 @@ int main()
 			printf(ESC_YELLOW "SP_L %ld | SP_R %ld | DAC_L %ld | DAC_R %ld\n",
 			       audio_sp_vol(0), audio_sp_vol(1), audio_ch_vol(0), audio_ch_vol(1));
 		}
-		fflush(stdout);
 #endif
-		audio_process();
-		usb_hid_vendor_process(hid_vendor, &vendor_process);
 	}
 	return 0;
 }

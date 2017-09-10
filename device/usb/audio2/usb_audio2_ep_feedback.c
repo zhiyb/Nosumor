@@ -29,7 +29,7 @@ int usb_audio2_ep_feedback_register(usb_t *usb)
 {
 	epdata_t *epdata = calloc(1u, sizeof(epdata_t));
 	if (!epdata)
-		fatal();
+		panic();
 
 	const epin_t epin = {
 		.data = epdata,
