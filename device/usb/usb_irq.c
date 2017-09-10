@@ -115,8 +115,8 @@ void OTG_HS_IRQHandler()
 				continue;
 			if ((ep->DIEPCTL & USB_OTG_DIEPCTL_EPTYP_Msk) != EP_TYP_ISOCHRONOUS)
 				continue;
-			if ((!(ep->DIEPCTL & USB_OTG_DIEPCTL_EONUM_DPID_Msk)) == fn)
-				continue;
+			//if ((!(ep->DIEPCTL & USB_OTG_DIEPCTL_EONUM_DPID_Msk)) == fn)
+			//	continue;
 			DIEPCTL_SET(ep->DIEPCTL, mask);
 			//putchar(fn + 'A');
 		}
@@ -124,7 +124,6 @@ void OTG_HS_IRQHandler()
 	}
 	if (i & USB_OTG_GINTSTS_PXFR_INCOMPISOOUT_Msk) {
 		base->GINTSTS = USB_OTG_GINTSTS_PXFR_INCOMPISOOUT_Msk;
-#if 0
 		// Check frame parity
 		uint32_t mask = fn ? USB_OTG_DOEPCTL_SD0PID_SEVNFRM_Msk : USB_OTG_DOEPCTL_SODDFRM_Msk;
 		// Update endpoints
@@ -132,13 +131,14 @@ void OTG_HS_IRQHandler()
 			USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 			if (!(ep->DOEPCTL & USB_OTG_DOEPCTL_EPENA_Msk))
 				continue;
-			// Not defined for DOEPCTL?
-			if ((!(ep->DOEPCTL & USB_OTG_DIEPCTL_EONUM_DPID_Msk)) == fn)
+			if ((ep->DOEPCTL & USB_OTG_DOEPCTL_EPTYP_Msk) != EP_TYP_ISOCHRONOUS)
 				continue;
-			ep->DOEPCTL |= mask;
+			// Not defined for DOEPCTL?
+			//if ((!(ep->DOEPCTL & USB_OTG_DIEPCTL_EONUM_DPID_Msk)) == fn)
+			//	continue;
+			DOEPCTL_SET(ep->DOEPCTL, mask);
 			//putchar(fn + 'a');
 		}
-#endif
 		bk = 0;
 	}
 	if (i & USB_OTG_GINTSTS_OTGINT) {

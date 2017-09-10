@@ -57,6 +57,8 @@ static void flash_check(usb_hid_t *hid)
 
 void vendor_process(usb_hid_t *hid, vendor_report_t *rp)
 {
+	if (!rp->size)
+		return;
 #if 0
 	dbgprintf("\n" ESC_YELLOW "Vendor OUT report size %u, type %02x, content %02x %02x %02x",
 		  rp->size, rp->type, rp->payload[0], rp->payload[1], rp->payload[2]);
