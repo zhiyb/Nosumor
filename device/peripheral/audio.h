@@ -13,14 +13,16 @@ void audio_play(void *p, uint32_t size);
 void audio_process();
 uint32_t audio_transfer_cnt();
 uint32_t audio_data_cnt();
+int32_t audio_buffering();
 
 // Audio buffer information
 #define AUDIO_CHANNELS		2ul
 #define AUDIO_SAMPLE_SIZE	4ul
 #define AUDIO_FRAME_SIZE	(AUDIO_CHANNELS * AUDIO_SAMPLE_SIZE)
-#define AUDIO_BUFFER_LENGTH	256ul
+#define AUDIO_BUFFER_LENGTH	512ul
 #define AUDIO_BUFFER_SIZE	(AUDIO_FRAME_SIZE * AUDIO_BUFFER_LENGTH)
 #define AUDIO_TRANSFER_CNT(n)	((n) >> 1u)
+#define AUDIO_TRANSFER_BYTES(n)	((n) << 1u)
 #define AUDIO_TRANSFER_SIZE	(AUDIO_TRANSFER_CNT(AUDIO_BUFFER_SIZE))
 #define AUDIO_FRAME_TRANSFER	(AUDIO_TRANSFER_CNT(AUDIO_FRAME_SIZE))
 

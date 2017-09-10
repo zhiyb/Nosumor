@@ -97,6 +97,7 @@ static void usbif_as_config(usb_t *usb, void *pdata)
 
 	// Register endpoints
 	data->ep_data = usb_audio2_ep_data_register(usb);
+	// TODO: Feedback endpoint need to have the same endpoint number
 	data->ep_feedback = usb_audio2_ep_feedback_register(usb);
 
 	// Alternate setting 0, zero-bandwidth
@@ -110,13 +111,13 @@ static void usbif_as_config(usb_t *usb, void *pdata)
 
 	// Data stream endpoint descriptor
 	usb_desc_add_endpoint(usb, EP_DIR_OUT | data->ep_data,
-			      EP_ISOCHRONOUS | EP_ISO_SYNC | EP_ISO_DATA,
+			      EP_ISOCHRONOUS | EP_ISO_ASYNC | EP_ISO_DATA,
 			      DATA_MAX_SIZE, 1u);
 	usb_desc_add(usb, &desc_ep[0], desc_ep[0].bLength);
 	// Feedback endpoint descriptor
 	usb_desc_add_endpoint(usb, EP_DIR_IN | data->ep_feedback,
 			      EP_ISOCHRONOUS | EP_ISO_NONE | EP_ISO_FEEDBACK,
-			      4u, 1u);
+			      4u, 4u);
 }
 
 static void usbif_as_enable(usb_t *usb, void *pdata)

@@ -93,6 +93,12 @@ static inline void init()
 	while (usb_mode(&usb) != 0);
 	usb_init_device(&usb);
 
+#ifndef BOOTLOADER
+	puts(ESC_CYAN "Initialising audio...");
+	audio_init();
+	usb_audio2_init(&usb);
+#endif
+
 	puts(ESC_CYAN "Initialising USB HID interface...");
 	void *hid_data = usb_hid_init(&usb);
 	void *hid_keyboard = usb_hid_keyboard_init(hid_data);
@@ -100,12 +106,6 @@ static inline void init()
 
 	puts(ESC_CYAN "Initialising keyboard...");
 	keyboard_init(hid_keyboard);
-
-#ifndef BOOTLOADER
-	puts(ESC_CYAN "Initialising audio...");
-	audio_init();
-	usb_audio2_init(&usb);
-#endif
 
 	puts(ESC_CYAN "Initialising LEDs...");
 	// RGB:	PA0(R), PA1(G), PA2(B)
@@ -183,8 +183,12 @@ int main()
 #ifdef DEBUG
 	uint32_t mask = keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4];
 #endif
-	uint32_t prev_tick = systick_cnt();
-	uint32_t prev_cnt = audio_transfer_cnt(), prev_data = audio_data_cnt();
+	struct {
+		uint32_t tick, audio, data, feedback;
+	} cnt, prev = {
+		systick_cnt(), audio_transfer_cnt(),
+		audio_data_cnt(), usb_audio2_feedback_cnt(),
+	};
 	for (;;) {
 		uint32_t s = keyboard_status();
 		if (s & keyboard_masks[0])
@@ -221,25 +225,35 @@ int main()
 		}
 
 		// Every 1024 systick ticks
-		uint32_t tick = systick_cnt();
-		if ((tick - prev_tick) & ~(1023ul)) {
-			prev_tick += 1024ul;
+		cnt.tick = systick_cnt();
+		if ((cnt.tick - prev.tick) & ~(1023ul)) {
+			prev.tick += 1024ul;
 			// Calculate audio frequency
-			uint32_t cnt = audio_transfer_cnt();
-			uint32_t diff = cnt - prev_cnt;
-			prev_cnt = cnt;
+			cnt.audio = audio_transfer_cnt();
+			uint32_t diff = cnt.audio - prev.audio;
+			prev.audio = cnt.audio;
 			diff *= 1000ul;
 			uint32_t div = 1024ul * AUDIO_FRAME_TRANSFER;
 			printf(ESC_YELLOW "Audio freq: " ESC_WHITE "%lu+%lu",
 			       diff / div, diff & (div - 1u));
 			// Calculate audio data frequency
-			cnt = audio_data_cnt();
-			diff = cnt - prev_data;
-			prev_data = cnt;
+			cnt.data = audio_data_cnt();
+			diff = cnt.data - prev.data;
+			prev.data = cnt.data;
 			diff *= 1000ul;
 			div = 1024ul;
-			printf(ESC_YELLOW " / " ESC_WHITE "%lu+%lu\n",
+			printf(ESC_YELLOW " / " ESC_WHITE "%lu+%lu",
 			       diff / div, diff & (div - 1u));
+			// Calculate feedback frequency
+			cnt.feedback = usb_audio2_feedback_cnt();
+			diff = cnt.feedback - prev.feedback;
+			prev.feedback = cnt.feedback;
+			diff *= 1000ul;
+			div = 1024ul;
+			printf(ESC_YELLOW " / " ESC_WHITE "%lu+%lu",
+			       diff / div, diff & (div - 1u));
+			// Audio data offset
+			printf(ESC_YELLOW " => " ESC_WHITE "%ld\n", audio_buffering());
 			// Audio volume settings
 			printf(ESC_YELLOW "SP_L %ld | SP_R %ld | DAC_L %ld | DAC_R %ld\n",
 			       audio_sp_vol(0), audio_sp_vol(1), audio_ch_vol(0), audio_ch_vol(1));

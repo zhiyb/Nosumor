@@ -63,11 +63,9 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 	uint32_t siz = ep->DOEPTSIZ;
 	epout_recv(usb, n);
 	uint32_t pktcnt = 1u - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
-	uint32_t size = DATA_MAX_SIZE - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
-	//dbgprintf(ESC_BLUE "<X|%lx|%lx>", pktcnt, size);
-	if (pktcnt) {
-		audio_play(epdata->data[epdata->swap], 192u);
-	}
+	uint32_t size = DATA_MAX_SIZE - FIELD(siz, USB_OTG_DOEPTSIZ_XFRSIZ);
+	if (pktcnt)
+		audio_play(epdata->data[epdata->swap], size);
 }
 
 int usb_audio2_ep_data_register(usb_t *usb)

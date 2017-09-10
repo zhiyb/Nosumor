@@ -31,9 +31,10 @@ static struct {
 	// Audio buffer
 	uint8_t buf[AUDIO_BUFFER_LENGTH][AUDIO_CHANNELS][AUDIO_SAMPLE_SIZE] ALIGN(AUDIO_FRAME_SIZE);
 	// Buffer write data pointer
-	void *ptr;
+	void * volatile ptr;
 	// Data counter
 	uint32_t cnt_transfer, cnt_data;
+	int32_t offset;
 	// Configurations
 	volatile cfg_t cfg;
 	volatile int update;
@@ -155,12 +156,22 @@ void audio_init()
 static void audio_tick(uint32_t tick)
 {
 	static uint32_t prev = AUDIO_TRANSFER_SIZE;
+	__disable_irq();
 	// Data transferred
 	uint16_t ndtr = STREAM_TX->NDTR;
 	// Size increment: (prev - NDTR + size) % size
 	uint32_t n = (prev - ndtr) & (AUDIO_TRANSFER_SIZE - 1ul);
 	prev = ndtr;
 	data.cnt_transfer += n;
+	if (data.ptr)
+		data.offset -= AUDIO_TRANSFER_BYTES(n);
+	__enable_irq();
+
+	// Clear buffer if lost sync
+	if (data.offset < -(int32_t)AUDIO_BUFFER_SIZE) {
+		memset(data.buf, 0, sizeof(data.buf));
+		data.offset = 0;
+	}
 }
 
 void audio_process()
@@ -292,24 +303,40 @@ void audio_out_enable(int enable)
 {
 	data.cfg.dac = enable ? 0x00 : 0x0c;
 	data.update = 1;
+	data.offset = 0;
+	data.ptr = 0;
 	if (enable)
 		dbgprintf(ESC_BLUE "Audio unmuted\n");
 	else
 		dbgprintf(ESC_BLUE "Audio muted\n");
 }
 
-static uint32_t *next_frame()
+static inline uint32_t *next_frame()
 {
-	uint32_t mem = (AUDIO_BUFFER_SIZE) - (STREAM_TX->NDTR << 1u) + (AUDIO_FRAME_SIZE << 3u);
+	// ((buffer - remaining) + buffering) & (alignment & buffer)
+	uint32_t mem = (AUDIO_BUFFER_SIZE) - AUDIO_TRANSFER_BYTES(STREAM_TX->NDTR)
+			+ (AUDIO_FRAME_SIZE << 4u);
 	mem &= ~(AUDIO_FRAME_SIZE - 1ul) & (AUDIO_BUFFER_SIZE - 1ul);
 	return (uint32_t *)((void *)data.buf + mem);
 }
 
 void audio_play(void *p, uint32_t size)
 {
-	uint32_t *mem = next_frame(), *ptr = (uint32_t *)p;
+	uint32_t *mem = data.ptr ?: next_frame(), *ptr = (uint32_t *)p;
+	// Update offset
+	audio_tick(0);
+	__disable_irq();
+	data.offset += size;
+	if (!data.ptr) {	// ((mem - buf) - (buffer - remaining) + buffer) % buffer
+		data.offset = (void *)mem - (void *)data.buf + AUDIO_TRANSFER_BYTES(STREAM_TX->NDTR);
+		data.offset %= AUDIO_BUFFER_SIZE;
+	}
+	__enable_irq();
+	// Fill buffer
 	size >>= 2u;
 	data.cnt_data += size >> 1u;
+	if (size & 1u)
+		dbgbkpt();
 	while (size--) {
 		*mem++ = ((*ptr) << 16ul) | ((*ptr) >> 16ul);
 		ptr++;
@@ -364,4 +391,9 @@ void audio_ch_vol_set_async(uint32_t ch, int32_t v)
 	}
 	data.cfg.ch[ch].vol = v / audio_ch_vol_res();
 	data.update = 1;
+}
+
+int32_t audio_buffering()
+{
+	return data.offset;
 }

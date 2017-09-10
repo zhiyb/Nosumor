@@ -137,7 +137,6 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 			return;
 		}
 	}
-	dbgbkpt();
 }
 
 static void usbif_config(usb_t *usb, void *p)
