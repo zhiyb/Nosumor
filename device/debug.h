@@ -1,13 +1,17 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
+#include <stm32f7xx.h>
+#include <stdio.h>
+
 #define dbgexist()	(CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk)
-#define panic()		do __BKPT(0); while (1)
+#define panic()		do { \
+	printf("\nPanic at %s():%d\n", __PRETTY_FUNCTION__, __LINE__); \
+	__BKPT(0); \
+} while (1)
 
 #ifdef DEBUG
 
-#include <stm32f7xx.h>
-#include <stdio.h>
 #include <string.h>
 #include <escape.h>
 
