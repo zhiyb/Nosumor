@@ -32,7 +32,7 @@
 #define BOOTLOADER_FUNC	((void (*)())*(uint32_t *)(BOOTLOADER_BASE + 4u))
 
 usb_t usb;	// Shared with PVD
-static usb_hid_t *hid_vendor;
+static usb_hid_if_t *hid_vendor;
 
 static inline void bootloader_check()
 {
@@ -100,9 +100,9 @@ static inline void init()
 #endif
 
 	puts(ESC_CYAN "Initialising USB HID interface...");
-	void *hid_data = usb_hid_init(&usb);
-	void *hid_keyboard = usb_hid_keyboard_init(hid_data);
-	hid_vendor = usb_hid_vendor_init(hid_data);
+	usb_hid_t *hid = usb_hid_init(&usb);
+	usb_hid_if_t *hid_keyboard = usb_hid_keyboard_init(hid);
+	hid_vendor = usb_hid_vendor_init(hid);
 
 	puts(ESC_CYAN "Initialising keyboard...");
 	keyboard_init(hid_keyboard);

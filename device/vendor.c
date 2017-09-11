@@ -24,7 +24,7 @@ typedef struct PACKED {
 
 static vendor_report_t report;
 
-static void ping(usb_hid_t *hid)
+static void ping(usb_hid_if_t *hid)
 {
 	report.type = Pong;
 	pong_t *p = (pong_t *)report.payload;
@@ -42,7 +42,7 @@ static void ping(usb_hid_t *hid)
 	usb_hid_vendor_send(hid, &report);
 }
 
-static void flash_check(usb_hid_t *hid)
+static void flash_check(usb_hid_if_t *hid)
 {
 	report.type = FlashStatus;
 	report.size = VENDOR_REPORT_BASE_SIZE + 1u;
@@ -55,7 +55,7 @@ static void flash_check(usb_hid_t *hid)
 		puts(ESC_RED "Invalid HEX content received");
 }
 
-void vendor_process(usb_hid_t *hid, vendor_report_t *rp)
+void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp)
 {
 	if (!rp->size)
 		return;

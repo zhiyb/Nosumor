@@ -26,14 +26,14 @@ uint8_t keycodes[KEYBOARD_KEYS] = {
 	0x1b, 0x1d, 0x06, 0x35, 0x29,
 };
 
-usb_hid_t *hid = 0;
+usb_hid_if_t *hid = 0;
 
 static volatile uint32_t status, debouncing, timeout[KEYBOARD_KEYS];
 
 static uint32_t keyboard_gpio_status();
 static void keyboard_tick(uint32_t tick);
 
-void keyboard_init(usb_hid_t *hid_keyboard)
+void keyboard_init(usb_hid_if_t *hid_keyboard)
 {
 	hid = hid_keyboard;
 
@@ -174,7 +174,7 @@ static void keyboard_tick(uint32_t tick)
 	uint32_t err = (status & mask) ^ (stat & mask);
 	EXTI->SWIER = err;
 	if (err)
-		dbgbkpt();
+		dbgprintf(ESC_RED "Keyboard tick mismatch\n");
 	debouncing &= ~mask;
 	__enable_irq();
 }

@@ -52,7 +52,7 @@ typedef struct data_t {
 	} report;
 } data_t;
 
-static void hid_report(usb_hid_t *hid, usb_hid_report_t *report, uint32_t size)
+static void hid_report(usb_hid_if_t *hid, usb_hid_report_t *report, uint32_t size)
 {
 	vendor_report_t *rp = (vendor_report_t *)report;
 	// Push report to hid buffer at the front
@@ -67,12 +67,12 @@ static void hid_report(usb_hid_t *hid, usb_hid_report_t *report, uint32_t size)
 	hid->data = dp;
 }
 
-usb_hid_t *usb_hid_vendor_init(usb_hid_data_t *hid_data)
+usb_hid_if_t *usb_hid_vendor_init(usb_hid_t *hid_data)
 {
-	usb_hid_t *hid = calloc(1u, sizeof(usb_hid_t) + VENDOR_REPORT_SIZE - 1u);
+	usb_hid_if_t *hid = calloc(1u, sizeof(usb_hid_if_t) + VENDOR_REPORT_SIZE - 1u);
 	if (!hid)
 		panic();
-	hid->hid_data = (usb_hid_data_t *)hid_data;
+	hid->hid_data = (usb_hid_t *)hid_data;
 	hid->recv = &hid_report;
 	hid->size = VENDOR_REPORT_SIZE;
 	const_desc_t desc = {
@@ -83,7 +83,7 @@ usb_hid_t *usb_hid_vendor_init(usb_hid_data_t *hid_data)
 	return hid;
 }
 
-void usb_hid_vendor_process(usb_hid_t *hid, vendor_func_t func)
+void usb_hid_vendor_process(usb_hid_if_t *hid, vendor_func_t func)
 {
 	if (!hid->data)
 		return;
@@ -108,7 +108,7 @@ void usb_hid_vendor_process(usb_hid_t *hid, vendor_func_t func)
 	}
 }
 
-void usb_hid_vendor_send(usb_hid_t *hid, vendor_report_t *report)
+void usb_hid_vendor_send(usb_hid_if_t *hid, vendor_report_t *report)
 {
 	report->id = hid->report.id;
 	while (hid->pending);

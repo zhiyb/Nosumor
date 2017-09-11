@@ -13,7 +13,7 @@ extern "C" {
 
 extern const uint32_t keyboard_masks[KEYBOARD_KEYS];
 
-void keyboard_init(usb_hid_t *hid_keyboard);
+void keyboard_init(usb_hid_if_t *hid_keyboard);
 uint32_t keyboard_status();
 
 #ifdef __cplusplus
