@@ -108,13 +108,16 @@ static inline void init()
 	keyboard_init(hid_keyboard);
 
 	puts(ESC_CYAN "Initialising LEDs...");
-	// RGB:	PA0(R), PA1(G), PA2(B)
-	// LED:	PB14(1), PB15(2), PA11(3), PA10(4)
+	// RGB:	PA0(R), PA1(G), PA2(B)			| TIM5_CH123
+	// LED:	PB14(1), PB15(2), PA11(3), PA10(4)	| TIM12_CH12, TIM1_CH43
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN;
 	// 01: General purpose output mode
 	GPIO_MODER(GPIOA, 0, 0b01);
 	GPIO_MODER(GPIOA, 1, 0b01);
 	GPIO_MODER(GPIOA, 2, 0b01);
+	GPIO_OTYPER_OD(GPIOA, 0);
+	GPIO_OTYPER_OD(GPIOA, 1);
+	GPIO_OTYPER_OD(GPIOA, 2);
 	GPIOA->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1 | GPIO_ODR_ODR_2);
 	GPIO_MODER(GPIOB, 14, 0b01);
 	GPIO_MODER(GPIOB, 15, 0b01);
@@ -191,6 +194,11 @@ int main()
 	};
 	for (;;) {
 		uint32_t s = keyboard_status();
+		int up = s & (keyboard_masks[0] | keyboard_masks[1]);
+		if (up)
+			GPIOA->ODR |= GPIO_ODR_ODR_10 | GPIO_ODR_ODR_11;
+		else
+			GPIOA->ODR &= ~(GPIO_ODR_ODR_10 | GPIO_ODR_ODR_11);
 		if (s & keyboard_masks[0])
 			GPIOB->ODR &= ~GPIO_ODR_ODR_15;
 		else
@@ -199,18 +207,23 @@ int main()
 			GPIOB->ODR &= ~GPIO_ODR_ODR_14;
 		else
 			GPIOB->ODR |= GPIO_ODR_ODR_14;
-		if (s & keyboard_masks[2])
-			GPIOA->ODR &= ~GPIO_ODR_ODR_0;
-		else
-			GPIOA->ODR |= GPIO_ODR_ODR_0;
-		if (s & keyboard_masks[3])
-			GPIOA->ODR &= ~GPIO_ODR_ODR_2;
-		else
-			GPIOA->ODR |= GPIO_ODR_ODR_2;
-		if (s & keyboard_masks[4])
-			GPIOA->ODR &= ~GPIO_ODR_ODR_1;
-		else
-			GPIOA->ODR |= GPIO_ODR_ODR_1;
+		int down = s & (keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4]);
+		if (up && !down) {
+			GPIOA->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_2 | GPIO_ODR_ODR_1);
+		} else {
+			if (s & keyboard_masks[2])
+				GPIOA->ODR &= ~GPIO_ODR_ODR_0;
+			else
+				GPIOA->ODR |= GPIO_ODR_ODR_0;
+			if (s & keyboard_masks[3])
+				GPIOA->ODR &= ~GPIO_ODR_ODR_2;
+			else
+				GPIOA->ODR |= GPIO_ODR_ODR_2;
+			if (s & keyboard_masks[4])
+				GPIOA->ODR &= ~GPIO_ODR_ODR_1;
+			else
+				GPIOA->ODR |= GPIO_ODR_ODR_1;
+		}
 
 		// Process time consuming tasks
 		usb_process(&usb);
