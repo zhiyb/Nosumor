@@ -7,7 +7,9 @@
 extern "C" {
 #endif
 
-void audio_init();
+typedef struct usb_audio_t usb_audio_t;
+
+void audio_init(usb_audio_t *audio);
 void audio_out_enable(int enable);
 void audio_play(void *p, uint32_t size);
 void audio_process();

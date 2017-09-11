@@ -1,20 +1,14 @@
+#include <malloc.h>
 #include "../usb_desc.h"
 #include "usb_audio2_defs.h"
 #include "usb_audio2_structs.h"
 #include "usb_audio2_entities.h"
+#include "usb_audio2_desc.h"
 
-void usb_audio2_cs_init(data_t *data)
+desc_t usb_audio2_cs_get(usb_audio_t *audio, usb_audio_entity_t *entity, setup_t pkt)
 {
-	data->cs.freq = 192000;
-	data->cs.range[0].min = 192000;
-	data->cs.range[0].max = 192000;
-	data->cs.range[0].res = 0;
-	data->cs.valid = 1;
-}
-
-desc_t usb_audio2_cs_get(data_t *data, setup_t pkt)
-{
-	desc_t desc = {0, data->buf.raw};
+	const audio_cs_t *data = entity->data;
+	desc_t desc = {0, audio->buf.raw};
 	uint8_t cs = pkt.bType, cn = pkt.bIndex;
 	dbgprintf(ESC_GREEN "(CS_");
 	switch (cs) {
@@ -27,11 +21,13 @@ desc_t usb_audio2_cs_get(data_t *data, setup_t pkt)
 		switch (pkt.bRequest) {
 		case CUR:
 			dbgprintf("f");
-			desc.size = layout_cur_get(data, 3, &data->cs.freq);
+			audio->buf.cur3 = data->sam_freq(audio, entity->id);
+			desc.size = sizeof(layout3_cur_t);
 			break;
 		case RANGE:
 			dbgprintf("fr");
-			desc.size = layout_range_get(data, 3, &data->cs.range[0], ASIZE(data->cs.range));
+			audio->buf.wNumSubRanges = data->sam_freq_range(audio, entity->id, audio->buf.range3);
+			desc.size = 2u + audio->buf.wNumSubRanges * sizeof(layout3_range_t);
 			break;
 		default:
 			dbgbkpt();
@@ -46,7 +42,8 @@ desc_t usb_audio2_cs_get(data_t *data, setup_t pkt)
 		switch (pkt.bRequest) {
 		case CUR:
 			dbgprintf("v");
-			desc.size = layout_cur_get(data, 1, &data->cs.valid);
+			audio->buf.cur1 = data->valid(audio, entity->id);
+			desc.size = sizeof(layout1_cur_t);
 			break;
 		default:
 			dbgbkpt();
@@ -59,9 +56,9 @@ desc_t usb_audio2_cs_get(data_t *data, setup_t pkt)
 	return desc;
 }
 
-int usb_audio2_cs_set(data_t *data, setup_t pkt, void *buf)
+int usb_audio2_cs_set(usb_audio_t *audio, usb_audio_entity_t *entity, setup_t pkt)
 {
-	uint16_t v;
+	const audio_cs_t *data = entity->data;
 	uint8_t cs = pkt.bType, cn = pkt.bIndex;
 	dbgprintf(ESC_RED "(CS_");
 	switch (cs) {
@@ -75,9 +72,7 @@ int usb_audio2_cs_set(data_t *data, setup_t pkt, void *buf)
 		case CUR:
 			dbgprintf("F");
 			// TODO: Check frequency validity
-			data->cs.freq = layout_cur(3, buf);
-			dbgprintf(")");
-			return 1;
+			return data->sam_freq_set(audio, entity->id, layout_cur(3, pkt.data));
 		default:
 			dbgbkpt();
 		}
@@ -85,4 +80,24 @@ int usb_audio2_cs_set(data_t *data, setup_t pkt, void *buf)
 		dbgbkpt();
 	}
 	return 0;
+}
+
+void usb_audio2_register_cs(usb_audio_t *audio, const uint8_t id, const audio_cs_t *data,
+			    usb_t *usb, uint8_t bmAttributes, uint8_t bmControls,
+			    uint8_t bAssocTerminal, uint8_t iClockSource)
+{
+	// Register entitry
+	usb_audio_entity_t *entity = usb_audio2_register_entity(audio, id, data);
+	entity->get = &usb_audio2_cs_get;
+	entity->set = &usb_audio2_cs_set;
+	// Add descriptor
+	const desc_cs_t desc = {
+		8u, CS_INTERFACE, CLOCK_SOURCE, id,
+		bmAttributes, bmControls, bAssocTerminal, iClockSource
+	};
+	void *pd = malloc(desc.bLength);
+	if (!pd)
+		panic();
+	memcpy(pd, &desc, desc.bLength);
+	entity->desc = pd;
 }

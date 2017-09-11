@@ -4,6 +4,7 @@
 #include <malloc.h>
 #include <math.h>
 #include <stm32f7xx.h>
+#include <usb/audio2/usb_audio2_entities.h>
 #include "../macros.h"
 #include "../escape.h"
 #include "../debug.h"
@@ -41,10 +42,11 @@ static struct {
 } data;
 
 static void audio_reset();
+static void audio_init_config();
 static void audio_config();
 static void audio_tick(uint32_t tick);
 
-void audio_init()
+void audio_init(usb_audio_t *audio)
 {
 	// Initialise I2C GPIOs
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN_Msk;
@@ -149,81 +151,12 @@ void audio_init()
 	GPIO_PUPDR(GPIOC, 4, GPIO_PUPDR_UP);
 
 	// Start
-	audio_config();
+	audio_init_config();
 	systick_register_handler(audio_tick);
+	usb_audio2_register(audio, &audio_config);
 }
 
-static void audio_tick(uint32_t tick)
-{
-	static uint32_t prev = AUDIO_TRANSFER_SIZE;
-	__disable_irq();
-	// Data transferred
-	uint16_t ndtr = STREAM_TX->NDTR;
-	// Size increment: (prev - NDTR + size) % size
-	uint32_t n = (prev - ndtr) & (AUDIO_TRANSFER_SIZE - 1ul);
-	prev = ndtr;
-	data.cnt_transfer += n;
-	if (data.ptr)
-		data.offset -= AUDIO_TRANSFER_BYTES(n);
-	__enable_irq();
-
-	// Clear buffer if lost sync
-	if (data.offset < -(int32_t)AUDIO_BUFFER_SIZE) {
-		memset(data.buf, 0, sizeof(data.buf));
-		data.offset = 0;
-	}
-}
-
-void audio_process()
-{
-	// Copy configurations to local storage
-	if (!data.update)
-		return;
-	__disable_irq();
-	cfg_t cfg = data.cfg;
-	data.update = 0;
-	__enable_irq();
-
-	// Commands
-	const uint8_t cmd[] = {
-		0x00, 0x00,		// Page 0
-		0x40, cfg.dac,		// DAC configuration
-		0x41, cfg.ch[0].vol,	// DAC left volume
-		0x42, cfg.ch[1].vol,	// DAC right volume
-		0x00, 0x01,		// Page 1
-		0x2a, cfg.sp[0].gain,	// SPL driver PGA = 6dB, not muted
-		0x2b, cfg.sp[1].gain,	// SPR driver PGA = 6dB, not muted
-	}, *p = cmd;
-
-	// Write configration sequence
-	for (uint32_t i = 0; i != sizeof(cmd) / sizeof(cmd[0]) / 2; i++) {
-		i2c_write(I2C, I2C_ADDR, p, 2);
-		p += 2;
-	}
-}
-
-uint32_t audio_transfer_cnt()
-{
-	return data.cnt_transfer;
-}
-
-uint32_t audio_data_cnt()
-{
-	return data.cnt_data;
-}
-
-static void audio_page(I2C_TypeDef *i2c, uint8_t page)
-{
-	i2c_write_reg(i2c, I2C_ADDR, 0x00, page);
-}
-
-static void audio_reset()
-{
-	audio_page(I2C, 0);
-	i2c_write_reg(I2C, I2C_ADDR, 0x01, 1u);
-}
-
-static void audio_config()
+static void audio_init_config()
 {
 	static const uint8_t cmd[] = {
 		0x00, 0x00,		// Page 0
@@ -297,6 +230,81 @@ static void audio_config()
 		i2c_write(I2C, I2C_ADDR, p, 2);
 		p += 2;
 	}
+}
+
+static void audio_config()
+{
+	;
+}
+
+static void audio_tick(uint32_t tick)
+{
+	static uint32_t prev = AUDIO_TRANSFER_SIZE;
+	__disable_irq();
+	// Data transferred
+	uint16_t ndtr = STREAM_TX->NDTR;
+	// Size increment: (prev - NDTR + size) % size
+	uint32_t n = (prev - ndtr) & (AUDIO_TRANSFER_SIZE - 1ul);
+	prev = ndtr;
+	data.cnt_transfer += n;
+	if (data.ptr)
+		data.offset -= AUDIO_TRANSFER_BYTES(n);
+	__enable_irq();
+
+	// Clear buffer if lost sync
+	if (data.offset < -(int32_t)AUDIO_BUFFER_SIZE) {
+		memset(data.buf, 0, sizeof(data.buf));
+		data.offset = 0;
+	}
+}
+
+void audio_process()
+{
+	// Copy configurations to local storage
+	if (!data.update)
+		return;
+	__disable_irq();
+	cfg_t cfg = data.cfg;
+	data.update = 0;
+	__enable_irq();
+
+	// Commands
+	const uint8_t cmd[] = {
+		0x00, 0x00,		// Page 0
+		0x40, cfg.dac,		// DAC configuration
+		0x41, cfg.ch[0].vol,	// DAC left volume
+		0x42, cfg.ch[1].vol,	// DAC right volume
+		0x00, 0x01,		// Page 1
+		0x2a, cfg.sp[0].gain,	// SPL driver PGA = 6dB, not muted
+		0x2b, cfg.sp[1].gain,	// SPR driver PGA = 6dB, not muted
+	}, *p = cmd;
+
+	// Write configration sequence
+	for (uint32_t i = 0; i != sizeof(cmd) / sizeof(cmd[0]) / 2; i++) {
+		i2c_write(I2C, I2C_ADDR, p, 2);
+		p += 2;
+	}
+}
+
+uint32_t audio_transfer_cnt()
+{
+	return data.cnt_transfer;
+}
+
+uint32_t audio_data_cnt()
+{
+	return data.cnt_data;
+}
+
+static void audio_page(I2C_TypeDef *i2c, uint8_t page)
+{
+	i2c_write_reg(i2c, I2C_ADDR, 0x00, page);
+}
+
+static void audio_reset()
+{
+	audio_page(I2C, 0);
+	i2c_write_reg(I2C, I2C_ADDR, 0x01, 1u);
 }
 
 void audio_out_enable(int enable)

@@ -50,10 +50,6 @@ typedef struct PACKED desc_cs_t {
 	uint8_t iClockSource;
 } desc_cs_t;
 
-static const desc_cs_t desc_cs[] = {
-	{8u, CS_INTERFACE, CLOCK_SOURCE, CS_PLL, 0b000, 0b0111u, 0u, 0u},
-};
-
 // Clock selector
 typedef struct PACKED desc_cx_t {
 	uint8_t bLength;		// 7 + p
@@ -66,10 +62,6 @@ typedef struct PACKED desc_cx_t {
 	//uint8_t bmControls;
 	//uint8_t iClockSelector;
 } desc_cx_t;
-
-static const desc_cx_t desc_cx_in = {
-	7u + 1u, CS_INTERFACE, CLOCK_SELECTOR, CX_IN, 1u, {CS_PLL, 0b01u, 0u}
-};
 
 // Input terminal
 typedef struct PACKED desc_it_t {
@@ -120,13 +112,6 @@ typedef struct PACKED desc_fu_t {
 	uint32_t bmaControls[];
 	//uint8_t iFeature;
 } desc_fu_t;
-
-static const desc_fu_t desc_fu_out = {
-	6u + (2u + 1u) * 4u, CS_INTERFACE, FEATURE_UNIT, FU_Out, IT_USB,
-	{FU_CTRL(FU_MUTE_CONTROL, BM_RW) | FU_CTRL(FU_VOLUME_CONTROL, BM_RW),
-	 FU_CTRL(FU_MUTE_CONTROL, BM_RW) | FU_CTRL(FU_VOLUME_CONTROL, BM_RW),
-	 FU_CTRL(FU_MUTE_CONTROL, BM_RW) | FU_CTRL(FU_VOLUME_CONTROL, BM_RW), 0u}
-};
 
 // Audio stream interface
 typedef struct PACKED desc_as_t {

@@ -15,25 +15,12 @@
 
 static void usbif_ac_config(usb_t *usb, void *pdata)
 {
-	data_t *data = (data_t *)pdata;
+	usb_audio_t *audio = (usb_audio_t *)pdata;
+	audio->config(usb, audio);
 	if (!desc_ac.wTotalLength) {
 		desc_ac.wTotalLength = desc_ac.bLength;
-		// Clock sources
-		const desc_cs_t *pcs = desc_cs;
-		for (uint32_t i = 0; i != ASIZE(desc_cs); i++, pcs++)
-			desc_ac.wTotalLength += pcs->bLength;
-		// Clock selectors
-		desc_ac.wTotalLength += desc_cx_in.bLength;
-		// Input terminals
-		const desc_it_t *pit = desc_it;
-		for (uint32_t i = 0; i != ASIZE(desc_it); i++, pit++)
-			desc_ac.wTotalLength += pit->bLength;
-		// Feature units
-		desc_ac.wTotalLength += desc_fu_out.bLength;
-		// Output terminals
-		const desc_ot_t *pot = desc_ot;
-		for (uint32_t i = 0; i != ASIZE(desc_ot); i++, pot++)
-			desc_ac.wTotalLength += pot->bLength;
+		for (usb_audio_entity_t **p = &audio->entities; *p; p = &(*p)->next)
+			desc_ac.wTotalLength += (*p)->desc->bLength;
 	}
 	// Audio interface association
 	uint32_t s = usb_desc_add_string(usb, 0, LANG_EN_US, "USB Audio");
@@ -42,22 +29,12 @@ static void usbif_ac_config(usb_t *usb, void *pdata)
 	// Audio control interface
 	usb_desc_add_interface(usb, 0u, 0u, AUDIO, AUDIOCONTROL, IP_VERSION_02_00, 0u);
 	usb_desc_add(usb, &desc_ac, desc_ac.bLength);
-	// Clock sources
-	const desc_cs_t *pcs = desc_cs;
-	for (uint32_t i = 0; i != ASIZE(desc_cs); i++, pcs++)
-		usb_desc_add(usb, pcs, pcs->bLength);
-	// Clock selectors
-	usb_desc_add(usb, &desc_cx_in, desc_cx_in.bLength);
-	// Input terminals
-	const desc_it_t *pit = desc_it;
-	for (uint32_t i = 0; i != ASIZE(desc_it); i++, pit++)
-		usb_desc_add(usb, pit, pit->bLength);
-	// Feature units
-	usb_desc_add(usb, &desc_fu_out, desc_fu_out.bLength);
-	// Output terminals
-	const desc_ot_t *pot = desc_ot;
-	for (uint32_t i = 0; i != ASIZE(desc_ot); i++, pot++)
-		usb_desc_add(usb, pot, pot->bLength);
+	// Entity descriptors
+	for (usb_audio_entity_t **p = &audio->entities; *p; p = &(*p)->next) {
+		usb_desc_add(usb, (*p)->desc, (*p)->desc->bLength);
+		free((*p)->desc);
+		(*p)->desc = 0;
+	}
 }
 
 static void usbif_ac_setup_class(usb_t *usb, void *data, uint32_t ep, setup_t pkt)
@@ -93,7 +70,7 @@ static void usbif_ac_setup_class(usb_t *usb, void *data, uint32_t ep, setup_t pk
 
 static void usbif_as_config(usb_t *usb, void *pdata)
 {
-	data_t *data = (data_t *)pdata;
+	usb_audio_t *data = (usb_audio_t *)pdata;
 
 	// Register endpoints
 	data->ep_data = usb_audio2_ep_data_register(usb);
@@ -122,7 +99,7 @@ static void usbif_as_config(usb_t *usb, void *pdata)
 
 static void usbif_as_enable(usb_t *usb, void *pdata)
 {
-	data_t *data = pdata;
+	usb_audio_t *data = pdata;
 	usb_audio2_ep_data_halt(usb, data->ep_data, 0);
 	usb_audio2_ep_feedback_halt(usb, data->ep_feedback, 0);
 	dbgprintf(ESC_BLUE "USB Audio enabled\n");
@@ -130,7 +107,7 @@ static void usbif_as_enable(usb_t *usb, void *pdata)
 
 static void usbif_as_disable(usb_t *usb, void *pdata)
 {
-	data_t *data = pdata;
+	usb_audio_t *data = pdata;
 	usb_audio2_ep_data_halt(usb, data->ep_data, 1);
 	usb_audio2_ep_feedback_halt(usb, data->ep_feedback, 1);
 	dbgprintf(ESC_BLUE "USB Audio disabled\n");
@@ -168,9 +145,9 @@ static void usbif_as_setup_std(usb_t *usb, void *pdata, uint32_t ep, setup_t pkt
 	}
 }
 
-void usb_audio2_init(usb_t *usb)
+usb_audio_t *usb_audio2_init(usb_t *usb)
 {
-	data_t *data = calloc(1u, sizeof(data_t));
+	usb_audio_t *data = calloc(1u, sizeof(usb_audio_t));
 	if (!data)
 		panic();
 	usb_audio2_entities_init(data);
@@ -190,4 +167,5 @@ void usb_audio2_init(usb_t *usb)
 		.setup_std = &usbif_as_setup_std,
 	};
 	usb_interface_register(usb, &usbif_as);
+	return data;
 }

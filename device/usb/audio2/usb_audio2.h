@@ -8,8 +8,9 @@ extern "C" {
 #endif
 
 typedef struct usb_t usb_t;
+typedef struct usb_audio_t usb_audio_t;
 
-void usb_audio2_init(usb_t *usb);
+usb_audio_t *usb_audio2_init(usb_t *usb);
 uint32_t usb_audio2_feedback_cnt();
 
 #ifdef __cplusplus

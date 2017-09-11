@@ -1,41 +1,28 @@
-#include <peripheral/audio.h>
+#include <malloc.h>
 #include "../usb_desc.h"
 #include "usb_audio2_defs.h"
 #include "usb_audio2_structs.h"
 #include "usb_audio2_entities.h"
+#include "usb_audio2_desc.h"
 
-void usb_audio2_fu_init(data_t *data)
+desc_t usb_audio2_fu_get(usb_audio_t *audio, usb_audio_entity_t *entity, setup_t pkt)
 {
-	data->fu.mute[0] = 0x00;
-	data->fu.vol[0] = audio_sp_vol_min();
-	data->fu.range[0].min = audio_sp_vol_min();
-	data->fu.range[0].max = audio_sp_vol_max();
-	data->fu.range[0].res = audio_sp_vol_res();
-	for (int i = 1; i != CHANNELS; i++) {
-		data->fu.mute[i] = 0x00;
-		data->fu.vol[i] = audio_ch_vol_min();
-		data->fu.range[i].min = audio_ch_vol_min();
-		data->fu.range[i].max = audio_ch_vol_max();
-		data->fu.range[i].res = audio_ch_vol_res();
-	}
-}
-
-desc_t usb_audio2_fu_get(data_t *data, setup_t pkt)
-{
-	desc_t desc = {0, data->buf.raw};
+	const audio_fu_t *data = entity->data;
+	desc_t desc = {0, audio->buf.raw};
 	uint8_t cs = pkt.bType, cn = pkt.bIndex;
 	dbgprintf(ESC_GREEN "(FU_");
 	switch (cs) {
 	case FU_MUTE_CONTROL:
 		// Layout 1 parameter block
-		if (cn >= ASIZE(data->fu.mute)) {
+		if (cn > data->channels) {
 			dbgbkpt();
 			break;
 		}
 		switch (pkt.bRequest) {
 		case CUR:
 			dbgprintf("m");
-			desc.size = layout_cur_get(data, 1, &data->fu.mute[cn]);
+			audio->buf.cur1 = data->mute(audio, entity->id, cn);
+			desc.size = sizeof(layout1_cur_t);
 			break;
 		default:
 			dbgbkpt();
@@ -43,18 +30,20 @@ desc_t usb_audio2_fu_get(data_t *data, setup_t pkt)
 		break;
 	case FU_VOLUME_CONTROL:
 		// Layout 2 parameter block
-		if (cn >= ASIZE(data->fu.vol)) {
+		if (cn >= data->channels) {
 			dbgbkpt();
 			break;
 		}
 		switch (pkt.bRequest) {
 		case CUR:
 			dbgprintf("v");
-			desc.size = layout_cur_get(data, 2, &data->fu.vol[cn]);
+			audio->buf.cur2 = data->volume(audio, entity->id, cn);
+			desc.size = sizeof(layout2_cur_t);
 			break;
 		case RANGE:
 			dbgprintf("vr");
-			desc.size = layout_range_get(data, 2, &data->fu.range[cn], 1u);
+			audio->buf.wNumSubRanges = data->volume_range(audio, entity->id, cn, audio->buf.range2);
+			desc.size = 2u + audio->buf.wNumSubRanges * sizeof(layout2_range_t);
 			break;
 		default:
 			dbgbkpt();
@@ -63,49 +52,39 @@ desc_t usb_audio2_fu_get(data_t *data, setup_t pkt)
 	default:
 		dbgbkpt();
 	}
-	dbgprintf("%u/%lu@%u)", cn, desc.size, pkt.wLength);
+	dbgprintf("%u|%lu@%u)", cn, desc.size, pkt.wLength);
 	return desc;
 }
 
-int usb_audio2_fu_set(data_t *data, setup_t pkt, void *buf)
+int usb_audio2_fu_set(usb_audio_t *audio, usb_audio_entity_t *entity, setup_t pkt)
 {
+	const audio_fu_t *data = entity->data;
 	uint8_t cs = pkt.bType, cn = pkt.bIndex;
 	dbgprintf(ESC_RED "(FU_");
 	switch (cs) {
 	case FU_MUTE_CONTROL:
 		// Layout 1 parameter block
-		if (cn >= ASIZE(data->fu.mute)) {
+		if (cn > data->channels) {
 			dbgbkpt();
 			break;
 		}
 		switch (pkt.bRequest) {
 		case CUR:
-			dbgprintf("M");
-			data->fu.mute[cn] = layout_cur(1, buf);
-			dbgprintf("%u)", cn);
-			return 1;
+			dbgprintf("M%u|", cn);
+			return data->mute_set(audio, entity->id, cn, layout_cur(1, pkt.data));
 		default:
 			dbgbkpt();
 		}
 	case FU_VOLUME_CONTROL:
 		// Layout 2 parameter block
-		if (cn >= ASIZE(data->fu.vol)) {
+		if (cn > data->channels) {
 			dbgbkpt();
 			break;
 		}
 		switch (pkt.bRequest) {
 		case CUR: {
-			dbgprintf("V");
-			int16_t v = layout_cur(2, buf);
-			data->fu.vol[cn] = v;
-			if (cn == 0) {
-				audio_sp_vol_set_async(0u, v);
-				audio_sp_vol_set_async(1u, v);
-			} else {
-				audio_ch_vol_set_async(cn - 1u, v);
-			}
-			dbgprintf("%u)", cn);
-			return 1;
+			dbgprintf("V%u|", cn);
+			return data->volume_set(audio, entity->id, cn, layout_cur(2, pkt.data));
 		}
 		default:
 			dbgbkpt();
@@ -115,4 +94,26 @@ int usb_audio2_fu_set(data_t *data, setup_t pkt, void *buf)
 		dbgbkpt();
 	}
 	return 0;
+}
+
+void usb_audio2_register_fu(usb_audio_t *audio, const uint8_t id, const audio_fu_t *data,
+			    usb_t *usb, uint8_t bSourceID,
+			    uint32_t *bmaControls, uint8_t iFeature)
+{
+	// Register entitry
+	usb_audio_entity_t *entity = usb_audio2_register_entity(audio, id, data);
+	entity->get = &usb_audio2_fu_get;
+	entity->set = &usb_audio2_fu_set;
+	// Add descriptor
+	uint8_t bmaLength = (data->channels + 1u) * 4u;
+	uint8_t bLength = 6u + bmaLength;
+	desc_fu_t *pd = malloc(bLength);
+	pd->bLength = bLength;
+	pd->bDescriptorType = CS_INTERFACE;
+	pd->bDescriptorSubtype = FEATURE_UNIT;
+	pd->bUnitID = id;
+	pd->bSourceID = bSourceID;
+	memcpy(pd->bmaControls, bmaControls, bmaLength);
+	*((uint8_t *)pd + bLength - 1u) = iFeature;
+	entity->desc = (void *)pd;
 }
