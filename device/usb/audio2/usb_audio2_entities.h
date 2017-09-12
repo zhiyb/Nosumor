@@ -1,6 +1,7 @@
 #ifndef USB_AUDIO2_ENTITIES_H
 #define USB_AUDIO2_ENTITIES_H
 
+#include <string.h>
 #include <debug.h>
 #include "../usb_setup.h"
 
