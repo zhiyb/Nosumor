@@ -148,65 +148,6 @@ void audio_config_enable(int enable)
 	cfg.update = 1;
 }
 
-/* DAC */
-
-int audio_ch_mute(uint32_t ch)
-{
-	return !!(cfg.dac & (0x04 << ch));
-}
-
-void audio_ch_mute_set_async(uint32_t ch, int v)
-{
-	if (v)
-		cfg.dac |= (0x04 << ch);
-	else
-		cfg.dac &= ~(0x04 << ch);
-	cfg.update = 1;
-}
-
-int32_t audio_ch_vol(uint32_t ch)
-{
-	return (int)(0.5 * 256) * cfg.ch[ch].vol;	// res
-}
-
-void audio_ch_vol_set_async(uint32_t ch, int32_t v)
-{
-	cfg.ch[ch].vol = v / (int)(0.5 * 256);		// res
-	cfg.update = 1;
-}
-
-/* Speaker */
-
-int audio_sp_mute(uint32_t ch)
-{
-	return !(cfg.sp[ch].gain & 0x04);
-}
-
-void audio_sp_mute_set_async(uint32_t ch, int v)
-{
-	if (v)
-		cfg.sp[ch].gain &= ~0x04;
-	else
-		cfg.sp[ch].gain |= 0x04;
-	cfg.update = 1;
-}
-
-int32_t audio_sp_vol(uint32_t ch)
-{
-	int32_t v = (cfg.sp[ch].gain >> 3u) & 0x03u;
-	v *= (int)(6 * 256);	// res
-	v += (int)(6 * 256);	// min
-	return v;
-}
-
-void audio_sp_vol_set_async(uint32_t ch, int32_t v)
-{
-	v -= (int)(6 * 256);	// min
-	v /= (int)(6 * 256);	// res
-	cfg.sp[ch].gain = (v << 3u) | 0x04;
-	cfg.update = 1;
-}
-
 // Clock source control
 layout1_cur_t cs_valid(usb_audio_t *audio, const uint8_t id)
 {
@@ -250,13 +191,14 @@ layout1_cur_t fu_mute(usb_audio_t *audio, const uint8_t id, const int cn)
 		dbgbkpt();
 		return 0;
 	}
+	int ch = cn - 1;
 	switch (id) {
 	case FU_DAC:
-		return audio_ch_mute(cn - 1u);
+		return !!(cfg.dac & (0x04 << ch));
 	case FU_Speaker:
-		return audio_sp_mute(cn - 1u);
+		return !(cfg.sp[ch].gain & 0x04);
 	case FU_Headphones:
-		return !(cfg.hp[cn - 1u].gain & 0x04);
+		return !(cfg.hp[ch].gain & 0x04);
 	}
 	dbgbkpt();
 	return 0;
@@ -268,23 +210,32 @@ int fu_mute_set(usb_audio_t *audio, const uint8_t id, const int cn, layout1_cur_
 		dbgbkpt();
 		return 0;
 	}
+	int ch = cn - 1;
 	switch (id) {
 	case FU_DAC:
-		audio_ch_mute_set_async(cn - 1u, v);
-		return 1;
+		if (v)
+			cfg.dac |= (0x04 << ch);
+		else
+			cfg.dac &= ~(0x04 << ch);
+		break;
 	case FU_Speaker:
-		audio_sp_mute_set_async(cn - 1u, v);
-		return 1;
+		if (v)
+			cfg.sp[ch].gain &= ~0x04;
+		else
+			cfg.sp[ch].gain |= 0x04;
+		break;
 	case FU_Headphones:
 		if (v)
-			cfg.hp[cn - 1].gain &= ~0x04;
+			cfg.hp[ch].gain &= ~0x04;
 		else
-			cfg.hp[cn - 1].gain |= 0x04;
-		cfg.update = 1;
-		return 1;
+			cfg.hp[ch].gain |= 0x04;
+		break;
+	default:
+		dbgbkpt();
+		return 0;
 	}
-	dbgbkpt();
-	return 0;
+	cfg.update = 1;
+	return 1;
 }
 
 layout2_cur_t fu_volume(usb_audio_t *audio, const uint8_t id, const int cn)
@@ -293,13 +244,14 @@ layout2_cur_t fu_volume(usb_audio_t *audio, const uint8_t id, const int cn)
 		dbgbkpt();
 		return 0;
 	}
+	int ch = cn - 1;
 	switch (id) {
 	case FU_DAC:
-		return audio_ch_vol(cn - 1u);
+		return (int)(0.5 * 256) * cfg.ch[ch].vol;
 	case FU_Speaker:
-		return audio_sp_vol(cn - 1u);
+		return ((cfg.sp[ch].gain >> 3u) & 0x03u) * (int)(6 * 256) + (int)(6 * 256);
 	case FU_Headphones:
-		return ((cfg.hp[cn - 1u].gain >> 3u) & 0x0fu) * (int)(1 * 256);
+		return ((cfg.hp[ch].gain >> 3u) & 0x0fu) * (int)(1 * 256);
 	}
 	dbgbkpt();
 	return 0;
@@ -311,20 +263,23 @@ int fu_volume_set(usb_audio_t *audio, const uint8_t id, const int cn, const layo
 		dbgbkpt();
 		return 0;
 	}
+	int ch = cn - 1;
 	switch (id) {
 	case FU_DAC:
-		audio_ch_vol_set_async(cn - 1u, v);
-		return 1;
+		cfg.ch[ch].vol = v / (int)(0.5 * 256);
+		break;
 	case FU_Speaker:
-		audio_sp_vol_set_async(cn - 1u, v);
+		cfg.sp[ch].gain = (((v - (int)(6 * 256)) / (int)(6 * 256)) << 3u) | 0x04;
 		return 1;
 	case FU_Headphones:
-		cfg.hp[cn - 1u].gain = ((v / (int)(1 * 256)) << 3u) | 0x0fu;
-		cfg.update = 1;
-		return 1;
+		cfg.hp[ch].gain = ((v / (int)(1 * 256)) << 3u) | 0x0fu;
+		break;
+	default:
+		dbgbkpt();
+		return 0;
 	}
-	dbgbkpt();
-	return 0;
+	cfg.update = 1;
+	return 1;
 }
 
 uint32_t fu_volume_range(usb_audio_t *audio, const uint8_t id, const int cn, layout2_range_t *buf)

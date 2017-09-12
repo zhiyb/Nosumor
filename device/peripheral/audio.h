@@ -31,16 +31,6 @@ uint32_t audio_transfer_cnt();
 uint32_t audio_data_cnt();
 int32_t audio_buffering();
 
-// Audio device configurations, unit: 1/256 dB
-
-// Speaker gain
-int32_t audio_sp_vol(uint32_t ch);
-void audio_sp_vol_set_async(uint32_t ch, int32_t v);
-
-// DAC gain
-int32_t audio_ch_vol(uint32_t ch);
-void audio_ch_vol_set_async(uint32_t ch, int32_t v);
-
 #ifdef __cplusplus
 }
 #endif

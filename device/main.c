@@ -267,9 +267,6 @@ int main()
 			       diff / div, diff & (div - 1u));
 			// Audio data offset
 			printf(ESC_YELLOW " => " ESC_WHITE "%ld\n", audio_buffering());
-			// Audio volume settings
-			printf(ESC_YELLOW "SP_L %ld | SP_R %ld | DAC_L %ld | DAC_R %ld\n",
-			       audio_sp_vol(0), audio_sp_vol(1), audio_ch_vol(0), audio_ch_vol(1));
 		}
 #endif
 	}
