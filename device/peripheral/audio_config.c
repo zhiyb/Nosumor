@@ -7,6 +7,18 @@
 #define I2C		AUDIO_I2C
 #define I2C_ADDR	AUDIO_I2C_ADDR
 
+// Entities
+enum {
+	IT_USB = 1,
+	CS_PLL,
+	CX_In,
+	FU_DAC,
+	FU_Speaker,
+	OT_Speaker,
+	OT_Headphones,
+};
+
+// Configurations
 typedef struct {
 	int update;
 	struct {
@@ -20,13 +32,7 @@ typedef struct {
 
 volatile cfg_t cfg;
 
-// Audio device configurations, unit: 1/256 dB
-
-// Speaker gain
-static inline int32_t audio_sp_vol_min() {return 6 * 256;}
-static inline int32_t audio_sp_vol_max() {return 24 * 256;}
-static inline int32_t audio_sp_vol_res() {return 6 * 256;}
-
+// Initial configuration
 void audio_init_config()
 {
 	static const uint8_t cmd[] = {
@@ -102,6 +108,7 @@ void audio_init_config()
 	}
 }
 
+// Upload configuration to codec
 void audio_config_update()
 {
 	// Copy configurations to local storage
@@ -130,6 +137,7 @@ void audio_config_update()
 	}
 }
 
+// Enable/disable codec
 void audio_config_enable(int enable)
 {
 	cfg.dac = enable ? 0x00 : 0x0c;
@@ -138,18 +146,32 @@ void audio_config_enable(int enable)
 
 /* Speaker */
 
+int audio_sp_mute(uint32_t ch)
+{
+	return !(cfg.sp[ch].gain & 0x04);
+}
+
+void audio_sp_mute_set_async(uint32_t ch, int v)
+{
+	if (v)
+		cfg.sp[ch].gain &= ~0x04;
+	else
+		cfg.sp[ch].gain |= 0x04;
+	cfg.update = 1;
+}
+
 int32_t audio_sp_vol(uint32_t ch)
 {
 	int32_t v = (cfg.sp[ch].gain >> 3u) & 0x03u;
-	v *= audio_sp_vol_res();
-	v += audio_sp_vol_min();
+	v *= (int)(6 * 256);	// res
+	v += (int)(6 * 256);	// min
 	return v;
 }
 
 void audio_sp_vol_set_async(uint32_t ch, int32_t v)
 {
-	v -= audio_sp_vol_min();
-	v /= audio_sp_vol_res();
+	v -= (int)(6 * 256);	// min
+	v /= (int)(6 * 256);	// res
 	cfg.sp[ch].gain = (v << 3u) | 0x04;
 	cfg.update = 1;
 }
@@ -172,12 +194,12 @@ void audio_ch_mute_set_async(uint32_t ch, int v)
 
 int32_t audio_ch_vol(uint32_t ch)
 {
-	return (int)(0.5 * 256) * cfg.ch[ch].vol;
+	return (int)(0.5 * 256) * cfg.ch[ch].vol;	// res
 }
 
 void audio_ch_vol_set_async(uint32_t ch, int32_t v)
 {
-	cfg.ch[ch].vol = v / (int)(0.5 * 256);
+	cfg.ch[ch].vol = v / (int)(0.5 * 256);		// res
 	cfg.update = 1;
 }
 
@@ -220,13 +242,15 @@ layout1_cur_t cx_selector(usb_audio_t *audio, const uint8_t id)
 // Feature unit control
 layout1_cur_t fu_mute(usb_audio_t *audio, const uint8_t id, const int cn)
 {
+	if (cn == 0) {
+		dbgbkpt();
+		return 0;
+	}
 	switch (id) {
-	case FU_Out:
-		if (cn == 0) {
-			dbgbkpt();
-			return 0;
-		}
+	case FU_DAC:
 		return audio_ch_mute(cn - 1u);
+	case FU_Speaker:
+		return audio_sp_mute(cn - 1u);
 	}
 	dbgbkpt();
 	return 0;
@@ -234,13 +258,16 @@ layout1_cur_t fu_mute(usb_audio_t *audio, const uint8_t id, const int cn)
 
 int fu_mute_set(usb_audio_t *audio, const uint8_t id, const int cn, layout1_cur_t v)
 {
+	if (cn == 0) {
+		dbgbkpt();
+		return 0;
+	}
 	switch (id) {
-	case FU_Out:
-		if (cn == 0) {
-			dbgbkpt();
-			return 0;
-		}
+	case FU_DAC:
 		audio_ch_mute_set_async(cn - 1u, v);
+		return 1;
+	case FU_Speaker:
+		audio_sp_mute_set_async(cn - 1u, v);
 		return 1;
 	}
 	dbgbkpt();
@@ -249,13 +276,15 @@ int fu_mute_set(usb_audio_t *audio, const uint8_t id, const int cn, layout1_cur_
 
 layout2_cur_t fu_volume(usb_audio_t *audio, const uint8_t id, const int cn)
 {
+	if (cn == 0) {
+		dbgbkpt();
+		return 0;
+	}
 	switch (id) {
-	case FU_Out:
-		if (cn == 0) {
-			dbgbkpt();
-			return 0;
-		}
+	case FU_DAC:
 		return audio_ch_vol(cn - 1u);
+	case FU_Speaker:
+		return audio_sp_vol(cn - 1u);
 	}
 	dbgbkpt();
 	return 0;
@@ -263,13 +292,16 @@ layout2_cur_t fu_volume(usb_audio_t *audio, const uint8_t id, const int cn)
 
 int fu_volume_set(usb_audio_t *audio, const uint8_t id, const int cn, const layout2_cur_t v)
 {
+	if (cn == 0) {
+		dbgbkpt();
+		return 0;
+	}
 	switch (id) {
-	case FU_Out:
-		if (cn == 0) {
-			dbgbkpt();
-			return 0;
-		}
+	case FU_DAC:
 		audio_ch_vol_set_async(cn - 1u, v);
+		return 1;
+	case FU_Speaker:
+		audio_sp_vol_set_async(cn - 1u, v);
 		return 1;
 	}
 	dbgbkpt();
@@ -278,19 +310,26 @@ int fu_volume_set(usb_audio_t *audio, const uint8_t id, const int cn, const layo
 
 uint32_t fu_volume_range(usb_audio_t *audio, const uint8_t id, const int cn, layout2_range_t *buf)
 {
-	static const layout2_range_t fu_out[] = {
+	static const layout2_range_t fu_dac[] = {
 		// DAC gain
 		{(int)(-63.5 * 256), (int)(24 * 256), (int)(0.5 * 256)},
 	};
+	static const layout2_range_t fu_speaker[] = {
+		// DAC gain
+		{(int)(6 * 256), (int)(24 * 256), (int)(6 * 256)},
+	};
 
+	if (cn == 0) {
+		dbgbkpt();
+		return 0;
+	}
 	switch (id) {
-	case FU_Out:
-		if (cn == 0) {
-			dbgbkpt();
-			return 0;
-		}
-		memcpy(buf, fu_out, sizeof(fu_out));
-		return ASIZE(fu_out);
+	case FU_DAC:
+		memcpy(buf, fu_dac, sizeof(fu_dac));
+		return ASIZE(fu_dac);
+	case FU_Speaker:
+		memcpy(buf, fu_speaker, sizeof(fu_speaker));
+		return ASIZE(fu_speaker);
 	}
 	dbgbkpt();
 	return 0;
@@ -325,7 +364,7 @@ void audio_usb_config(usb_audio_t *audio)
 			       2u, SP_FL | SP_FR, 0u, 0u, 0u);
 
 	// Feature unit
-	static const audio_fu_t fu_out = {
+	static const audio_fu_t fu = {
 		.channels = AUDIO_CHANNELS,
 		.mute = &fu_mute,
 		.mute_set = &fu_mute_set,
@@ -333,13 +372,16 @@ void audio_usb_config(usb_audio_t *audio)
 		.volume_set = &fu_volume_set,
 		.volume_range = &fu_volume_range,
 	};
-	const uint32_t fu_out_ctrls[] = {0u,	// No master channel controls
+	const uint32_t fu_ctrls[] = {0u,	// No master channel controls
 		CTRL(FU_MUTE_CONTROL, CTRL_RW) | CTRL(FU_VOLUME_CONTROL, CTRL_RW),
 		CTRL(FU_MUTE_CONTROL, CTRL_RW) | CTRL(FU_VOLUME_CONTROL, CTRL_RW),
 	};
-	usb_audio2_register_fu(audio, FU_Out, &fu_out, IT_USB, fu_out_ctrls, 0u);
+	usb_audio2_register_fu(audio, FU_DAC, &fu, IT_USB, fu_ctrls, 0u);
+	usb_audio2_register_fu(audio, FU_Speaker, &fu, FU_DAC, fu_ctrls, 0u);
 
 	// Output terminal
-	static const audio_ot_t ot_usb;
-	usb_audio2_register_ot(audio, OT_Speaker, &ot_usb, Speaker, 0u, FU_Out, CX_In, 0u, 0u);
+	static const audio_ot_t ot_speaker;
+	usb_audio2_register_ot(audio, OT_Speaker, &ot_speaker, Speaker, 0u, FU_Speaker, CX_In, 0u, 0u);
+	static const audio_ot_t ot_hp;
+	usb_audio2_register_ot(audio, OT_Headphones, &ot_hp, Headphones, 0u, FU_DAC, CX_In, 0u, 0u);
 }

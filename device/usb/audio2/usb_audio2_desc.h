@@ -21,15 +21,6 @@ static desc_ac_t desc_ac = {
 	9u, CS_INTERFACE, HEADER, 0x0200u, DESKTOP_SPEAKER, 0u, 0u,
 };
 
-// Entities
-enum {
-	CS_PLL = 1,
-	CX_In,
-	IT_USB,
-	FU_Out,
-	OT_Speaker,
-};
-
 // Clock source
 typedef struct PACKED desc_cs_t {
 	uint8_t bLength;
@@ -125,7 +116,7 @@ typedef struct PACKED desc_as_t {
 } desc_as_t;
 
 static const desc_as_t desc_as[] = {
-	{16u, CS_INTERFACE, AS_GENERAL, IT_USB, 0b0000,
+	{16u, CS_INTERFACE, AS_GENERAL, 1u, 0b0000,
 	 FORMAT_TYPE_I, FRMT_I_PCM, 2u, SP_FL | SP_FR, 0u},
 };
 
