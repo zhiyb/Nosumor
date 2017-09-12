@@ -34,21 +34,24 @@ static void epin_update(usb_t *usb, uint32_t n)
 	if (data->pending)
 		return;
 
-	// Check frame parity
+	// Frame parity checking not needed
+	// Frame parity will always be the same if interval != 1
+#if 0
 	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
-	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
 	uint32_t fn = (FIELD(dev->DSTS, USB_OTG_DSTS_FNSOF)) & 1;
 	fn = fn ? USB_OTG_DIEPCTL_SD0PID_SEVNFRM_Msk : USB_OTG_DIEPCTL_SODDFRM_Msk;
+#endif
 
 	// Calculate feedback frequency
 	int16_t diff = -audio_buffering() + (AUDIO_FRAME_SIZE << 4u);
 	// TODO: Variable frequency
 	data->freq = (24ul << 16u) + diff / 2;
 
+	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
 	ep->DIEPDMA = (uint32_t)&data->freq;
 	ep->DIEPTSIZ = (1u << USB_OTG_DIEPTSIZ_PKTCNT_Pos) | 4u;
 	// Enable endpoint
-	DIEPCTL_SET(ep->DIEPCTL, fn | USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_CNAK_Msk);
+	DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_CNAK_Msk);
 
 	data->pending = 1;
 	cnt++;
@@ -58,6 +61,8 @@ static void epin_xfr_cplt(usb_t *usb, uint32_t n)
 {
 	epdata_t *data = (epdata_t *)usb->epin[n].data;
 	data->pending = 0;
+	// No more isochronous incomplete checks needed
+	usb->epin[n].isoc_check = 0;
 	epin_update(usb, n);
 }
 
@@ -77,14 +82,16 @@ int usb_audio2_ep_feedback_register(usb_t *usb)
 	return ep;
 }
 
-void usb_audio2_ep_feedback_halt(usb_t *usb, int ep, int halt)
+void usb_audio2_ep_feedback_halt(usb_t *usb, int n, int halt)
 {
-	epdata_t *data = (epdata_t *)usb->epin[ep].data;
+	epdata_t *data = (epdata_t *)usb->epin[n].data;
 	if (!data)
 		return;
 	data->enabled = !halt;
-	if (!halt)
-		epin_update(usb, ep);
+	if (!halt) {
+		usb->epin[n].isoc_check = 1;
+		epin_update(usb, n);
+	}
 }
 
 uint32_t usb_audio2_feedback_cnt()

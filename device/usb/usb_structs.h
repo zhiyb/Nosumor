@@ -20,6 +20,7 @@ typedef struct epin_t {
 	void (*halt)(usb_t *usb, uint32_t ep, int halt);
 	void (*timeout)(usb_t *usb, uint32_t ep);
 	void (*xfr_cplt)(usb_t *usb, uint32_t ep);
+	int isoc_check;
 } epin_t;
 
 typedef struct epout_t {
@@ -28,6 +29,7 @@ typedef struct epout_t {
 	void (*halt)(usb_t *usb, uint32_t ep, int halt);
 	void (*setup_cplt)(usb_t *usb, uint32_t ep);
 	void (*xfr_cplt)(usb_t *usb, uint32_t ep);
+	int isoc_check;
 } epout_t;
 
 // Interface handlers

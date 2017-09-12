@@ -52,6 +52,7 @@ static void epout_halt(usb_t *usb, uint32_t n, int halt)
 		DOEPCTL_SET(ep->DOEPCTL, USB_OTG_DOEPCTL_EPDIS);
 		//while (ep->DOEPCTL & USB_OTG_DOEPCTL_EPENA_Msk);
 	} else {
+		usb->epout[n].isoc_check = 1;
 		epout_recv(usb, n);
 	}
 }
@@ -61,6 +62,8 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 	epdata_t *epdata = usb->epout[n].data;
 	uint32_t siz = ep->DOEPTSIZ;
+	// No more isochronous incomplete checks needed
+	usb->epout[n].isoc_check = 0;
 	epout_recv(usb, n);
 	uint32_t pktcnt = 1u - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
 	uint32_t size = DATA_MAX_SIZE - FIELD(siz, USB_OTG_DOEPTSIZ_XFRSIZ);

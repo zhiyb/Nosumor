@@ -110,13 +110,15 @@ void OTG_HS_IRQHandler()
 		uint32_t mask = fn ? USB_OTG_DIEPCTL_SD0PID_SEVNFRM_Msk : USB_OTG_DIEPCTL_SODDFRM_Msk;
 		// Update endpoints
 		for (uint32_t n = 1; n != usb->nepin; n++) {
+			if (!usb->epin[n].isoc_check)
+				continue;
 			USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
 			if (!(ep->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk))
 				continue;
 			if ((ep->DIEPCTL & USB_OTG_DIEPCTL_EPTYP_Msk) != EP_TYP_ISOCHRONOUS)
 				continue;
-			//if ((!(ep->DIEPCTL & USB_OTG_DIEPCTL_EONUM_DPID_Msk)) == fn)
-			//	continue;
+			if ((!(ep->DIEPCTL & USB_OTG_DIEPCTL_EONUM_DPID_Msk)) == fn)
+				continue;
 			DIEPCTL_SET(ep->DIEPCTL, mask);
 			//putchar(fn + 'A');
 		}
@@ -128,14 +130,16 @@ void OTG_HS_IRQHandler()
 		uint32_t mask = fn ? USB_OTG_DOEPCTL_SD0PID_SEVNFRM_Msk : USB_OTG_DOEPCTL_SODDFRM_Msk;
 		// Update endpoints
 		for (uint32_t n = 1; n != usb->nepout; n++) {
+			if (!usb->epout[n].isoc_check)
+				continue;
 			USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 			if (!(ep->DOEPCTL & USB_OTG_DOEPCTL_EPENA_Msk))
 				continue;
 			if ((ep->DOEPCTL & USB_OTG_DOEPCTL_EPTYP_Msk) != EP_TYP_ISOCHRONOUS)
 				continue;
 			// Not defined for DOEPCTL?
-			//if ((!(ep->DOEPCTL & USB_OTG_DIEPCTL_EONUM_DPID_Msk)) == fn)
-			//	continue;
+			if ((!(ep->DOEPCTL & USB_OTG_DIEPCTL_EONUM_DPID_Msk)) == fn)
+				continue;
 			DOEPCTL_SET(ep->DOEPCTL, mask);
 			//putchar(fn + 'a');
 		}
