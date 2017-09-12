@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define SW_VERSION	2
+#define SW_VERSION	0x0003
 
 #define VENDOR_REPORT_BASE_SIZE	(3u)
 #define VENDOR_REPORT_SIZE	(VENDOR_REPORT_BASE_SIZE + 32u)
