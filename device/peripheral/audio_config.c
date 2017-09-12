@@ -402,16 +402,21 @@ void audio_usb_config(usb_t *usb, usb_audio_t *audio)
 		CTRL(FU_MUTE_CONTROL, CTRL_RW) | CTRL(FU_VOLUME_CONTROL, CTRL_RW),
 		CTRL(FU_MUTE_CONTROL, CTRL_RW) | CTRL(FU_VOLUME_CONTROL, CTRL_RW),
 	};
+	const uint32_t fu_mute[] = {0u,		// Mute only controls
+		CTRL(FU_MUTE_CONTROL, CTRL_RW),
+		CTRL(FU_MUTE_CONTROL, CTRL_RW),
+	};
 	uint32_t s = usb_desc_add_string(usb, 0, LANG_EN_US, "DAC volume");
 	usb_audio2_register_fu(audio, FU_DAC, &fu, IT_USB, fu_ctrls, s);
+	// Mute only so that DAC volume will be used as the main volume
 	s = usb_desc_add_string(usb, 0, LANG_EN_US, "Headphone analog attenuation");
-	usb_audio2_register_fu(audio, FU_Headphone, &fu, FU_DAC, fu_ctrls, s);
+	usb_audio2_register_fu(audio, FU_Headphone, &fu, FU_DAC, fu_mute, s);
 	s = usb_desc_add_string(usb, 0, LANG_EN_US, "Headphone driver");
-	usb_audio2_register_fu(audio, FU_HeadphoneDriver, &fu, FU_Headphone, fu_ctrls, s);
+	usb_audio2_register_fu(audio, FU_HeadphoneDriver, &fu, FU_Headphone, fu_mute, s);
 	s = usb_desc_add_string(usb, 0, LANG_EN_US, "Speaker analog attenuation");
-	usb_audio2_register_fu(audio, FU_Speaker, &fu, FU_DAC, fu_ctrls, s);
+	usb_audio2_register_fu(audio, FU_Speaker, &fu, FU_DAC, fu_mute, s);
 	s = usb_desc_add_string(usb, 0, LANG_EN_US, "Speaker driver");
-	usb_audio2_register_fu(audio, FU_SpeakerDriver, &fu, FU_Speaker, fu_ctrls, s);
+	usb_audio2_register_fu(audio, FU_SpeakerDriver, &fu, FU_Speaker, fu_mute, s);
 
 	// Output terminal
 	static const audio_ot_t ot_speaker;
