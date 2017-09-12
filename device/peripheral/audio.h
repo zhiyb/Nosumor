@@ -21,9 +21,10 @@ extern "C" {
 #define AUDIO_TRANSFER_SIZE	(AUDIO_TRANSFER_CNT(AUDIO_BUFFER_SIZE))
 #define AUDIO_FRAME_TRANSFER	(AUDIO_TRANSFER_CNT(AUDIO_FRAME_SIZE))
 
+typedef struct usb_t usb_t;
 typedef struct usb_audio_t usb_audio_t;
 
-void audio_init(usb_audio_t *audio);
+void audio_init(usb_t *usb, usb_audio_t *audio);
 void audio_out_enable(int enable);
 void audio_play(void *p, uint32_t size);
 void audio_process();

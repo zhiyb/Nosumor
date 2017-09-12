@@ -1,3 +1,4 @@
+#include <usb/usb_desc.h>
 #include <usb/audio2/usb_audio2_entities.h>
 #include <usb/audio2/usb_audio2_desc.h>
 #include <usb/audio2/usb_audio2_defs.h>
@@ -238,13 +239,13 @@ int fu_mute_set(usb_audio_t *audio, const uint8_t id, const int cn, layout1_cur_
 		SETCLR(cfg.dac, 0x04 << ch, v);
 		break;
 	case FU_Headphone:
-		SETCLR(cfg.hp[ch].atten, 0x80, v);
+		SETCLR(cfg.hp[ch].atten, 0x80, !v);
 		break;
 	case FU_HeadphoneDriver:
 		SETCLR(cfg.hp[ch].gain, 0x04, !v);
 		break;
 	case FU_Speaker:
-		SETCLR(cfg.sp[ch].atten, 0x80, v);
+		SETCLR(cfg.sp[ch].atten, 0x80, !v);
 		break;
 	case FU_SpeakerDriver:
 		SETCLR(cfg.sp[ch].gain, 0x04, !v);
@@ -294,13 +295,15 @@ int fu_volume_set(usb_audio_t *audio, const uint8_t id, const int cn, const layo
 		cfg.ch[ch].vol = v / (int)(0.5 * 256);
 		break;
 	case FU_Headphone:
-		cfg.hp[ch].atten = -v / (int)(0.5 * 256);
+		cfg.hp[ch].atten &= 0x80;
+		cfg.hp[ch].atten |= 0x7f & (-v / (int)(0.5 * 256));
 		break;
 	case FU_HeadphoneDriver:
 		cfg.hp[ch].gain = ((v / (int)(1 * 256)) << 3u) | 0x0fu;
 		break;
 	case FU_Speaker:
-		cfg.sp[ch].atten = -v / (int)(0.5 * 256);
+		cfg.sp[ch].atten &= 0x80;
+		cfg.sp[ch].atten |= 0x7f & (-v / (int)(0.5 * 256));
 		break;
 	case FU_SpeakerDriver:
 		cfg.sp[ch].gain = (((v - (int)(6 * 256)) / (int)(6 * 256)) << 3u) | 0x04;
@@ -359,7 +362,7 @@ uint32_t fu_volume_range(usb_audio_t *audio, const uint8_t id, const int cn, lay
 }
 
 // USB control register
-void audio_usb_config(usb_audio_t *audio)
+void audio_usb_config(usb_t *usb, usb_audio_t *audio)
 {
 	// Clock source
 	static const audio_cs_t cs_pll = {
@@ -399,11 +402,16 @@ void audio_usb_config(usb_audio_t *audio)
 		CTRL(FU_MUTE_CONTROL, CTRL_RW) | CTRL(FU_VOLUME_CONTROL, CTRL_RW),
 		CTRL(FU_MUTE_CONTROL, CTRL_RW) | CTRL(FU_VOLUME_CONTROL, CTRL_RW),
 	};
-	usb_audio2_register_fu(audio, FU_DAC, &fu, IT_USB, fu_ctrls, 0u);
-	usb_audio2_register_fu(audio, FU_Headphone, &fu, FU_DAC, fu_ctrls, 0u);
-	usb_audio2_register_fu(audio, FU_HeadphoneDriver, &fu, FU_Headphone, fu_ctrls, 0u);
-	usb_audio2_register_fu(audio, FU_Speaker, &fu, FU_DAC, fu_ctrls, 0u);
-	usb_audio2_register_fu(audio, FU_SpeakerDriver, &fu, FU_Speaker, fu_ctrls, 0u);
+	uint32_t s = usb_desc_add_string(usb, 0, LANG_EN_US, "DAC volume");
+	usb_audio2_register_fu(audio, FU_DAC, &fu, IT_USB, fu_ctrls, s);
+	s = usb_desc_add_string(usb, 0, LANG_EN_US, "Headphone analog attenuation");
+	usb_audio2_register_fu(audio, FU_Headphone, &fu, FU_DAC, fu_ctrls, s);
+	s = usb_desc_add_string(usb, 0, LANG_EN_US, "Headphone driver");
+	usb_audio2_register_fu(audio, FU_HeadphoneDriver, &fu, FU_Headphone, fu_ctrls, s);
+	s = usb_desc_add_string(usb, 0, LANG_EN_US, "Speaker analog attenuation");
+	usb_audio2_register_fu(audio, FU_Speaker, &fu, FU_DAC, fu_ctrls, s);
+	s = usb_desc_add_string(usb, 0, LANG_EN_US, "Speaker driver");
+	usb_audio2_register_fu(audio, FU_SpeakerDriver, &fu, FU_Speaker, fu_ctrls, s);
 
 	// Output terminal
 	static const audio_ot_t ot_speaker;

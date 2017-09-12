@@ -28,13 +28,13 @@ static struct {
 } data;
 
 void audio_init_config();
-void audio_usb_config(usb_audio_t *audio);
+void audio_usb_config(usb_t *usb, usb_audio_t *audio);
 void audio_config_update();
 void audio_config_enable(int enable);
 
 static void audio_tick(uint32_t tick);
 
-void audio_init(usb_audio_t *audio)
+void audio_init(usb_t *usb, usb_audio_t *audio)
 {
 	// Initialise I2C GPIOs
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN_Msk;
@@ -142,7 +142,7 @@ void audio_init(usb_audio_t *audio)
 	// Start
 	audio_init_config();
 	systick_register_handler(audio_tick);
-	audio_usb_config(audio);
+	audio_usb_config(usb, audio);
 	audio_process();
 }
 

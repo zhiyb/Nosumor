@@ -96,7 +96,7 @@ static inline void init()
 #ifndef BOOTLOADER
 	puts(ESC_CYAN "Initialising audio...");
 	usb_audio_t *audio = usb_audio2_init(&usb);
-	audio_init(audio);
+	audio_init(&usb, audio);
 #endif
 
 	puts(ESC_CYAN "Initialising USB HID interface...");
