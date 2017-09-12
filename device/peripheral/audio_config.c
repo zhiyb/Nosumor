@@ -14,6 +14,7 @@ enum {
 	CX_In,
 	FU_DAC,
 	FU_Speaker,
+	FU_Headphones,
 	OT_Speaker,
 	OT_Headphones,
 };
@@ -21,10 +22,13 @@ enum {
 // Configurations
 typedef struct {
 	int update;
+	uint8_t dac;		// 0: 0x40
 	struct {
 		int8_t vol;	// 0: 0x41, 0x42
 	} ch[2];
-	uint8_t dac;		// 0: 0x40
+	struct {
+		uint8_t gain;	// 1: 0x28, 0x29
+	} hp[2];
 	struct {
 		uint8_t gain;	// 1: 0x2a, 0x2b
 	} sp[2];
@@ -83,10 +87,6 @@ void audio_init_config()
 		0x25, 0x0f,		// HPR analog volume = -7.5dB
 		0x26, 0x00,		// SPL analog volume = 0dB
 		0x27, 0x00,		// SPR analog volume = 0dB
-		0x28, 0x06,		// HPL driver PGA = 0dB, not muted
-		0x29, 0x06,		// HPR driver PGA = 0dB, not muted
-		0x2a, 0x04,		// SPL driver PGA = 6dB, not muted
-		0x2b, 0x04,		// SPR driver PGA = 6dB, not muted
 		0x2c, 0x10,		// DAC high current, HP as headphone
 		0x2e, 0x0a,		// MICBIAS force on, MICBIAS = 2.5V
 		//0x2f, 0x00,		// MIC PGA 0dB
@@ -96,6 +96,8 @@ void audio_init_config()
 
 	cfg.ch[0].vol = 0x00;	// DAC left volume = 0dB
 	cfg.ch[1].vol = 0x00;	// DAC right volume = 0dB
+	cfg.hp[0].gain = 0x06;	// HPL driver PGA = 0dB, not muted
+	cfg.hp[1].gain = 0x06;	// HPR driver PGA = 0dB, not muted
 	cfg.sp[0].gain = 0x14;	// SPL driver PGA = 6dB, not muted
 	cfg.sp[1].gain = 0x14;	// SPR driver PGA = 6dB, not muted
 	cfg.dac = 0x0c;		// DAC muted, independent volume
@@ -126,8 +128,10 @@ void audio_config_update()
 		0x41, c.ch[0].vol,	// DAC left volume
 		0x42, c.ch[1].vol,	// DAC right volume
 		0x00, 0x01,		// Page 1
-		0x2a, c.sp[0].gain,	// SPL driver PGA = 6dB, not muted
-		0x2b, c.sp[1].gain,	// SPR driver PGA = 6dB, not muted
+		0x28, c.hp[0].gain,	// HPL driver
+		0x29, c.hp[1].gain,	// HPR driver
+		0x2a, c.sp[0].gain,	// SPL driver
+		0x2b, c.sp[1].gain,	// SPR driver
 	}, *p = cmd;
 
 	// Write configration sequence
@@ -141,6 +145,33 @@ void audio_config_update()
 void audio_config_enable(int enable)
 {
 	cfg.dac = enable ? 0x00 : 0x0c;
+	cfg.update = 1;
+}
+
+/* DAC */
+
+int audio_ch_mute(uint32_t ch)
+{
+	return !!(cfg.dac & (0x04 << ch));
+}
+
+void audio_ch_mute_set_async(uint32_t ch, int v)
+{
+	if (v)
+		cfg.dac |= (0x04 << ch);
+	else
+		cfg.dac &= ~(0x04 << ch);
+	cfg.update = 1;
+}
+
+int32_t audio_ch_vol(uint32_t ch)
+{
+	return (int)(0.5 * 256) * cfg.ch[ch].vol;	// res
+}
+
+void audio_ch_vol_set_async(uint32_t ch, int32_t v)
+{
+	cfg.ch[ch].vol = v / (int)(0.5 * 256);		// res
 	cfg.update = 1;
 }
 
@@ -173,33 +204,6 @@ void audio_sp_vol_set_async(uint32_t ch, int32_t v)
 	v -= (int)(6 * 256);	// min
 	v /= (int)(6 * 256);	// res
 	cfg.sp[ch].gain = (v << 3u) | 0x04;
-	cfg.update = 1;
-}
-
-/* DAC */
-
-int audio_ch_mute(uint32_t ch)
-{
-	return !!(cfg.dac & (0x04 << ch));
-}
-
-void audio_ch_mute_set_async(uint32_t ch, int v)
-{
-	if (v)
-		cfg.dac |= (0x04 << ch);
-	else
-		cfg.dac &= ~(0x04 << ch);
-	cfg.update = 1;
-}
-
-int32_t audio_ch_vol(uint32_t ch)
-{
-	return (int)(0.5 * 256) * cfg.ch[ch].vol;	// res
-}
-
-void audio_ch_vol_set_async(uint32_t ch, int32_t v)
-{
-	cfg.ch[ch].vol = v / (int)(0.5 * 256);		// res
 	cfg.update = 1;
 }
 
@@ -251,6 +255,8 @@ layout1_cur_t fu_mute(usb_audio_t *audio, const uint8_t id, const int cn)
 		return audio_ch_mute(cn - 1u);
 	case FU_Speaker:
 		return audio_sp_mute(cn - 1u);
+	case FU_Headphones:
+		return !(cfg.hp[cn - 1u].gain & 0x04);
 	}
 	dbgbkpt();
 	return 0;
@@ -269,6 +275,13 @@ int fu_mute_set(usb_audio_t *audio, const uint8_t id, const int cn, layout1_cur_
 	case FU_Speaker:
 		audio_sp_mute_set_async(cn - 1u, v);
 		return 1;
+	case FU_Headphones:
+		if (v)
+			cfg.hp[cn - 1].gain &= ~0x04;
+		else
+			cfg.hp[cn - 1].gain |= 0x04;
+		cfg.update = 1;
+		return 1;
 	}
 	dbgbkpt();
 	return 0;
@@ -285,6 +298,8 @@ layout2_cur_t fu_volume(usb_audio_t *audio, const uint8_t id, const int cn)
 		return audio_ch_vol(cn - 1u);
 	case FU_Speaker:
 		return audio_sp_vol(cn - 1u);
+	case FU_Headphones:
+		return ((cfg.hp[cn - 1u].gain >> 3u) & 0x0fu) * (int)(1 * 256);
 	}
 	dbgbkpt();
 	return 0;
@@ -303,6 +318,10 @@ int fu_volume_set(usb_audio_t *audio, const uint8_t id, const int cn, const layo
 	case FU_Speaker:
 		audio_sp_vol_set_async(cn - 1u, v);
 		return 1;
+	case FU_Headphones:
+		cfg.hp[cn - 1u].gain = ((v / (int)(1 * 256)) << 3u) | 0x0fu;
+		cfg.update = 1;
+		return 1;
 	}
 	dbgbkpt();
 	return 0;
@@ -318,6 +337,10 @@ uint32_t fu_volume_range(usb_audio_t *audio, const uint8_t id, const int cn, lay
 		// DAC gain
 		{(int)(6 * 256), (int)(24 * 256), (int)(6 * 256)},
 	};
+	static const layout2_range_t fu_headphones[] = {
+		// DAC gain
+		{(int)(0 * 256), (int)(9 * 256), (int)(1 * 256)},
+	};
 
 	if (cn == 0) {
 		dbgbkpt();
@@ -330,6 +353,9 @@ uint32_t fu_volume_range(usb_audio_t *audio, const uint8_t id, const int cn, lay
 	case FU_Speaker:
 		memcpy(buf, fu_speaker, sizeof(fu_speaker));
 		return ASIZE(fu_speaker);
+	case FU_Headphones:
+		memcpy(buf, fu_headphones, sizeof(fu_headphones));
+		return ASIZE(fu_headphones);
 	}
 	dbgbkpt();
 	return 0;
@@ -378,10 +404,11 @@ void audio_usb_config(usb_audio_t *audio)
 	};
 	usb_audio2_register_fu(audio, FU_DAC, &fu, IT_USB, fu_ctrls, 0u);
 	usb_audio2_register_fu(audio, FU_Speaker, &fu, FU_DAC, fu_ctrls, 0u);
+	usb_audio2_register_fu(audio, FU_Headphones, &fu, FU_DAC, fu_ctrls, 0u);
 
 	// Output terminal
 	static const audio_ot_t ot_speaker;
 	usb_audio2_register_ot(audio, OT_Speaker, &ot_speaker, Speaker, 0u, FU_Speaker, CX_In, 0u, 0u);
 	static const audio_ot_t ot_hp;
-	usb_audio2_register_ot(audio, OT_Headphones, &ot_hp, Headphones, 0u, FU_DAC, CX_In, 0u, 0u);
+	usb_audio2_register_ot(audio, OT_Headphones, &ot_hp, Headphones, 0u, FU_Headphones, CX_In, 0u, 0u);
 }
