@@ -43,7 +43,7 @@ static void epin_update(usb_t *usb, uint32_t n)
 #endif
 
 	// Calculate feedback frequency
-	int16_t diff = -audio_buffering() + (AUDIO_FRAME_SIZE << 4u);
+	int16_t diff = -audio_buffering() + (AUDIO_FRAME_SIZE << 2u);
 	// TODO: Variable frequency
 	data->freq = (24ul << 16u) + diff / 2;
 

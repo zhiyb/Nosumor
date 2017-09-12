@@ -202,7 +202,7 @@ static inline uint32_t *next_frame()
 {
 	// ((buffer - remaining) + buffering) & (alignment & buffer)
 	uint32_t mem = (AUDIO_BUFFER_SIZE) - AUDIO_TRANSFER_BYTES(STREAM_TX->NDTR)
-			+ (AUDIO_FRAME_SIZE << 4u);
+			+ (AUDIO_FRAME_SIZE << 2u);
 	mem &= ~(AUDIO_FRAME_SIZE - 1ul) & (AUDIO_BUFFER_SIZE - 1ul);
 	return (uint32_t *)((void *)data.buf + mem);
 }
