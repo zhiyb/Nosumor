@@ -327,13 +327,13 @@
 #include "usb_audio2_defs_termt.h"
 
 // bmControls
-#define BM_NA	0b00
-#define BM_RO	0b01
-#define BM_RW	0b11
+#define CTRL_NA	0b00ul
+#define CTRL_RO	0b01ul
+#define CTRL_RW	0b11ul
 
-// Feature Unit bmaControls
-// f: A.17.7 Feature Unit Control Selectors
-// e: bmControls
-#define FU_CTRL(f, e)	((e) << (((f) - 1u) << 1u))
+// bmaControls
+// s: Control Selectors
+// c: bmControls
+#define CTRL(s, c)	((c) << (((s) - 1u) << 1u))
 
 #endif // USB_AUDIO2_DEFS_H

@@ -30,7 +30,7 @@ desc_t usb_audio2_fu_get(usb_audio_t *audio, usb_audio_entity_t *entity, setup_t
 		break;
 	case FU_VOLUME_CONTROL:
 		// Layout 2 parameter block
-		if (cn >= data->channels) {
+		if (cn > data->channels) {
 			dbgbkpt();
 			break;
 		}
@@ -97,8 +97,7 @@ int usb_audio2_fu_set(usb_audio_t *audio, usb_audio_entity_t *entity, setup_t pk
 }
 
 void usb_audio2_register_fu(usb_audio_t *audio, const uint8_t id, const audio_fu_t *data,
-			    usb_t *usb, uint8_t bSourceID,
-			    uint32_t *bmaControls, uint8_t iFeature)
+			    uint8_t bSourceID, const uint32_t *bmaControls, uint8_t iFeature)
 {
 	// Register entitry
 	usb_audio_entity_t *entity = usb_audio2_register_entity(audio, id, data);

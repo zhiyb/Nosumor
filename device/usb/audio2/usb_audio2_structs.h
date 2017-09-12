@@ -52,7 +52,6 @@ typedef struct usb_audio_t {
 		};
 	} buf;
 	int ep_data, ep_feedback;
-	void (*config)(usb_t *, usb_audio_t *);
 } usb_audio_t;
 
 #ifdef __cplusplus

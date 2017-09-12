@@ -21,10 +21,10 @@ static desc_ac_t desc_ac = {
 	9u, CS_INTERFACE, HEADER, 0x0200u, DESKTOP_SPEAKER, 0u, 0u,
 };
 
-// Units
+// Entities
 enum {
 	CS_PLL = 1,
-	CX_IN,
+	CX_In,
 	IT_USB,
 	FU_Out,
 	OT_Speaker,
@@ -49,6 +49,12 @@ typedef struct PACKED desc_cs_t {
 	uint8_t bAssocTerminal;
 	uint8_t iClockSource;
 } desc_cs_t;
+
+#define CS_EXTERNAL	0b000
+#define CS_FIXED	0b001
+#define CS_VARIABLE	0b010
+#define CS_PROGRAMMABLE	0b011
+#define CS_SOF		0b100
 
 // Clock selector
 typedef struct PACKED desc_cx_t {
@@ -79,11 +85,6 @@ typedef struct PACKED desc_it_t {
 	uint8_t iTerminal;
 } desc_it_t;
 
-static const desc_it_t desc_it[] = {
-	{17u, CS_INTERFACE, INPUT_TERMINAL, IT_USB, USB_streaming, 0u, CX_IN,
-	 2u, SP_FL | SP_FR, 0u, 0u, 0u},
-};
-
 // Output terminal
 typedef struct PACKED desc_ot_t {
 	uint8_t bLength;
@@ -97,10 +98,6 @@ typedef struct PACKED desc_ot_t {
 	uint16_t bmControls;
 	uint8_t iTerminal;
 } desc_ot_t;
-
-static const desc_ot_t desc_ot[] = {
-	{12u, CS_INTERFACE, OUTPUT_TERMINAL, OT_Speaker, Speaker, 0u, FU_Out, CX_IN, 0u, 0u},
-};
 
 // Feature unit
 typedef struct PACKED desc_fu_t {

@@ -7,15 +7,8 @@
 extern "C" {
 #endif
 
-typedef struct usb_audio_t usb_audio_t;
-
-void audio_init(usb_audio_t *audio);
-void audio_out_enable(int enable);
-void audio_play(void *p, uint32_t size);
-void audio_process();
-uint32_t audio_transfer_cnt();
-uint32_t audio_data_cnt();
-int32_t audio_buffering();
+#define AUDIO_I2C	I2C1
+#define AUDIO_I2C_ADDR	0b0011000u
 
 // Audio buffer information
 #define AUDIO_CHANNELS		2ul
@@ -28,19 +21,23 @@ int32_t audio_buffering();
 #define AUDIO_TRANSFER_SIZE	(AUDIO_TRANSFER_CNT(AUDIO_BUFFER_SIZE))
 #define AUDIO_FRAME_TRANSFER	(AUDIO_TRANSFER_CNT(AUDIO_FRAME_SIZE))
 
+typedef struct usb_audio_t usb_audio_t;
+
+void audio_init(usb_audio_t *audio);
+void audio_out_enable(int enable);
+void audio_play(void *p, uint32_t size);
+void audio_process();
+uint32_t audio_transfer_cnt();
+uint32_t audio_data_cnt();
+int32_t audio_buffering();
+
 // Audio device configurations, unit: 1/256 dB
 
 // Speaker gain
-static inline int32_t audio_sp_vol_min() {return 6 * 256;}
-static inline int32_t audio_sp_vol_max() {return 24 * 256;}
-static inline int32_t audio_sp_vol_res() {return 6 * 256;}
 int32_t audio_sp_vol(uint32_t ch);
 void audio_sp_vol_set_async(uint32_t ch, int32_t v);
 
 // DAC gain
-static inline int32_t audio_ch_vol_min() {return -63.5 * 256;}
-static inline int32_t audio_ch_vol_max() {return 24 * 256;}
-static inline int32_t audio_ch_vol_res() {return 0.5 * 256;}
 int32_t audio_ch_vol(uint32_t ch);
 void audio_ch_vol_set_async(uint32_t ch, int32_t v);
 

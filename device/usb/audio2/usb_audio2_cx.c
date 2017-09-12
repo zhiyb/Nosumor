@@ -35,8 +35,8 @@ desc_t usb_audio2_cx_get(usb_audio_t *audio, usb_audio_entity_t *entity, setup_t
 	return desc;
 }
 
-void usb_audio2_register_cx(usb_audio_t *audio, const uint8_t id, const audio_cs_t *data,
-			    usb_t *usb, uint8_t bNrInPins, uint8_t *baCSourceID,
+void usb_audio2_register_cx(usb_audio_t *audio, const uint8_t id, const audio_cx_t *data,
+			    uint8_t bNrInPins, const uint8_t *baCSourceID,
 			    uint8_t bmControls, uint8_t iClockSelector)
 {
 	// Register entitry

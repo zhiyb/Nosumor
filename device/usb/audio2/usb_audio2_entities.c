@@ -49,15 +49,6 @@ void usb_audio2_set(usb_t *usb, usb_audio_t *data, uint32_t ep, setup_t pkt)
 		usb_ep_in_stall(usb->base, ep);
 }
 
-void usb_audio2_entities_init(usb_audio_t *data)
-{
-}
-
-void usb_audio2_register(usb_audio_t *data, void (*config)(usb_t *, usb_audio_t *))
-{
-	data->config = config;
-}
-
 usb_audio_entity_t *usb_audio2_register_entity(usb_audio_t *audio, const uint8_t id, const void *data)
 {
 	// Allocate entitry

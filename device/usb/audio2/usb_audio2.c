@@ -16,7 +16,6 @@
 static void usbif_ac_config(usb_t *usb, void *pdata)
 {
 	usb_audio_t *audio = (usb_audio_t *)pdata;
-	audio->config(usb, audio);
 	if (!desc_ac.wTotalLength) {
 		desc_ac.wTotalLength = desc_ac.bLength;
 		for (usb_audio_entity_t **p = &audio->entities; *p; p = &(*p)->next)
@@ -150,7 +149,6 @@ usb_audio_t *usb_audio2_init(usb_t *usb)
 	usb_audio_t *data = calloc(1u, sizeof(usb_audio_t));
 	if (!data)
 		panic();
-	usb_audio2_entities_init(data);
 	// Audio control interface
 	const usb_if_t usbif_ac = {
 		.data = data,

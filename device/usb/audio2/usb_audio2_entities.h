@@ -46,6 +46,12 @@ typedef struct {
 } audio_cx_t;
 
 typedef struct {
+} audio_it_t;
+
+typedef struct {
+} audio_ot_t;
+
+typedef struct {
 	int channels;
 	// FU_MUTE_CONTROL: Parameter layout 1
 	layout1_cur_t (*mute)(usb_audio_t *audio, const uint8_t id,
@@ -72,22 +78,29 @@ static inline uint32_t layout_cur(int type, void *p)
 	return v;
 }
 
-// Initialisation and register functions
-void usb_audio2_entities_init(usb_audio_t *data);
-void usb_audio2_register(usb_audio_t *data, void (*config)(usb_t *, usb_audio_t *));
+// Entity register functions
 usb_audio_entity_t *usb_audio2_register_entity(usb_audio_t *audio, const uint8_t id, const void *data);
 // Clock source
 void usb_audio2_register_cs(usb_audio_t *audio, const uint8_t id, const audio_cs_t *data,
-			    usb_t *usb, uint8_t bmAttributes, uint8_t bmControls,
+			    uint8_t bmAttributes, uint8_t bmControls,
 			    uint8_t bAssocTerminal, uint8_t iClockSource);
 // Clock selector
-void usb_audio2_register_cx(usb_audio_t *audio, const uint8_t id, const audio_cs_t *data,
-			    usb_t *usb, uint8_t bNrInPins, uint8_t *baCSourceID,
+void usb_audio2_register_cx(usb_audio_t *audio, const uint8_t id, const audio_cx_t *data,
+			    uint8_t bNrInPins, const uint8_t *baCSourceID,
 			    uint8_t bmControls, uint8_t iClockSelector);
 // Feature unit
 void usb_audio2_register_fu(usb_audio_t *audio, const uint8_t id, const audio_fu_t *data,
-			    usb_t *usb, uint8_t bSourceID,
-			    uint32_t *bmaControls, uint8_t iFeature);
+			    uint8_t bSourceID, const uint32_t *bmaControls, uint8_t iFeature);
+// Input terminal
+void usb_audio2_register_it(usb_audio_t *audio, const uint8_t id, const audio_it_t *data,
+			    uint16_t wTerminalType, uint8_t bAssocTerminal, uint8_t bCSourceID,
+			    uint8_t bNrChannels, uint32_t bmChannelConfig, uint8_t iChannelNames,
+			    uint16_t bmControls, uint8_t iTerminal);
+// Output terminal
+void usb_audio2_register_ot(usb_audio_t *audio, const uint8_t id, const audio_ot_t *data,
+			    uint16_t wTerminalType, uint8_t bAssocTerminal,
+			    uint8_t bSourceID, uint8_t bCSourceID,
+			    uint16_t bmControls, uint8_t iTerminal);
 
 // USB protocol
 void usb_audio2_get(usb_t *usb, usb_audio_t *data, uint32_t ep, setup_t pkt);

@@ -83,7 +83,7 @@ int usb_audio2_cs_set(usb_audio_t *audio, usb_audio_entity_t *entity, setup_t pk
 }
 
 void usb_audio2_register_cs(usb_audio_t *audio, const uint8_t id, const audio_cs_t *data,
-			    usb_t *usb, uint8_t bmAttributes, uint8_t bmControls,
+			    uint8_t bmAttributes, uint8_t bmControls,
 			    uint8_t bAssocTerminal, uint8_t iClockSource)
 {
 	// Register entitry

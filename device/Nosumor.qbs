@@ -55,6 +55,7 @@ Project {
             files: [
                 "peripheral/audio.c",
                 "peripheral/audio.h",
+                "peripheral/audio_config.c",
                 "peripheral/i2c.c",
                 "peripheral/i2c.h",
                 "peripheral/mmc_defs.h",
@@ -100,6 +101,7 @@ Project {
                 "usb/audio2/usb_audio2_ep_feedback.h",
                 "usb/audio2/usb_audio2_fu.c",
                 "usb/audio2/usb_audio2_structs.h",
+                "usb/audio2/usb_audio2_term.c",
             ]
         }
 
