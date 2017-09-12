@@ -7,14 +7,18 @@
 #define I2C		AUDIO_I2C
 #define I2C_ADDR	AUDIO_I2C_ADDR
 
+#define SETCLR(src, bit, v)	if (v) (src) |= (bit); else (src) &= ~(bit)
+
 // Entities
 enum {
 	IT_USB = 1,
 	CS_PLL,
 	CX_In,
 	FU_DAC,
-	FU_SpeakerDriver,
+	FU_Headphone,
 	FU_HeadphoneDriver,
+	FU_Speaker,
+	FU_SpeakerDriver,
 	OT_Speaker,
 	OT_Headphones,
 };
@@ -27,9 +31,11 @@ typedef struct {
 		int8_t vol;	// 0: 0x41, 0x42
 	} ch[2];
 	struct {
+		uint8_t atten;	// 1: 0x24, 0x25
 		uint8_t gain;	// 1: 0x28, 0x29
 	} hp[2];
 	struct {
+		uint8_t atten;	// 1: 0x26, 0x27
 		uint8_t gain;	// 1: 0x2a, 0x2b
 	} sp[2];
 } cfg_t;
@@ -96,6 +102,10 @@ void audio_init_config()
 
 	cfg.ch[0].vol = 0x00;	// DAC left volume = 0dB
 	cfg.ch[1].vol = 0x00;	// DAC right volume = 0dB
+	cfg.hp[0].atten = 0x8f,	// HPL analog volume = -7.5dB
+	cfg.hp[1].atten = 0x8f,	// HPR analog volume = -7.5dB
+	cfg.sp[0].atten = 0x80,	// SPL analog volume = 0dB
+	cfg.sp[1].atten = 0x80,	// SPR analog volume = 0dB
 	cfg.hp[0].gain = 0x06;	// HPL driver PGA = 0dB, not muted
 	cfg.hp[1].gain = 0x06;	// HPR driver PGA = 0dB, not muted
 	cfg.sp[0].gain = 0x14;	// SPL driver PGA = 6dB, not muted
@@ -128,6 +138,14 @@ void audio_config_update()
 		0x41, c.ch[0].vol,	// DAC left volume
 		0x42, c.ch[1].vol,	// DAC right volume
 		0x00, 0x01,		// Page 1
+		// HPL analog volume
+		0x24, (c.hp[0].atten & 0x80) ? c.hp[0].atten : 0x7f,
+		// HPR analog volume
+		0x25, (c.hp[1].atten & 0x80) ? c.hp[1].atten : 0x7f,
+		// SPL analog volume
+		0x26, (c.sp[0].atten & 0x80) ? c.sp[0].atten : 0x7f,
+		// SPR analog volume
+		0x27, (c.sp[1].atten & 0x80) ? c.sp[1].atten : 0x7f,
 		0x28, c.hp[0].gain,	// HPL driver
 		0x29, c.hp[1].gain,	// HPR driver
 		0x2a, c.sp[0].gain,	// SPL driver
@@ -195,10 +213,14 @@ layout1_cur_t fu_mute(usb_audio_t *audio, const uint8_t id, const int cn)
 	switch (id) {
 	case FU_DAC:
 		return !!(cfg.dac & (0x04 << ch));
-	case FU_SpeakerDriver:
-		return !(cfg.sp[ch].gain & 0x04);
+	case FU_Headphone:
+		return !(cfg.hp[ch].atten & 0x80);
 	case FU_HeadphoneDriver:
 		return !(cfg.hp[ch].gain & 0x04);
+	case FU_Speaker:
+		return !(cfg.sp[ch].atten & 0x80);
+	case FU_SpeakerDriver:
+		return !(cfg.sp[ch].gain & 0x04);
 	}
 	dbgbkpt();
 	return 0;
@@ -213,22 +235,19 @@ int fu_mute_set(usb_audio_t *audio, const uint8_t id, const int cn, layout1_cur_
 	int ch = cn - 1;
 	switch (id) {
 	case FU_DAC:
-		if (v)
-			cfg.dac |= (0x04 << ch);
-		else
-			cfg.dac &= ~(0x04 << ch);
+		SETCLR(cfg.dac, 0x04 << ch, v);
 		break;
-	case FU_SpeakerDriver:
-		if (v)
-			cfg.sp[ch].gain &= ~0x04;
-		else
-			cfg.sp[ch].gain |= 0x04;
+	case FU_Headphone:
+		SETCLR(cfg.hp[ch].atten, 0x80, v);
 		break;
 	case FU_HeadphoneDriver:
-		if (v)
-			cfg.hp[ch].gain &= ~0x04;
-		else
-			cfg.hp[ch].gain |= 0x04;
+		SETCLR(cfg.hp[ch].gain, 0x04, !v);
+		break;
+	case FU_Speaker:
+		SETCLR(cfg.sp[ch].atten, 0x80, v);
+		break;
+	case FU_SpeakerDriver:
+		SETCLR(cfg.sp[ch].gain, 0x04, !v);
 		break;
 	default:
 		dbgbkpt();
@@ -248,10 +267,16 @@ layout2_cur_t fu_volume(usb_audio_t *audio, const uint8_t id, const int cn)
 	switch (id) {
 	case FU_DAC:
 		return (int)(0.5 * 256) * cfg.ch[ch].vol;
-	case FU_SpeakerDriver:
-		return ((cfg.sp[ch].gain >> 3u) & 0x03u) * (int)(6 * 256) + (int)(6 * 256);
+	case FU_Headphone:
+		// TODO: Fix inaccuracy
+		return -((int)(0.5 * 256) * cfg.hp[ch].atten);
 	case FU_HeadphoneDriver:
 		return ((cfg.hp[ch].gain >> 3u) & 0x0fu) * (int)(1 * 256);
+	case FU_Speaker:
+		// TODO: Fix inaccuracy
+		return -((int)(0.5 * 256) * cfg.sp[ch].atten);
+	case FU_SpeakerDriver:
+		return ((cfg.sp[ch].gain >> 3u) & 0x03u) * (int)(6 * 256) + (int)(6 * 256);
 	}
 	dbgbkpt();
 	return 0;
@@ -268,12 +293,18 @@ int fu_volume_set(usb_audio_t *audio, const uint8_t id, const int cn, const layo
 	case FU_DAC:
 		cfg.ch[ch].vol = v / (int)(0.5 * 256);
 		break;
-	case FU_SpeakerDriver:
-		cfg.sp[ch].gain = (((v - (int)(6 * 256)) / (int)(6 * 256)) << 3u) | 0x04;
-		return 1;
+	case FU_Headphone:
+		cfg.hp[ch].atten = -v / (int)(0.5 * 256);
+		break;
 	case FU_HeadphoneDriver:
 		cfg.hp[ch].gain = ((v / (int)(1 * 256)) << 3u) | 0x0fu;
 		break;
+	case FU_Speaker:
+		cfg.sp[ch].atten = -v / (int)(0.5 * 256);
+		break;
+	case FU_SpeakerDriver:
+		cfg.sp[ch].gain = (((v - (int)(6 * 256)) / (int)(6 * 256)) << 3u) | 0x04;
+		return 1;
 	default:
 		dbgbkpt();
 		return 0;
@@ -285,16 +316,23 @@ int fu_volume_set(usb_audio_t *audio, const uint8_t id, const int cn, const layo
 uint32_t fu_volume_range(usb_audio_t *audio, const uint8_t id, const int cn, layout2_range_t *buf)
 {
 	static const layout2_range_t fu_dac[] = {
-		// DAC gain
+		// DAC volume
 		{(int)(-63.5 * 256), (int)(24 * 256), (int)(0.5 * 256)},
 	};
-	static const layout2_range_t fu_speaker[] = {
-		// DAC gain
-		{(int)(6 * 256), (int)(24 * 256), (int)(6 * 256)},
+	static const layout2_range_t fu_atten[] = {
+		// Analog attenuation
+		// TODO: Range not complete
+		{(int)(-41.7 * 256), (int)(-35.2 * 256), (int)(0.5 * 256)},
+		{(int)(-34.6 * 256), (int)(-18.1 * 256), (int)(0.5 * 256)},
+		{(int)(-17.5 * 256), (int)(0 * 256), (int)(0.5 * 256)},
 	};
-	static const layout2_range_t fu_headphones[] = {
-		// DAC gain
+	static const layout2_range_t fu_headphone_driver[] = {
+		// Headphone driver gain
 		{(int)(0 * 256), (int)(9 * 256), (int)(1 * 256)},
+	};
+	static const layout2_range_t fu_speaker_driver[] = {
+		// Speaker driver gain
+		{(int)(6 * 256), (int)(24 * 256), (int)(6 * 256)},
 	};
 
 	if (cn == 0) {
@@ -305,12 +343,16 @@ uint32_t fu_volume_range(usb_audio_t *audio, const uint8_t id, const int cn, lay
 	case FU_DAC:
 		memcpy(buf, fu_dac, sizeof(fu_dac));
 		return ASIZE(fu_dac);
-	case FU_SpeakerDriver:
-		memcpy(buf, fu_speaker, sizeof(fu_speaker));
-		return ASIZE(fu_speaker);
+	case FU_Headphone:
+	case FU_Speaker:
+		memcpy(buf, fu_atten, sizeof(fu_atten));
+		return ASIZE(fu_atten);
 	case FU_HeadphoneDriver:
-		memcpy(buf, fu_headphones, sizeof(fu_headphones));
-		return ASIZE(fu_headphones);
+		memcpy(buf, fu_headphone_driver, sizeof(fu_headphone_driver));
+		return ASIZE(fu_headphone_driver);
+	case FU_SpeakerDriver:
+		memcpy(buf, fu_speaker_driver, sizeof(fu_speaker_driver));
+		return ASIZE(fu_speaker_driver);
 	}
 	dbgbkpt();
 	return 0;
@@ -358,8 +400,10 @@ void audio_usb_config(usb_audio_t *audio)
 		CTRL(FU_MUTE_CONTROL, CTRL_RW) | CTRL(FU_VOLUME_CONTROL, CTRL_RW),
 	};
 	usb_audio2_register_fu(audio, FU_DAC, &fu, IT_USB, fu_ctrls, 0u);
-	usb_audio2_register_fu(audio, FU_SpeakerDriver, &fu, FU_DAC, fu_ctrls, 0u);
-	usb_audio2_register_fu(audio, FU_HeadphoneDriver, &fu, FU_DAC, fu_ctrls, 0u);
+	usb_audio2_register_fu(audio, FU_Headphone, &fu, FU_DAC, fu_ctrls, 0u);
+	usb_audio2_register_fu(audio, FU_HeadphoneDriver, &fu, FU_Headphone, fu_ctrls, 0u);
+	usb_audio2_register_fu(audio, FU_Speaker, &fu, FU_DAC, fu_ctrls, 0u);
+	usb_audio2_register_fu(audio, FU_SpeakerDriver, &fu, FU_Speaker, fu_ctrls, 0u);
 
 	// Output terminal
 	static const audio_ot_t ot_speaker;
