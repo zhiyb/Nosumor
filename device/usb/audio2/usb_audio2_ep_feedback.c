@@ -45,7 +45,7 @@ static void epin_update(usb_t *usb, uint32_t n)
 	// Calculate feedback frequency
 	int16_t diff = -audio_buffering() + (AUDIO_FRAME_SIZE << 2u);
 	// TODO: Variable frequency
-	data->freq = (24ul << 16u) + diff / 2;
+	data->freq = (24ul << 16u) + diff;
 
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
 	ep->DIEPDMA = (uint32_t)&data->freq;
