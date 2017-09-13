@@ -171,10 +171,10 @@ static void keyboard_tick(uint32_t tick)
 	__disable_irq();
 	EXTI->RTSR |= mask;
 	EXTI->FTSR |= mask;
-	uint32_t err = (status & mask) ^ (stat & mask);
+	uint32_t err = (status ^ stat) & mask;
 	EXTI->SWIER = err;
-	if (err)
-		dbgprintf(ESC_RED "Keyboard tick mismatch\n");
 	debouncing &= ~mask;
 	__enable_irq();
+	if (err)
+		dbgprintf(ESC_RED "Keyboard tick mismatch\n");
 }
