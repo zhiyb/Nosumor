@@ -3,6 +3,7 @@
 #include "../usb_structs.h"
 #include "../usb_macros.h"
 #include "../usb_ep.h"
+#include "../usb_irq.h"
 #include "../usb_ram.h"
 #include "usb_audio2_structs.h"
 #include "usb_audio2_ep_data.h"
@@ -43,9 +44,9 @@ static void epin_update(usb_t *usb, uint32_t n)
 #endif
 
 	// Calculate feedback frequency
-	int16_t diff = -audio_buffering() + (AUDIO_FRAME_SIZE << 2u);
+	int16_t diff = -audio_buffering() + (AUDIO_FRAME_SIZE << 3u);
 	// TODO: Variable frequency
-	data->freq = (24ul << 16u) + diff;
+	data->freq = (24ul << 16u) + (diff / 2);
 
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
 	ep->DIEPDMA = (uint32_t)&data->freq;
@@ -62,7 +63,7 @@ static void epin_xfr_cplt(usb_t *usb, uint32_t n)
 	epdata_t *data = (epdata_t *)usb->epin[n].data;
 	data->pending = 0;
 	// No more isochronous incomplete checks needed
-	usb->epin[n].isoc_check = 0;
+	usb_isoc_check(usb, n | EP_DIR_IN, 0);
 	epin_update(usb, n);
 }
 
@@ -89,7 +90,7 @@ void usb_audio2_ep_feedback_halt(usb_t *usb, int n, int halt)
 		return;
 	data->enabled = !halt;
 	if (!halt) {
-		usb->epin[n].isoc_check = 1;
+		usb_isoc_check(usb, n | EP_DIR_IN, 1);
 		epin_update(usb, n);
 	}
 }

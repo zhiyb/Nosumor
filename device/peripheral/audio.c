@@ -141,7 +141,7 @@ void audio_init(usb_t *usb, usb_audio_t *audio)
 
 	// Start
 	audio_init_config();
-	systick_register_handler(audio_tick);
+	//systick_register_handler(audio_tick);
 	audio_usb_config(usb, audio);
 	audio_process();
 }
@@ -149,7 +149,6 @@ void audio_init(usb_t *usb, usb_audio_t *audio)
 static void audio_tick(uint32_t tick)
 {
 	static uint32_t prev = AUDIO_TRANSFER_SIZE;
-	__disable_irq();
 	// Data transferred
 	uint16_t ndtr = STREAM_TX->NDTR;
 	// Size increment: (prev - NDTR + size) % size
@@ -158,13 +157,6 @@ static void audio_tick(uint32_t tick)
 	data.cnt_transfer += n;
 	if (data.ptr)
 		data.offset -= AUDIO_TRANSFER_BYTES(n);
-	__enable_irq();
-
-	// Clear buffer if lost sync
-	if (data.offset < -(int32_t)AUDIO_BUFFER_SIZE) {
-		memset(data.buf, 0, sizeof(data.buf));
-		data.offset = 0;
-	}
 }
 
 void audio_process()
@@ -194,41 +186,43 @@ void audio_out_enable(int enable)
 	data.ptr = 0;
 	if (enable)
 		dbgprintf(ESC_BLUE "Audio unmuted\n");
-	else
+	else {
 		dbgprintf(ESC_BLUE "Audio muted\n");
+		memset(data.buf, 0, sizeof(data.buf));
+	}
 }
 
-static inline uint32_t *next_frame()
+static inline uint32_t *next_frame(uint32_t nbytes)
 {
 	// ((buffer - remaining) + buffering) & (alignment & buffer)
-	uint32_t mem = (AUDIO_BUFFER_SIZE) - AUDIO_TRANSFER_BYTES(STREAM_TX->NDTR)
-			+ (AUDIO_FRAME_SIZE << 2u);
+	uint32_t mem = AUDIO_BUFFER_SIZE - nbytes + (AUDIO_FRAME_SIZE << 3u);
 	mem &= ~(AUDIO_FRAME_SIZE - 1ul) & (AUDIO_BUFFER_SIZE - 1ul);
 	return (uint32_t *)((void *)data.buf + mem);
 }
 
 void audio_play(void *p, uint32_t size)
 {
-	uint32_t *mem = data.ptr ?: next_frame(), *ptr = (uint32_t *)p;
+	uint32_t nbytes = AUDIO_TRANSFER_BYTES(STREAM_TX->NDTR);
+	uint32_t *mem = data.ptr ?: next_frame(nbytes), *ptr = (uint32_t *)p;
+	// Fill buffer
+	uint32_t slots = size >> 2u;
+	if (slots & 1u)
+		dbgbkpt();
+	uint32_t *mptr = mem;
+	while (slots--) {
+		*mptr++ = ((*ptr) << 16ul) | ((*ptr) >> 16ul);
+		ptr++;
+		// Circular buffer wrap around
+		if ((void *)mptr == (void *)data.buf + AUDIO_BUFFER_SIZE)
+			mptr = (void *)data.buf;
+	}
 	// Update offset
 	audio_tick(0);
-	__disable_irq();
 	data.offset += size;
 	if (!data.ptr) {	// ((mem - buf) - (buffer - remaining) + buffer) % buffer
-		data.offset = (void *)mem - (void *)data.buf + AUDIO_TRANSFER_BYTES(STREAM_TX->NDTR);
+		data.offset = (void *)mem - (void *)data.buf + nbytes;
 		data.offset %= AUDIO_BUFFER_SIZE;
 	}
-	__enable_irq();
-	// Fill buffer
-	size >>= 2u;
-	data.cnt_data += size >> 1u;
-	if (size & 1u)
-		dbgbkpt();
-	while (size--) {
-		*mem++ = ((*ptr) << 16ul) | ((*ptr) >> 16ul);
-		ptr++;
-		if ((void *)mem == (void *)data.buf + AUDIO_BUFFER_SIZE)
-			mem = (void *)data.buf;
-	}
-	data.ptr = mem;
+	data.cnt_data += size >> 3u;
+	data.ptr = mptr;
 }

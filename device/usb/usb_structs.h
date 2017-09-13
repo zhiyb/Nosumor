@@ -20,7 +20,6 @@ typedef struct epin_t {
 	void (*halt)(usb_t *usb, uint32_t ep, int halt);
 	void (*timeout)(usb_t *usb, uint32_t ep);
 	void (*xfr_cplt)(usb_t *usb, uint32_t ep);
-	int isoc_check;
 } epin_t;
 
 typedef struct epout_t {
@@ -29,7 +28,6 @@ typedef struct epout_t {
 	void (*halt)(usb_t *usb, uint32_t ep, int halt);
 	void (*setup_cplt)(usb_t *usb, uint32_t ep);
 	void (*xfr_cplt)(usb_t *usb, uint32_t ep);
-	int isoc_check;
 } epout_t;
 
 // Interface handlers
@@ -67,7 +65,7 @@ typedef struct usb_t {
 		uint32_t fifo;
 	};
 	// Endpoint allocation
-	uint32_t nepin, nepout;
+	uint32_t nepin, nepout, episoc;
 	epin_t epin[USB_EPIN_CNT];
 	epout_t epout[USB_EPOUT_CNT];
 	// Descriptors

@@ -3,6 +3,7 @@
 #include "../usb_structs.h"
 #include "../usb_macros.h"
 #include "../usb_ep.h"
+#include "../usb_irq.h"
 #include "usb_audio2_structs.h"
 #include "usb_audio2_ep_data.h"
 
@@ -13,18 +14,19 @@ typedef struct {
 
 static void epout_recv(usb_t *usb, uint32_t n)
 {
+	// Check frame parity
 	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
+	uint32_t fn = FIELD(dev->DSTS, USB_OTG_DSTS_FNSOF) & 1u;
+	fn = fn ? USB_OTG_DOEPCTL_SD0PID_SEVNFRM_Msk : USB_OTG_DOEPCTL_SODDFRM_Msk;
+	// Configure endpoint DMA
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 	epdata_t *epdata = usb->epout[n].data;
-	// Configure endpoint DMA
 	ep->DOEPDMA = (uint32_t)epdata->data[epdata->swap];
 	// Reset packet counter
 	ep->DOEPTSIZ = (1u << USB_OTG_DOEPTSIZ_PKTCNT_Pos) | DATA_MAX_SIZE;
-	// Check frame parity
-	uint32_t fn = FIELD(dev->DSTS, USB_OTG_DSTS_FNSOF);
-	fn = (fn & 1) ? USB_OTG_DOEPCTL_SD0PID_SEVNFRM_Msk : USB_OTG_DOEPCTL_SODDFRM_Msk;
 	// Enable endpoint
-	DOEPCTL_SET(ep->DOEPCTL, fn | USB_OTG_DOEPCTL_EPENA | USB_OTG_DOEPCTL_CNAK);
+	ep->DOEPCTL |= fn | USB_OTG_DOEPCTL_CNAK;
+	ep->DOEPCTL |= USB_OTG_DOEPCTL_EPENA;
 	epdata->swap = !epdata->swap;
 }
 
@@ -33,10 +35,9 @@ static void epout_init(usb_t *usb, uint32_t n)
 	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 	// Set endpoint type
-	ep->DOEPCTL = USB_OTG_DOEPCTL_USBAEP_Msk | USB_OTG_DOEPCTL_SD0PID_SEVNFRM_Msk |
-			EP_TYP_ISOCHRONOUS | DATA_MAX_SIZE;
+	ep->DOEPCTL = USB_OTG_DOEPCTL_USBAEP_Msk | EP_TYP_ISOCHRONOUS | DATA_MAX_SIZE;
 	// Clear interrupts
-	ep->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk;
+	ep->DOEPINT = USB_OTG_DOEPINT_OTEPDIS_Msk | USB_OTG_DOEPINT_XFRC_Msk;
 	// Unmask interrupts
 	dev->DAINTMSK |= DAINTMSK_OUT(n);
 }
@@ -49,7 +50,11 @@ static void epout_halt(usb_t *usb, uint32_t n, int halt)
 		return;
 	epdata->enabled = !halt;
 	if (!halt) {
-		usb->epout[n].isoc_check = 1;
+		usb_isoc_check(usb, n | EP_DIR_OUT, 1);
+		// Clear interrupts
+		USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
+		ep->DOEPINT = USB_OTG_DOEPINT_OTEPDIS_Msk | USB_OTG_DOEPINT_XFRC_Msk;
+		// Receive data
 		epout_recv(usb, n);
 	}
 }
@@ -59,14 +64,14 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 	epdata_t *epdata = usb->epout[n].data;
 	uint32_t siz = ep->DOEPTSIZ;
-	// No more isochronous incomplete checks needed
-	usb->epout[n].isoc_check = 0;
 	if (epdata->enabled)
 		epout_recv(usb, n);
 	uint32_t pktcnt = 1u - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
 	uint32_t size = DATA_MAX_SIZE - FIELD(siz, USB_OTG_DOEPTSIZ_XFRSIZ);
 	if (pktcnt)
 		audio_play(epdata->data[epdata->swap], size);
+	// No more isochronous incomplete checks needed
+	usb_isoc_check(usb, n | EP_DIR_OUT, 0);
 }
 
 int usb_audio2_ep_data_register(usb_t *usb)

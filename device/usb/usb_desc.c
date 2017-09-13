@@ -58,6 +58,7 @@ static desc_t usb_desc_device(usb_t *usb)
 	pd->bMaxPacketSize0 = usb_ep0_max_size(usb->base);
 	pd->iManufacturer = usb_desc_add_string(usb, 0, LANG_EN_US, "zhiyb");
 	pd->iProduct = usb_desc_add_string(usb, 0, LANG_EN_US, "Nosumor remake");
+	// TODO: Valid serial number characters are [0-9A-F]
 	pd->iSerialNumber = usb_desc_add_string(usb, 0, LANG_EN_US, "V0.3");
 	usb->desc.dev.p = pd;
 	usb->desc.dev.size = pd->bLength;

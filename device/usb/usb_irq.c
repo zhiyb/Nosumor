@@ -48,6 +48,19 @@ void usb_disable(usb_t *usb)
 	usb->speed = USB_Reset;
 }
 
+void usb_isoc_check(usb_t *usb, uint8_t ep, int enable)
+{
+	uint32_t mask;
+	if ((ep & EP_DIR_Msk) == EP_DIR_IN)
+		mask = DAINTMSK_IN(ep & ~EP_DIR_Msk);
+	else
+		mask = DAINTMSK_OUT(ep & ~EP_DIR_Msk);
+	if (enable)
+		usb->episoc |= mask;
+	else
+		usb->episoc &= ~mask;
+}
+
 static inline void usb_endpoint_irq(usb_t *usb)
 {
 	USB_OTG_GlobalTypeDef *base = usb->base;
@@ -96,8 +109,9 @@ void OTG_HS_IRQHandler()
 	usb_t *usb = usb_hs;
 	USB_OTG_GlobalTypeDef *base = usb->base;
 	USB_OTG_DeviceTypeDef *dev = DEV(base);
-	uint32_t i = base->GINTSTS, bk = 1, fn = FIELD(dev->DSTS, USB_OTG_DSTS_FNSOF) & 1ul;
-	i &= base->GINTMSK;
+	uint32_t i = base->GINTSTS, msk = base->GINTMSK, bk = 1;
+	uint32_t fn = FIELD(dev->DSTS, USB_OTG_DSTS_FNSOF) & 1ul;
+	i &= msk;
 	if (!i)
 		return;
 	if (i & (USB_OTG_GINTSTS_OEPINT_Msk | USB_OTG_GINTSTS_IEPINT_Msk)) {
@@ -106,11 +120,14 @@ void OTG_HS_IRQHandler()
 	}
 	if (i & USB_OTG_GINTSTS_IISOIXFR_Msk) {
 		base->GINTSTS = USB_OTG_GINTSTS_IISOIXFR_Msk;
+		uint32_t mask = FIELD(usb->episoc, USB_OTG_DAINT_IEPINT);
+		if (!mask)
+			base->GINTMSK &= ~USB_OTG_GINTMSK_IISOIXFRM_Msk;
 		// Check frame parity
-		uint32_t mask = fn ? USB_OTG_DIEPCTL_SD0PID_SEVNFRM_Msk : USB_OTG_DIEPCTL_SODDFRM_Msk;
+		uint32_t parity = fn ? USB_OTG_DIEPCTL_SD0PID_SEVNFRM_Msk : USB_OTG_DIEPCTL_SODDFRM_Msk;
 		// Update endpoints
-		for (uint32_t n = 1; n != usb->nepin; n++) {
-			if (!usb->epin[n].isoc_check)
+		for (uint32_t n = 1u; mask; n++, mask >>= 1u) {
+			if (!(mask & 1u))
 				continue;
 			USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
 			if (!(ep->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk))
@@ -119,18 +136,21 @@ void OTG_HS_IRQHandler()
 				continue;
 			if ((!(ep->DIEPCTL & USB_OTG_DIEPCTL_EONUM_DPID_Msk)) == fn)
 				continue;
-			DIEPCTL_SET(ep->DIEPCTL, mask);
+			DIEPCTL_SET(ep->DIEPCTL, parity);
 			//putchar(fn + 'A');
 		}
 		bk = 0;
 	}
 	if (i & USB_OTG_GINTSTS_PXFR_INCOMPISOOUT_Msk) {
 		base->GINTSTS = USB_OTG_GINTSTS_PXFR_INCOMPISOOUT_Msk;
+		uint32_t mask = FIELD(usb->episoc, USB_OTG_DAINT_OEPINT);
+		if (!mask)
+			base->GINTMSK &= ~USB_OTG_GINTMSK_PXFRM_IISOOXFRM_Msk;
 		// Check frame parity
-		uint32_t mask = fn ? USB_OTG_DOEPCTL_SD0PID_SEVNFRM_Msk : USB_OTG_DOEPCTL_SODDFRM_Msk;
+		uint32_t parity = fn ? USB_OTG_DOEPCTL_SD0PID_SEVNFRM_Msk : USB_OTG_DOEPCTL_SODDFRM_Msk;
 		// Update endpoints
-		for (uint32_t n = 1; n != usb->nepout; n++) {
-			if (!usb->epout[n].isoc_check)
+		for (uint32_t n = 1u; mask; n++, mask >>= 1u) {
+			if (!(mask & 1u))
 				continue;
 			USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 			if (!(ep->DOEPCTL & USB_OTG_DOEPCTL_EPENA_Msk))
@@ -140,7 +160,7 @@ void OTG_HS_IRQHandler()
 			// Not defined for DOEPCTL?
 			if ((!(ep->DOEPCTL & USB_OTG_DIEPCTL_EONUM_DPID_Msk)) == fn)
 				continue;
-			DOEPCTL_SET(ep->DOEPCTL, mask);
+			DOEPCTL_SET(ep->DOEPCTL, parity);
 			//putchar(fn + 'a');
 		}
 		bk = 0;
@@ -167,6 +187,18 @@ void OTG_HS_IRQHandler()
 	}
 	if (bk)
 		dbgbkpt();
+	// Check isochronous incomplete interrupts
+	if (FIELD(usb->episoc, USB_OTG_DAINT_IEPINT))
+		msk |= USB_OTG_GINTMSK_IISOIXFRM_Msk;
+	else
+		msk &= ~USB_OTG_GINTMSK_IISOIXFRM_Msk;
+	if (FIELD(usb->episoc, USB_OTG_DAINT_OEPINT))
+		msk |= USB_OTG_GINTMSK_PXFRM_IISOOXFRM_Msk;
+	else
+		msk &= ~USB_OTG_GINTMSK_PXFRM_IISOOXFRM_Msk;
+	// Update interrupt masks
+	if (msk != base->GINTMSK)
+		base->GINTMSK = msk;
 }
 
 void OTG_HS_EP1_IN_IRQHandler()
