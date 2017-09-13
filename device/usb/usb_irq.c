@@ -136,7 +136,7 @@ void OTG_HS_IRQHandler()
 				continue;
 			if ((!(ep->DIEPCTL & USB_OTG_DIEPCTL_EONUM_DPID_Msk)) == fn)
 				continue;
-			DIEPCTL_SET(ep->DIEPCTL, parity);
+			ep->DIEPCTL |= parity;
 			//putchar(fn + 'A');
 		}
 		bk = 0;
@@ -160,7 +160,7 @@ void OTG_HS_IRQHandler()
 			// Not defined for DOEPCTL?
 			if ((!(ep->DOEPCTL & USB_OTG_DIEPCTL_EONUM_DPID_Msk)) == fn)
 				continue;
-			DOEPCTL_SET(ep->DOEPCTL, parity);
+			ep->DOEPCTL |= parity;
 			//putchar(fn + 'a');
 		}
 		bk = 0;
