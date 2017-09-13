@@ -109,9 +109,9 @@ void OTG_HS_IRQHandler()
 	usb_t *usb = usb_hs;
 	USB_OTG_GlobalTypeDef *base = usb->base;
 	USB_OTG_DeviceTypeDef *dev = DEV(base);
-	uint32_t i = base->GINTSTS, msk = base->GINTMSK, bk = 1;
+	uint32_t i = base->GINTSTS, bk = 1;
 	uint32_t fn = FIELD(dev->DSTS, USB_OTG_DSTS_FNSOF) & 1ul;
-	i &= msk;
+	i &= base->GINTMSK;
 	if (!i)
 		return;
 	if (i & (USB_OTG_GINTSTS_OEPINT_Msk | USB_OTG_GINTSTS_IEPINT_Msk)) {
@@ -137,7 +137,6 @@ void OTG_HS_IRQHandler()
 			if ((!(ep->DIEPCTL & USB_OTG_DIEPCTL_EONUM_DPID_Msk)) == fn)
 				continue;
 			ep->DIEPCTL |= parity;
-			//putchar(fn + 'A');
 		}
 		bk = 0;
 	}
@@ -161,7 +160,6 @@ void OTG_HS_IRQHandler()
 			if ((!(ep->DOEPCTL & USB_OTG_DIEPCTL_EONUM_DPID_Msk)) == fn)
 				continue;
 			ep->DOEPCTL |= parity;
-			//putchar(fn + 'a');
 		}
 		bk = 0;
 	}
@@ -187,18 +185,6 @@ void OTG_HS_IRQHandler()
 	}
 	if (bk)
 		dbgbkpt();
-	// Check isochronous incomplete interrupts
-	if (FIELD(usb->episoc, USB_OTG_DAINT_IEPINT))
-		msk |= USB_OTG_GINTMSK_IISOIXFRM_Msk;
-	else
-		msk &= ~USB_OTG_GINTMSK_IISOIXFRM_Msk;
-	if (FIELD(usb->episoc, USB_OTG_DAINT_OEPINT))
-		msk |= USB_OTG_GINTMSK_PXFRM_IISOOXFRM_Msk;
-	else
-		msk &= ~USB_OTG_GINTMSK_PXFRM_IISOOXFRM_Msk;
-	// Update interrupt masks
-	if (msk != base->GINTMSK)
-		base->GINTMSK = msk;
 }
 
 void OTG_HS_EP1_IN_IRQHandler()
