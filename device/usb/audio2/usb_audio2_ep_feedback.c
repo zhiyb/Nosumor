@@ -17,13 +17,21 @@ typedef struct {
 
 static void epin_init(usb_t *usb, uint32_t n)
 {
+	// Allocate TX FIFO
 	uint32_t size = 4u, addr = usb_ram_alloc(usb, &size);
 	usb->base->DIEPTXF[n - 1] = DIEPTXF(addr, size);
-	// Unmask interrupts
+	// Clear interrupts
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
 	ep->DIEPINT = USB_OTG_DIEPINT_XFRC_Msk;
+	// Unmask interrupts
 	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
-	dev->DAINTMSK |= DAINTMSK_IN(n);
+	if (n == 1u) {
+		dev->DEACHINT = USB_OTG_DEACHINT_IEP1INT_Msk;
+		dev->DINEP1MSK = USB_OTG_DIEPINT_XFRC_Msk;
+		dev->DEACHMSK |= USB_OTG_DEACHINTMSK_IEP1INTM_Msk;
+	} else {
+		dev->DAINTMSK |= DAINTMSK_IN(n);
+	}
 	// Configure endpoint
 	ep->DIEPCTL = USB_OTG_DIEPCTL_USBAEP_Msk | EP_TYP_ISOCHRONOUS |
 			(n << USB_OTG_DIEPCTL_TXFNUM_Pos) | (4u << USB_OTG_DIEPCTL_MPSIZ_Pos);
@@ -37,11 +45,6 @@ static void epin_update(usb_t *usb, uint32_t n)
 
 	// Frame parity checking not needed
 	// Frame parity will always be the same if interval != 1
-#if 0
-	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
-	uint32_t fn = (FIELD(dev->DSTS, USB_OTG_DSTS_FNSOF)) & 1;
-	fn = fn ? USB_OTG_DIEPCTL_SD0PID_SEVNFRM_Msk : USB_OTG_DIEPCTL_SODDFRM_Msk;
-#endif
 
 	// Calculate feedback frequency
 	int16_t diff = -audio_buffering() + (AUDIO_FRAME_SIZE << 4u);

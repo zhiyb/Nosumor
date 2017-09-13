@@ -68,7 +68,7 @@ static inline void usb_endpoint_irq(usb_t *usb)
 	uint32_t daint = dev->DAINT;
 	uint32_t mask = FIELD(daint, USB_OTG_DAINT_OEPINT);
 	for (uint32_t n = 0u; mask; n++, mask >>= 1u) {
-		if (!(mask & 1u))
+		if (n == 1u || !(mask & 1u))
 			continue;
 		USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(base, n);
 		uint32_t intr = ep->DOEPINT;
@@ -83,7 +83,7 @@ static inline void usb_endpoint_irq(usb_t *usb)
 	}
 	mask = FIELD(daint, USB_OTG_DAINT_IEPINT);
 	for (uint32_t n = 0u; mask; n++, mask >>= 1u) {
-		if (!(mask & 1u))
+		if (n == 1u || !(mask & 1u))
 			continue;
 		USB_OTG_INEndpointTypeDef *ep = EP_IN(base, n);
 		uint32_t intr = ep->DIEPINT;
@@ -203,12 +203,36 @@ void OTG_HS_IRQHandler()
 
 void OTG_HS_EP1_IN_IRQHandler()
 {
-	USB_OTG_GlobalTypeDef *usb = usb_hs->base;
-	dbgbkpt();
+	usb_t *usb = usb_hs;
+	USB_OTG_GlobalTypeDef *base = usb->base;
+	USB_OTG_DeviceTypeDef *dev = DEV(base);
+	dev->DEACHINT = USB_OTG_DEACHINT_IEP1INT_Msk;
+	USB_OTG_INEndpointTypeDef *ep = EP_IN(base, 1);
+	uint32_t intr = ep->DIEPINT;
+	if (intr & USB_OTG_DIEPINT_XFRC_Msk) {
+		ep->DIEPINT = USB_OTG_DIEPINT_XFRC_Msk;
+		FUNC(usb->epin[1].xfr_cplt)(usb, 1);
+	}
+	if (intr & USB_OTG_DIEPINT_TOC_Msk) {
+		ep->DIEPINT = USB_OTG_DIEPINT_TOC_Msk;
+		FUNC(usb->epin[1].timeout)(usb, 1);
+	}
 }
 
 void OTG_HS_EP1_OUT_IRQHandler()
 {
-	USB_OTG_GlobalTypeDef *usb = usb_hs->base;
-	dbgbkpt();
+	usb_t *usb = usb_hs;
+	USB_OTG_GlobalTypeDef *base = usb->base;
+	USB_OTG_DeviceTypeDef *dev = DEV(base);
+	dev->DEACHINT = USB_OTG_DEACHINT_OEP1INT_Msk;
+	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(base, 1);
+	uint32_t intr = ep->DOEPINT;
+	if (intr & USB_OTG_DOEPINT_XFRC_Msk) {
+		ep->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk;
+		FUNC(usb->epout[1].xfr_cplt)(usb, 1);
+	}
+	if (intr & (USB_OTG_DOEPINT_STUP_Msk | USB_OTG_DOEPINT_OTEPSPR_Msk)) {
+		ep->DOEPINT = USB_OTG_DOEPINT_STUP_Msk | USB_OTG_DOEPINT_OTEPSPR_Msk;
+		FUNC(usb->epout[1].setup_cplt)(usb, 1);
+	}
 }

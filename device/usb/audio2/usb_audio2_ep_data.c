@@ -25,21 +25,26 @@ static void epout_recv(usb_t *usb, uint32_t n)
 	// Reset packet counter
 	ep->DOEPTSIZ = (1u << USB_OTG_DOEPTSIZ_PKTCNT_Pos) | DATA_MAX_SIZE;
 	// Enable endpoint
-	ep->DOEPCTL |= fn | USB_OTG_DOEPCTL_CNAK;
-	ep->DOEPCTL |= USB_OTG_DOEPCTL_EPENA;
+	ep->DOEPCTL |= fn | USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA;
 	epdata->swap = !epdata->swap;
 }
 
 static void epout_init(usb_t *usb, uint32_t n)
 {
-	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 	// Set endpoint type
 	ep->DOEPCTL = USB_OTG_DOEPCTL_USBAEP_Msk | EP_TYP_ISOCHRONOUS | DATA_MAX_SIZE;
 	// Clear interrupts
 	ep->DOEPINT = USB_OTG_DOEPINT_OTEPDIS_Msk | USB_OTG_DOEPINT_XFRC_Msk;
 	// Unmask interrupts
-	dev->DAINTMSK |= DAINTMSK_OUT(n);
+	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
+	if (n == 1u) {
+		dev->DEACHINT = USB_OTG_DEACHINT_OEP1INT_Msk;
+		dev->DOUTEP1MSK = USB_OTG_DOEPINT_XFRC_Msk;
+		dev->DEACHMSK |= USB_OTG_DEACHINTMSK_OEP1INTM_Msk;
+	} else {
+		dev->DAINTMSK |= DAINTMSK_OUT(n);
+	}
 }
 
 static void epout_halt(usb_t *usb, uint32_t n, int halt)
