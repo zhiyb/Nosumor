@@ -132,7 +132,7 @@ typedef struct PACKED desc_ep_t {
 } desc_ep_t;
 
 static const desc_ep_t desc_ep[] = {
-	{8u, CS_ENDPOINT, EP_GENERAL, 0u, 0u, 1u, 0u},
+	{8u, CS_ENDPOINT, EP_GENERAL, 0u, 0u, 0u, 0u},
 };
 
 // Type I format descriptor

@@ -68,6 +68,9 @@ void usb_desc_add_interface_association(usb_t *usb, uint8_t bInterfaceCount,
 					uint8_t bFunctionProtocol, uint8_t iFunction);
 void usb_desc_add_endpoint(usb_t *usb, uint8_t bEndpointAddress, uint8_t bmAttributes,
 			   uint16_t wMaxPacketSize, uint8_t bInterval);
+void usb_desc_add_endpoint_sync(usb_t *usb, uint8_t bEndpointAddress,
+				uint8_t bmAttributes, uint16_t wMaxPacketSize,
+				uint8_t bInterval, uint8_t bRefresh, uint8_t bSynchAddress);
 void usb_desc_add(usb_t *usb, const void *ptr, uint8_t size);
 
 #ifdef __cplusplus

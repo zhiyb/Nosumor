@@ -1,4 +1,5 @@
 #include <malloc.h>
+#include <systick.h>
 #include "../usb.h"
 #include "../usb_structs.h"
 #include "../usb_macros.h"
@@ -8,12 +9,21 @@
 #include "usb_audio2_structs.h"
 #include "usb_audio2_ep_data.h"
 
+// Endpoint update interval
+#define INTERVAL	512u
+
 uint32_t cnt = 0;
 
 typedef struct {
-	uint32_t cnt, freq;
+	int32_t offset, acc;
+	uint32_t freq, cnt;
 	volatile int enabled, pending;
+	// USB interface
+	usb_t *usb;
+	int ep;
 } epdata_t;
+
+static epdata_t epdata = {0};
 
 static void epin_init(usb_t *usb, uint32_t n)
 {
@@ -42,21 +52,12 @@ static void epin_update(usb_t *usb, uint32_t n)
 	epdata_t *data = (epdata_t *)usb->epin[n].data;
 	if (data->pending)
 		return;
-
-	// Frame parity checking not needed
-	// Frame parity will always be the same if interval != 1
-
-	// Calculate feedback frequency
-	int16_t diff = -audio_buffering() + (AUDIO_FRAME_SIZE << 4u);
-	// TODO: Variable frequency
-	data->freq = (24ul << 16u) + diff;
-
+	// Send frequency value
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
 	ep->DIEPDMA = (uint32_t)&data->freq;
 	ep->DIEPTSIZ = (1u << USB_OTG_DIEPTSIZ_PKTCNT_Pos) | 4u;
 	// Enable endpoint
 	DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_CNAK_Msk);
-
 	data->pending = 1;
 	cnt++;
 }
@@ -64,26 +65,42 @@ static void epin_update(usb_t *usb, uint32_t n)
 static void epin_xfr_cplt(usb_t *usb, uint32_t n)
 {
 	epdata_t *data = (epdata_t *)usb->epin[n].data;
-	data->pending = 0;
 	// No more isochronous incomplete checks needed
 	usb_isoc_check(usb, n | EP_DIR_IN, 0);
+	// Enable endpoint
+	data->pending = 0;
 	epin_update(usb, n);
+}
+
+static void feedback_update(uint32_t tick)
+{
+	epdata_t *data = &epdata;
+	if (!data->enabled)
+		return;
+	// Update every INTERVAL timeouts
+	if (tick & (INTERVAL - 1u))
+		return;
+	// Calculate feedback frequency
+	int32_t offset = audio_buffering();
+	int32_t diff = offset - data->offset;
+	data->offset = offset;
+	// Minimise offset and offset difference
+	data->acc -= offset + diff;
+	// TODO: Variable frequency
+	data->freq = (24ul << 16u) + data->acc;
 }
 
 int usb_audio2_ep_feedback_register(usb_t *usb)
 {
-	epdata_t *epdata = calloc(1u, sizeof(epdata_t));
-	if (!epdata)
-		panic();
-
+	epdata.usb = usb;
 	const epin_t epin = {
-		.data = epdata,
+		.data = &epdata,
 		.init = &epin_init,
 		.xfr_cplt = &epin_xfr_cplt,
 	};
-	int ep;
-	usb_ep_register(usb, &epin, &ep, 0, 0);
-	return ep;
+	usb_ep_register(usb, &epin, &epdata.ep, 0, 0);
+	systick_register_handler(&feedback_update);
+	return epdata.ep;
 }
 
 void usb_audio2_ep_feedback_halt(usb_t *usb, int n, int halt)
@@ -91,11 +108,18 @@ void usb_audio2_ep_feedback_halt(usb_t *usb, int n, int halt)
 	epdata_t *data = (epdata_t *)usb->epin[n].data;
 	if (!data)
 		return;
-	data->enabled = !halt;
 	if (!halt) {
-		usb_isoc_check(usb, n | EP_DIR_IN, 1);
+		// Reset statistics
+		data->offset = 0;
+		data->acc = 0;
+		// TODO: Variable frequency
+		data->freq = 24ul << 16u;
+		// Check for isochronous incomplete
+		usb_isoc_check(epdata.usb, epdata.ep | EP_DIR_IN, 1);
+		// Enable endpoint
 		epin_update(usb, n);
 	}
+	data->enabled = !halt;
 }
 
 uint32_t usb_audio2_feedback_cnt()

@@ -195,7 +195,7 @@ void audio_out_enable(int enable)
 static inline uint32_t *next_frame(uint32_t nbytes)
 {
 	// ((buffer - remaining) + buffering) & (alignment & buffer)
-	uint32_t mem = AUDIO_BUFFER_SIZE - nbytes + (AUDIO_FRAME_SIZE << 4u);
+	uint32_t mem = AUDIO_BUFFER_SIZE - nbytes + (AUDIO_FRAME_SIZE * 4u);
 	mem &= ~(AUDIO_FRAME_SIZE - 1ul) & (AUDIO_BUFFER_SIZE - 1ul);
 	return (uint32_t *)((void *)data.buf + mem);
 }
@@ -219,10 +219,8 @@ void audio_play(void *p, uint32_t size)
 	// Update offset
 	audio_tick(0);
 	data.offset += size;
-	if (!data.ptr) {	// ((mem - buf) - (buffer - remaining) + buffer) % buffer
-		data.offset = (void *)mem - (void *)data.buf + nbytes;
-		data.offset %= AUDIO_BUFFER_SIZE;
-	}
+	if (!data.ptr)
+		data.offset = 0;
 	data.cnt_data += size >> 3u;
 	data.ptr = mptr;
 }

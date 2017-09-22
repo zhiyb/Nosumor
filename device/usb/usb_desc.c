@@ -324,6 +324,33 @@ void usb_desc_add_endpoint(usb_t *usb, uint8_t bEndpointAddress, uint8_t bmAttri
 	usb->desc.config.size += e.bLength;
 }
 
+typedef struct PACKED {
+	uint8_t bLength;
+	uint8_t bDescriptorType;
+	uint8_t bEndpointAddress;
+	uint8_t bmAttributes;
+	uint16_t wMaxPacketSize;
+	uint8_t bInterval;
+	uint8_t bRefresh;
+	uint8_t bSynchAddress;
+} desc_ep_sync_t;
+
+void usb_desc_add_endpoint_sync(usb_t *usb, uint8_t bEndpointAddress,
+				uint8_t bmAttributes, uint16_t wMaxPacketSize,
+				uint8_t bInterval, uint8_t bRefresh, uint8_t bSynchAddress)
+{
+	static const uint8_t bLength = 9u;
+	usb->desc.config.p = realloc(usb->desc.config.p,
+				     usb->desc.config.size + bLength);
+	const desc_ep_sync_t e = {
+		bLength, ENDPOINT, bEndpointAddress, bmAttributes, wMaxPacketSize,
+		bInterval, bRefresh, bSynchAddress
+	};
+	desc_ep_t *ep = (desc_ep_t *)(usb->desc.config.p + usb->desc.config.size);
+	memcpy(ep, &e, e.bLength);
+	usb->desc.config.size += e.bLength;
+}
+
 /* Arbitrary descriptor */
 
 void usb_desc_add(usb_t *usb, const void *ptr, uint8_t size)
