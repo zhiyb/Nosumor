@@ -48,7 +48,9 @@ void SysTick_Handler()
 void systick_register_handler(systick_handler_t func)
 {
 	uint32_t n = nhandlers + 1u;
+	__disable_irq();
 	handlers = realloc(handlers, n * sizeof(systick_handler_t));
+	__enable_irq();
 	*(handlers + nhandlers) = func;
 	nhandlers = n;
 }
