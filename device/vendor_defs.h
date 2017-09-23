@@ -26,6 +26,7 @@ typedef struct pong_t {
 } pong_t;
 
 enum ReportINTypes {Pong = 0, FlashStatus};
-enum ReportOUTTypes {Ping = 0, FlashReset, FlashData, FlashCheck, FlashStart};
+enum ReportOUTTypes {Ping = 0, FlashReset, FlashData, FlashCheck, FlashStart,
+		KeycodeUpdate};
 
 #endif // VENDOR_DEFS_H

@@ -15,6 +15,7 @@ extern const uint32_t keyboard_masks[KEYBOARD_KEYS];
 
 void keyboard_init(usb_hid_if_t *hid_keyboard);
 uint32_t keyboard_status();
+void keyboard_keycode_set(unsigned int btn, uint8_t code);
 
 #ifdef __cplusplus
 }

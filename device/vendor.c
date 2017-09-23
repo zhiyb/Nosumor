@@ -3,6 +3,7 @@
 #include <string.h>
 #include <debug.h>
 #include <escape.h>
+#include <peripheral/keyboard.h>
 #include <usb/hid/usb_hid.h>
 #include "vendor.h"
 #include "vendor_defs.h"
@@ -83,6 +84,11 @@ void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp)
 		break;
 	case FlashStart:
 		flash_hex_program();
+		break;
+	case KeycodeUpdate:
+		if (size != 2)
+			break;
+		keyboard_keycode_set(rp->payload[0], rp->payload[1]);
 		break;
 	}
 }

@@ -100,6 +100,7 @@ static void feedback_update(uint32_t tick)
 		data->cnt = EP_UPDATES;
 		epin_update(data->usb, data->ep);
 	}
+	dbgprintf("|%ld", data->acc);
 }
 
 int usb_audio2_ep_feedback_register(usb_t *usb)
