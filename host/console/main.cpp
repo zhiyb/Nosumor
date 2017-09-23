@@ -92,6 +92,18 @@ void reset(hid_device *dev)
 	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
 }
 
+void keycode_update(hid_device *dev, unsigned int btn, int code)
+{
+	logger->info("Setting keycode of button {} to {}...", btn, code);
+	vendor_report_t report;
+	report.id = HID_REPORT_ID;
+	report.size = VENDOR_REPORT_BASE_SIZE + 2u;
+	report.type = KeycodeUpdate;
+	report.payload[0] = btn;
+	report.payload[1] = code;
+	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
+}
+
 void process(hid_device *dev, int argc, char **argv)
 {
 	hid_set_nonblocking(dev, 0);
@@ -105,6 +117,14 @@ void process(hid_device *dev, int argc, char **argv)
 		ping(dev);
 	} else if (strcmp(*argv, "reset") == 0) {
 		reset(dev);
+	} else if (strcmp(*argv, "keycode") == 0) {
+		if (argv++, !--argc)
+			return;
+		unsigned int btn = atoi(*argv);
+		if (argv++, !--argc)
+			return;
+		int code = atoi(*argv);
+		keycode_update(dev, btn, code);
 	}
 }
 
@@ -119,6 +139,7 @@ int main(int argc, char **argv)
 		clog << "  ping               | Check device signature and version info" << endl;
 		clog << "  reset              | Reset target device" << endl;
 		clog << "  flash program.hex  | Flash program.hex to target devices" << endl;
+		clog << "  keycode btn code   | Update keycode of button `btn' to `code'" << endl;
 		return 1;
 	}
 
