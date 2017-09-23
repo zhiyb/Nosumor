@@ -9,8 +9,10 @@
 #include "usb_audio2_structs.h"
 #include "usb_audio2_ep_data.h"
 
-// Endpoint update interval
-#define INTERVAL	512u
+// Frequency calculation update interval
+#define INTERVAL	1024u
+// Endpoint update repeats
+#define EP_UPDATES	2u
 
 uint32_t cnt = 0;
 
@@ -52,13 +54,18 @@ static void epin_update(usb_t *usb, uint32_t n)
 	epdata_t *data = (epdata_t *)usb->epin[n].data;
 	if (data->pending)
 		return;
+	// Check frame parity
+	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
+	uint32_t fn = FIELD(dev->DSTS, USB_OTG_DSTS_FNSOF) & 1u;
+	fn = fn ? USB_OTG_DOEPCTL_SD0PID_SEVNFRM_Msk : USB_OTG_DOEPCTL_SODDFRM_Msk;
 	// Send frequency value
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
 	ep->DIEPDMA = (uint32_t)&data->freq;
 	ep->DIEPTSIZ = (1u << USB_OTG_DIEPTSIZ_PKTCNT_Pos) | 4u;
 	// Enable endpoint
-	DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_CNAK_Msk);
+	ep->DIEPCTL |= fn | USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_CNAK_Msk;
 	data->pending = 1;
+	data->cnt--;
 	cnt++;
 }
 
@@ -69,7 +76,8 @@ static void epin_xfr_cplt(usb_t *usb, uint32_t n)
 	usb_isoc_check(usb, n | EP_DIR_IN, 0);
 	// Enable endpoint
 	data->pending = 0;
-	epin_update(usb, n);
+	if (!--data->cnt)
+		epin_update(usb, n);
 }
 
 static void feedback_update(uint32_t tick)
@@ -81,13 +89,17 @@ static void feedback_update(uint32_t tick)
 	if (tick & (INTERVAL - 1u))
 		return;
 	// Calculate feedback frequency
-	int32_t offset = audio_buffering();
+	int32_t offset = audio_buffering() / (int)AUDIO_FRAME_SIZE;
 	int32_t diff = offset - data->offset;
 	data->offset = offset;
-	// Minimise offset and offset difference
-	data->acc -= offset + diff;
+	data->acc -= diff;
 	// TODO: Variable frequency
 	data->freq = (24ul << 16u) + data->acc;
+	// Send update
+	if (diff) {
+		data->cnt = EP_UPDATES;
+		epin_update(data->usb, data->ep);
+	}
 }
 
 int usb_audio2_ep_feedback_register(usb_t *usb)
@@ -112,6 +124,7 @@ void usb_audio2_ep_feedback_halt(usb_t *usb, int n, int halt)
 		// Reset statistics
 		data->offset = 0;
 		data->acc = 0;
+		data->cnt = EP_UPDATES;
 		// TODO: Variable frequency
 		data->freq = 24ul << 16u;
 		// Check for isochronous incomplete

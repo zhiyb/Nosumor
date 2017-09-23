@@ -195,7 +195,7 @@ void audio_out_enable(int enable)
 static inline uint32_t *next_frame(uint32_t nbytes)
 {
 	// ((buffer - remaining) + buffering) & (alignment & buffer)
-	uint32_t mem = AUDIO_BUFFER_SIZE - nbytes + (AUDIO_FRAME_SIZE * 4u);
+	uint32_t mem = AUDIO_BUFFER_SIZE - nbytes + (AUDIO_FRAME_SIZE << 5u);
 	mem &= ~(AUDIO_FRAME_SIZE - 1ul) & (AUDIO_BUFFER_SIZE - 1ul);
 	return (uint32_t *)((void *)data.buf + mem);
 }
