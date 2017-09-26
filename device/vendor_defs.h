@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 
-#define SW_VERSION	0x0003
+#define SW_VERSION	0x0004
+#define SW_VERSION_STR	"0004"
 
 #define VENDOR_REPORT_BASE_SIZE	(3u)
 #define VENDOR_REPORT_SIZE	(VENDOR_REPORT_BASE_SIZE + 32u)

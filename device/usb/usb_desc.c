@@ -1,5 +1,6 @@
 #include <malloc.h>
 #include <string.h>
+#include <vendor_defs.h>
 #include "../debug.h"
 #include "usb_desc.h"
 #include "usb_ep0.h"
@@ -9,7 +10,7 @@
 
 #define USB_VID		0x0483
 #define USB_PID		0x5750
-#define USB_RELEASE	0x0003
+#define USB_RELEASE	SW_VERSION
 
 #define DEVICE				1u
 #define CONFIGURATION			2u
@@ -58,8 +59,8 @@ static desc_t usb_desc_device(usb_t *usb)
 	pd->bMaxPacketSize0 = usb_ep0_max_size(usb->base);
 	pd->iManufacturer = usb_desc_add_string(usb, 0, LANG_EN_US, "zhiyb");
 	pd->iProduct = usb_desc_add_string(usb, 0, LANG_EN_US, "Nosumor remake");
-	// TODO: Valid serial number characters are [0-9A-F]
-	pd->iSerialNumber = usb_desc_add_string(usb, 0, LANG_EN_US, "V0.3");
+	// Valid serial number characters are [0-9A-F]
+	pd->iSerialNumber = usb_desc_add_string(usb, 0, LANG_EN_US, SW_VERSION_STR);
 	usb->desc.dev.p = pd;
 	usb->desc.dev.size = pd->bLength;
 	return usb->desc.dev;
