@@ -1,7 +1,7 @@
 # Nosumor remake
 <sup>(A new project name needed)</sup>
 
-Design a small USB keyboard for playing [osu!](https://osu.ppy.sh/).
+Design a small USB keyboard for playing [osu!](https://osu.ppy.sh/): [Blog posts](https://zhiyb.wordpress.com/category/cc/embedded/nosumor/)
 
 In addition to mandatory keyboard functionalities, USB audio and Micro SD support <sup>work in progress</sup> are also added.
 
