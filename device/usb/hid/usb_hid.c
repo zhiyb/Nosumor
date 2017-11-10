@@ -51,7 +51,7 @@ typedef struct usb_hid_t {
 	int usages, ep_in, ep_out;
 	union {
 		usb_hid_report_t report;
-		uint8_t data[HID_OUT_MAX_SIZE];
+		uint8_t raw[HID_OUT_MAX_SIZE];
 	} pktbuf, buf[HID_OUT_MAX_PKT];
 } usb_hid_t;
 
@@ -127,7 +127,7 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 	// Copy packet
 	if (pkt_cnt != 1u)
 		dbgbkpt();
-	memcpy(data->pktbuf.data, data->buf, size);
+	memcpy(data->pktbuf.raw, data->buf, size);
 	// Receive new packets
 	usb_ep_out_transfer(usb->base, n, data->buf, 0u, HID_OUT_MAX_PKT, HID_OUT_MAX_SIZE);
 	// Process packet
@@ -164,7 +164,7 @@ static void usbif_config(usb_t *usb, void *p)
 	usb_desc_add_endpoint(usb, EP_DIR_IN | data->ep_in,
 			      EP_INTERRUPT, HID_IN_MAX_SIZE, 1u);
 	usb_desc_add_endpoint(usb, EP_DIR_OUT | data->ep_out,
-			      EP_INTERRUPT, HID_IN_MAX_SIZE, 1u);
+			      EP_INTERRUPT, HID_OUT_MAX_SIZE, 1u);
 }
 
 static void set_idle(uint8_t duration, uint8_t reportID)
