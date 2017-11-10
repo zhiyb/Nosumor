@@ -90,6 +90,8 @@ static void usb_setup_standard_interface(usb_t *usb, uint32_t ep, setup_t pkt)
 static int usb_setup_endpoint_halt(usb_t *usb, uint32_t ep, int halt)
 {
 	uint32_t n = ep & ~EP_DIR_Msk;
+	if (n == 0)
+		return 1;
 	switch (ep & EP_DIR_Msk) {
 	case EP_DIR_IN:
 		if (usb->epin[n].halt) {
