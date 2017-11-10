@@ -20,6 +20,7 @@
 // USB interfaces
 #include "usb/usb.h"
 #include "usb/audio2/usb_audio2.h"
+#include "usb/msc/usb_msc.h"
 #include "usb/hid/usb_hid.h"
 #include "usb/hid/keyboard/usb_hid_keyboard.h"
 #include "usb/hid/vendor/usb_hid_vendor.h"
@@ -97,6 +98,11 @@ static inline void init()
 	puts(ESC_CYAN "Initialising audio...");
 	usb_audio_t *audio = usb_audio2_init(&usb);
 	audio_init(&usb, audio);
+#endif
+
+#ifdef DEBUG
+	puts(ESC_CYAN "Initialising USB mass storage...");
+	usb_msc_t *msc = usb_msc_init(&usb);
 #endif
 
 	puts(ESC_CYAN "Initialising USB HID interface...");
@@ -237,6 +243,7 @@ int main()
 			usb_connect(&usb, 1);
 		}
 
+#if 0
 		// Every 1024 systick ticks
 		cnt.tick = systick_cnt();
 		if ((cnt.tick - prev.tick) & ~(1023ul)) {
@@ -268,6 +275,7 @@ int main()
 			// Audio data offset
 			printf(ESC_YELLOW " => " ESC_WHITE "%ld\n", audio_buffering());
 		}
+#endif
 #endif
 	}
 	return 0;
