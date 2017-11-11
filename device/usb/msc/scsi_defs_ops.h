@@ -1,7 +1,7 @@
-#ifndef SCSI_OPS_H
-#define SCSI_OPS_H
+#ifndef SCSI_DEFS_OPS_H
+#define SCSI_DEFS_OPS_H
 
-// SCSI Command Operation Codes
+// Command Operation Codes
 // http://www.t10.org/lists/2op.htm
 
 #define TEST_UNIT_READY	0x00
@@ -47,7 +47,7 @@
 #define MODE_SENSE_6	0x1A
 #define START_STOP_UNIT	0x1B
 #define LOAD_UNLOAD	0x1B
-#define SCAN	0x1B
+//#define SCAN	0x1B
 
 #define STOP_PRINT	0x1B
 #define OPEN_CLOSE_IMPORT_EXPORT_ELEMENT	0x1B
@@ -234,4 +234,4 @@
 #define VOLUME_SET__OUT	0xBF
 #define SEND_DVD_STRUCTURE	0xBF
 
-#endif // SCSI_OPS_H
+#endif // SCSI_DEFS_OPS_H

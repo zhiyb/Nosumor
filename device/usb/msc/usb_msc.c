@@ -8,6 +8,7 @@
 #include "../usb_macros.h"
 #include "usb_msc.h"
 #include "usb_msc_defs.h"
+#include "scsi.h"
 
 #define MSC_IN_MAX_SIZE		64u
 #define MSC_OUT_MAX_SIZE	64u
@@ -35,6 +36,7 @@ typedef struct PACKED csw_t {
 } csw_t;
 
 typedef struct usb_msc_t {
+	scsi_t *scsi;
 	int ep_in, ep_out;
 	union {
 		cbw_t cbw;
@@ -104,6 +106,7 @@ static void bulk_cbw(usb_t *usb, int n)
 	for (int i = cbw->bCBWCBLength; i != 0; i--)
 		dbgprintf("%02x,", *p++);
 	dbgprintf(">");
+	scsi_cmd(data->scsi, cbw->CBWCB, cbw->bCBWCBLength);
 }
 
 static void epout_xfr_cplt(usb_t *usb, uint32_t n)
@@ -181,6 +184,7 @@ usb_msc_t *usb_msc_init(usb_t *usb)
 	usb_msc_t *data = calloc(1u, sizeof(usb_msc_t));
 	if (!data)
 		panic();
+	data->scsi = scsi_init();
 	// Audio control interface
 	const usb_if_t usbif = {
 		.data = data,

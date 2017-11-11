@@ -120,8 +120,12 @@ Project {
         Group {
             name: "USB Mass Storage"
             files: [
+                "usb/msc/scsi.c",
+                "usb/msc/scsi.h",
                 "usb/msc/scsi_defs.h",
-                "usb/msc/scsi_ops.h",
+                "usb/msc/scsi_defs_cmds.h",
+                "usb/msc/scsi_defs_ops.h",
+                "usb/msc/scsi_defs_sense.h",
                 "usb/msc/usb_msc.c",
                 "usb/msc/usb_msc.h",
                 "usb/msc/usb_msc_defs.h",
