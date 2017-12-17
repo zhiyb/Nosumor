@@ -4,7 +4,8 @@ Project {
     minimumQbsVersion: "1.7.1"
 
     references: [
-        "console"
+        "console",
+        "qt",
     ]
 
     Product {
