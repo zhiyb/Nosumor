@@ -20,6 +20,7 @@ public slots:
 
 private slots:
 	void devRefresh();
+	void devRemoved(DeviceWidget *dev);
 
 private:
 	bool devOpen(hid_device_info *info);

@@ -43,7 +43,7 @@ void MainWindow::devRefresh()
 {
 	// Refresh existing devices, check for disconnection
 	for (auto it = devMap.begin(); it != devMap.end(); it++)
-		if (!it.value()->refresh())
+		if (!it.value()->devRefresh())
 			devMap.erase(it);
 	// Enumerate devices
 	int num = 0;
@@ -60,14 +60,21 @@ void MainWindow::devRefresh()
 	devCount->setText(tr("Connected: %1").arg(num));
 }
 
+void MainWindow::devRemoved(DeviceWidget *dev)
+{
+	devMap.remove(dev->devPath());
+	delete dev;
+}
+
 bool MainWindow::devOpen(hid_device_info *info)
 {
 	if (devMap.contains(info->path))
 		return true;
 	auto dev = new DeviceWidget(info, this);
 	layout->addWidget(dev);
-	if (!dev->open())
+	if (!dev->devOpen())
 		return false;
+	connect(dev, &DeviceWidget::devRemoved, this, &MainWindow::devRemoved);
 	devMap[info->path] = dev;
 	return true;
 }

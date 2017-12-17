@@ -11,14 +11,25 @@ public:
 	explicit DeviceWidget(hid_device_info *info, QWidget *parent = nullptr);
 	~DeviceWidget();
 
-	bool open();
-	bool refresh();
+	bool devOpen();
+	bool devRefresh();
+
+	QString devPath() {return this->path;}
 
 signals:
+	void devRemoved(DeviceWidget *);
 
 public slots:
 
+private slots:
+	void devReset();
+	void devFlash();
+
 private:
+	void readReport(hid_device *dev, void *p);
+	void devPing();
+
+	QLabel *ping;
 	QString path;
 	hid_device *dev;
 };
