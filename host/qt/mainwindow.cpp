@@ -10,17 +10,25 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 	setWindowTitle(tr("Nosumor"));
 	layout = new QVBoxLayout(w);
 
+	auto hbl = new QHBoxLayout();
+	layout->addLayout(hbl);
 	QGroupBox *gb = new QGroupBox(tr("Devices"), w);
-	layout->addWidget(gb);
-	QHBoxLayout *hbl = new QHBoxLayout(gb);
+	hbl->addWidget(gb);
+
+	auto vbl = new QVBoxLayout(gb);
+	vbl->addStretch();
+	vbl->addWidget(devCount = new QLabel);
 	QPushButton *pb = new QPushButton(tr("&Refresh"));
 	connect(pb, &QPushButton::clicked, this, &MainWindow::devRefresh);
-	hbl->addWidget(pb);
-	hbl->addSpacing(16);
-	hbl->addWidget(devCount = new QLabel);
-	hbl->addStretch();
+	vbl->addWidget(pb);
+	vbl->addStretch();
 
-	layout->addStretch();
+	gb = new QGroupBox(tr("Plugins"), w);
+	hbl->addWidget(gb, 1);
+	vbl = new QVBoxLayout(gb);
+	pluginList = new QListWidget(gb);
+	pluginList->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Ignored);
+	vbl->addWidget(pluginList);
 }
 
 MainWindow::~MainWindow()
@@ -85,7 +93,9 @@ bool MainWindow::loadPlugin(const QString path)
 		QMessageBox::warning(this, tr("Warning"), tr("Unable to load plugin:\n%1").arg(path));
 		return false;
 	}
-	plugins << load();
+	Plugin *plugin = load();
+	plugins << plugin;
+	pluginList->addItem(tr("%1 (%2)").arg(QString::fromStdString(plugin->name())).arg(path));
 	return true;
 }
 

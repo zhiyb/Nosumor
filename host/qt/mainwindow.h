@@ -30,6 +30,7 @@ private:
 	QList<Plugin *> plugins;
 	QHash<QString, DeviceWidget *> devMap;
 	QVBoxLayout *layout;
+	QListWidget *pluginList;
 	QLabel *devCount;
 };
 
