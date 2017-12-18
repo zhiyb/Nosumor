@@ -1,5 +1,5 @@
-#ifndef PLUGINFLASH_H
-#define PLUGINFLASH_H
+#ifndef PLUGINPING_H
+#define PLUGINPING_H
 
 #include <QtWidgets>
 #include "plugin.h"
@@ -14,4 +14,4 @@ public:
 	virtual void *pluginWidget(hid_device *dev, hid_device_info *info, void *parent = nullptr);
 };
 
-#endif // PLUGINFLASH_H
+#endif // PLUGINPING_H

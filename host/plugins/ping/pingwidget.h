@@ -1,5 +1,5 @@
-#ifndef PING_H
-#define PING_H
+#ifndef PINGWIDGET_H
+#define PINGWIDGET_H
 
 #include <QtWidgets>
 #include <pluginwidget.h>
@@ -22,4 +22,4 @@ private:
 	hid_device *dev;
 };
 
-#endif // PING_H
+#endif // PINGWIDGET_H
