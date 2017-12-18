@@ -4,6 +4,7 @@ Project {
     references: [
         "flash",
         "ping",
+        "keycode",
     ]
 
     StaticLibrary {
