@@ -4,11 +4,11 @@
 #include <QtWidgets>
 #include "plugin.h"
 
-class PluginFlash : public Plugin
+class PluginPing : public Plugin
 {
 public:
-	PluginFlash() : Plugin() {}
-	~PluginFlash() {}
+	PluginPing() : Plugin() {}
+	~PluginPing() {}
 
 	virtual std::string name() const {return "Ping-Pong";}
 	virtual void *pluginWidget(hid_device *dev, hid_device_info *info, void *parent = nullptr);

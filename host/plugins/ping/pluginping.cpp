@@ -3,10 +3,10 @@
 
 PLUGIN_EXPORT Plugin *pluginLoad()
 {
-	return new PluginFlash();
+	return new PluginPing();
 }
 
-void *PluginFlash::pluginWidget(hid_device *dev, hid_device_info *info, void *parent)
+void *PluginPing::pluginWidget(hid_device *dev, hid_device_info *info, void *parent)
 {
 	return new PingWidget(dev, info, (QWidget *)parent);
 }
