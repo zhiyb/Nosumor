@@ -6,7 +6,7 @@ PLUGIN_EXPORT Plugin *pluginLoad()
 	return new PluginKeycode();
 }
 
-void *PluginKeycode::pluginWidget(hid_device *dev, hid_device_info *info, void *parent)
+void *PluginKeycode::pluginWidget(hid_device *dev, hid_device_info *, void *parent)
 {
 	return new Keycode(dev, (QWidget *)parent);
 }
