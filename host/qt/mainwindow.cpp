@@ -69,7 +69,7 @@ void MainWindow::devRefresh()
 	int num = 0;
 	hid_device_info *devs = hid_enumerate(USB_VID, USB_PID);
 	for (hid_device_info *info = devs; info; info = info->next) {
-#if defined(WIN32)
+#ifdef WIN32
 		if (info->usage_page != HID_USAGE_PAGE || info->usage != HID_USAGE)
 			continue;
 #endif

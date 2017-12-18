@@ -6,9 +6,13 @@ PingWidget::PingWidget(hid_device *dev, hid_device_info *info, QWidget *parent) 
 {
 	this->dev = dev;
 
-	auto mf = QString::fromWCharArray(info->manufacturer_string ?: L"(null)");
-	auto prod = QString::fromWCharArray(info->product_string ?: L"(null)");
-	auto sn = QString::fromWCharArray(info->serial_number ?: L"(null)");
+	QString mf("(null)"), prod("(null)"), sn("(null)");
+	if (info->manufacturer_string)
+		mf = QString::fromWCharArray(info->manufacturer_string);
+	if (info->product_string)
+		prod = QString::fromWCharArray(info->product_string);
+	if (info->serial_number)
+		sn = QString::fromWCharArray(info->serial_number);
 
 	auto layout = new QHBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);

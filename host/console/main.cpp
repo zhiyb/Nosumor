@@ -3,7 +3,9 @@
 #include <string>
 #include <stdexcept>
 #include <stdint.h>
+#ifdef __GNUC__
 #include <libgen.h>
+#endif
 #include <hidapi.h>
 #include <dev_defs.h>
 #include "logger.h"
@@ -133,8 +135,20 @@ int main(int argc, char **argv)
 	logger->set_pattern("[%T %t/%l]: %v");
 	logger->set_level(spdlog::level::debug);
 
+#ifdef __GNUC__
+	auto name = basename(argv[0]);
+#else
+	auto len = strlen(argv[0]);
+	auto fname = new char[len];
+	auto ext = new char[len];
+	_splitpath(argv[0], NULL, NULL, fname, ext);
+	string name(string(fname) + string(ext));
+	delete fname;
+	delete ext;
+#endif
+
 	if (argc <= 1) {
-		clog << "Usage: " << basename(argv[0]) << " operation [arguments]" << endl << endl;
+		clog << "Usage: " << name << " operation [arguments]" << endl << endl;
 		clog << "Available operations:" << endl;
 		clog << "  ping               | Check device signature and version info" << endl;
 		clog << "  reset              | Reset target device" << endl;
@@ -152,13 +166,13 @@ int main(int argc, char **argv)
 	int num = 0;
 	hid_device_info *devs = hid_enumerate(USB_VID, USB_PID);
 	for (hid_device_info *info = devs; info; info = info->next) {
-#if defined(WIN32)
+#ifdef WIN32
 		if (info->usage_page != HID_USAGE_PAGE || info->usage != HID_USAGE)
 			continue;
 #endif
-		auto mf = info->manufacturer_string ?: L"(null)";
-		auto prod = info->product_string ?: L"(null)";
-		auto sn = info->serial_number ?: L"(null)";
+		auto mf = info->manufacturer_string ? info->manufacturer_string : L"(null)";
+		auto prod = info->product_string ? info->product_string : L"(null)";
+		auto sn = info->serial_number ? info->serial_number : L"(null)";
 		logger->info(L"({}) {} {}: {}", mf, prod, sn, info->path);
 		num++;
 		hid_device *dev = hid_open_path(info->path);

@@ -29,7 +29,6 @@ Project {
         Depends {name: "cpp"}
         cpp.includePaths: ["hidapi/hidapi"]
         cpp.optimization: "fast"
-        cpp.commonCompilerFlags: ["-Wno-unused-parameter"]
 
         Properties {
             condition: qbs.targetOS.contains("linux")
