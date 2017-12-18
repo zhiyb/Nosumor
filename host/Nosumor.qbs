@@ -6,6 +6,7 @@ Project {
     references: [
         "console",
         "qt",
+        "plugins",
     ]
 
     Product {

@@ -1,6 +1,7 @@
 #include <dev_defs.h>
 #include "mainwindow.h"
 #include "devicewidget.h"
+#include "plugin.h"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
@@ -24,6 +25,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 
 MainWindow::~MainWindow()
 {
+	foreach (auto plugin, plugins)
+		delete plugin;
 	hid_exit();
 }
 
@@ -33,6 +36,15 @@ int MainWindow::init()
 	if ((ret = hid_init()) != 0) {
 		QMessageBox::critical(this, tr("Error"), tr("Error initialising hidapi: %1").arg(ret));
 		return 1;
+	}
+
+	// Load plugins
+	QDir dir = QDir::current();
+	if (dir.cd("plugins")) {
+		QStringList filters;
+		filters << "*.dll" << "*.so";
+		foreach (auto info, dir.entryInfoList(filters, QDir::Files))
+			loadPlugin(info.absoluteFilePath());
 	}
 
 	devRefresh();
@@ -66,13 +78,24 @@ void MainWindow::devRemoved(DeviceWidget *dev)
 	delete dev;
 }
 
+bool MainWindow::loadPlugin(const QString path)
+{
+	auto load = (pluginLoad_t)QLibrary::resolve(path, "pluginLoad");
+	if (!load) {
+		QMessageBox::warning(this, tr("Warning"), tr("Unable to load plugin:\n%1").arg(path));
+		return false;
+	}
+	plugins << load();
+	return true;
+}
+
 bool MainWindow::devOpen(hid_device_info *info)
 {
 	if (devMap.contains(info->path))
 		return true;
 	auto dev = new DeviceWidget(info, this);
 	layout->addWidget(dev);
-	if (!dev->devOpen())
+	if (!dev->devOpen(info, &plugins))
 		return false;
 	connect(dev, &DeviceWidget::devRemoved, this, &MainWindow::devRemoved);
 	devMap[info->path] = dev;

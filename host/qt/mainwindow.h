@@ -4,6 +4,7 @@
 #include <QtWidgets>
 #include <hidapi.h>
 #include "devicewidget.h"
+#include "plugin.h"
 
 class MainWindow : public QMainWindow
 {
@@ -23,8 +24,10 @@ private slots:
 	void devRemoved(DeviceWidget *dev);
 
 private:
+	bool loadPlugin(const QString path);
 	bool devOpen(hid_device_info *info);
 
+	QList<Plugin *> plugins;
 	QHash<QString, DeviceWidget *> devMap;
 	QVBoxLayout *layout;
 	QLabel *devCount;

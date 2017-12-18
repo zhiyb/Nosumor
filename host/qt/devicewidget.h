@@ -3,6 +3,7 @@
 
 #include <QtWidgets>
 #include <hidapi.h>
+#include "plugin.h"
 
 class DeviceWidget : public QGroupBox
 {
@@ -11,7 +12,8 @@ public:
 	explicit DeviceWidget(hid_device_info *info, QWidget *parent = nullptr);
 	~DeviceWidget();
 
-	bool devOpen();
+	bool devOpen(hid_device_info *info, const QList<Plugin *> *plugins = nullptr);
+	// Check device status
 	bool devRefresh();
 
 	QString devPath() {return this->path;}
@@ -22,13 +24,13 @@ signals:
 public slots:
 
 private slots:
-	void devReset();
-	void devFlash();
+	void devRemove();
 
 private:
 	void readReport(hid_device *dev, void *p);
-	void devPing();
 
+	const QList<Plugin *> *plugins;
+	QVBoxLayout *layout;
 	QLabel *ping;
 	QString path;
 	hid_device *dev;
