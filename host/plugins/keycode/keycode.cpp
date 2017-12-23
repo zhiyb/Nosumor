@@ -1,6 +1,7 @@
 #include <QtWidgets>
 #include <dev_defs.h>
 #include <plugin.h>
+#include "inputcapture.h"
 #include "keycode.h"
 
 Keycode::Keycode(hid_device *dev, QWidget *parent) : PluginWidget(parent)
@@ -36,13 +37,11 @@ Keycode::Keycode(hid_device *dev, QWidget *parent) : PluginWidget(parent)
 
 void Keycode::update(int btn)
 {
-	const QString keys[5] = {tr("right key"), tr("left key"),
-				 tr("key 1"), tr("key 2"), tr("key 3")};
-	bool ok;
-	int code = QInputDialog::getInt(this, tr("Update keycode..."),
-					tr("Please input a new keycode for %1:").arg(keys[btn]),
-					0, 0, 255, 1, &ok);
-	if (!ok)
+	InputCapture ic(this);
+	if (ic.exec() == QDialog::Rejected)
+		return;
+	uint8_t code = ic.usage();
+	if (code == 0)
 		return;
 
 	vendor_report_t report;

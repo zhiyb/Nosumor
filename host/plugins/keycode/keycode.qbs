@@ -9,10 +9,14 @@ Project {
         Depends {name: "plugin.widget"}
 
         files: [
+            "inputcapture.cpp",
+            "inputcapture.h",
             "keycode.cpp",
             "keycode.h",
             "pluginkeycode.cpp",
             "pluginkeycode.h",
+            "usage.cpp",
+            "usage.h",
         ]
 
         Group {     // Properties for the produced executable
