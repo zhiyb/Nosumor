@@ -4,6 +4,7 @@
 InputCapture::InputCapture(QWidget *parent) : QDialog(parent)
 {
 	keycnt = 0;
+	setWindowTitle(tr("Input capture"));
 
 	auto *layout = new QVBoxLayout(this);
 	label = new QLabel(tr("Press a key..."), this);
@@ -17,11 +18,12 @@ void InputCapture::keyPressEvent(QKeyEvent *e)
 	if (e->isAutoRepeat())
 		return;
 	keycnt++;
-	_usage = Usage::keyboardUsage((Qt::Key)e->key());
+	_usage = Usage::keyboardUsage(e->modifiers(), (Qt::Key)e->key());
 	if (_usage != 0)
 		label->setText(Usage::keyboardString(_usage));
 	else
-		label->setText(tr("Keycode unknown!"));
+		label->setText(tr("Keycode unknown (0x%1)")
+			       .arg(e->key(), 8, 16, QChar('0')));
 }
 
 void InputCapture::keyReleaseEvent(QKeyEvent *e)

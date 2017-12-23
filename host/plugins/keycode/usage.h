@@ -5,7 +5,7 @@
 
 namespace Usage
 {
-uint8_t keyboardUsage(const Qt::Key key);
+uint8_t keyboardUsage(const Qt::KeyboardModifiers modifiers, const Qt::Key key);
 const char *keyboardString(const uint8_t usage);
 }
 

@@ -37,12 +37,23 @@ Keycode::Keycode(hid_device *dev, QWidget *parent) : PluginWidget(parent)
 
 void Keycode::update(int btn)
 {
-	InputCapture ic(this);
-	if (ic.exec() == QDialog::Rejected)
-		return;
-	uint8_t code = ic.usage();
-	if (code == 0)
-		return;
+	uint8_t code;
+	auto m = QApplication::queryKeyboardModifiers();
+	if (m & Qt::ControlModifier) {
+		bool ok;
+		code = QInputDialog::getInt(this, tr("Update keycode"),
+					    tr("Input a keycode:"),
+					    0, 0, 255, 1, &ok);
+		if (!ok)
+			return;
+	} else {
+		InputCapture ic(this);
+		if (ic.exec() == QDialog::Rejected)
+			return;
+		code = ic.usage();
+		if (code == 0)
+			return;
+	}
 
 	vendor_report_t report;
 	report.id = HID_REPORT_ID;
