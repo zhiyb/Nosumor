@@ -5,11 +5,11 @@ namespace Usage
 {
 
 static const struct {
-	uint8_t usage;
+	uint16_t usage;
 	Qt::KeyboardModifier modifiers;
 	Qt::Key key;
 	const char *string;
-} keyboard[] = {
+} id[] = {
 	// http://www.usb.org/developers/hidpage/Hut1_12v2.pdf
 	{4, Qt::NoModifier, Qt::Key_A, "A"},			// Note 4
 	{5, Qt::NoModifier, Qt::Key_B, "B"},
@@ -57,10 +57,10 @@ static const struct {
 	{47, Qt::NoModifier, Qt::Key_BracketLeft, "["},		// Note 4
 	{48, Qt::NoModifier, Qt::Key_BracketRight, "]"},	// Note 4
 	{49, Qt::NoModifier, Qt::Key_Backslash, "\\"},
-	{50, Qt::NoModifier, Qt::Key_QuoteLeft, "`"},		// Note 2
+	{50, Qt::NoModifier, (Qt::Key)0, "`(?)"},		// Note 2
 	{51, Qt::NoModifier, Qt::Key_Semicolon, ";"},		// Note 4
 	{52, Qt::NoModifier, Qt::Key_Apostrophe, "'"},		// Note 4
-	{53, Qt::NoModifier, Qt::Key_QuoteLeft, "`(?)"},	// Note 4
+	{53, Qt::NoModifier, Qt::Key_QuoteLeft, "`"},		// Note 4
 	{54, Qt::NoModifier, Qt::Key_Comma, ","},		// Note 4
 	{55, Qt::NoModifier, Qt::Key_Period, "."},		// Note 4
 	{56, Qt::NoModifier, Qt::Key_Slash, "/"},		// Note 4
@@ -77,7 +77,7 @@ static const struct {
 	{67, Qt::NoModifier, Qt::Key_F10, "F10"},
 	{68, Qt::NoModifier, Qt::Key_F11, "F11"},
 	{69, Qt::NoModifier, Qt::Key_F12, "F12"},
-	//{70, Qt::NoModifier, PrintScreen, "PrintScreen"},	// Note 1
+	{70, Qt::NoModifier, Qt::Key_Print, "PrintScreen"},	// Note 1
 	{71, Qt::NoModifier, Qt::Key_ScrollLock, "ScrollLock"},	// Note 11
 	{72, Qt::NoModifier, Qt::Key_Pause, "Pause"},		// Note 1
 	{73, Qt::NoModifier, Qt::Key_Insert, "Insert"},		// Note 1
@@ -142,22 +142,111 @@ static const struct {
 	{132, Qt::NoModifier, Qt::Key_ScrollLock, "ScrollLock(?)"},	// Note 12
 	{133, Qt::NoModifier, Qt::Key_Comma, "KP,"},		// Note 27
 	{134, Qt::NoModifier, Qt::Key_Equal, "KP="},		// Note 29
+	{135, Qt::NoModifier, (Qt::Key)0, "¥(\\)"},		// Note 15,28
+	{136, Qt::NoModifier, Qt::Key_Hiragana, "ひらがな"},	// Note 16
+	{137, Qt::NoModifier, (Qt::Key)0, "¥"},			// Note 17
+	{138, Qt::NoModifier, Qt::Key_Kana_Shift, "変換"},	// Note 18
+	{139, Qt::NoModifier, Qt::Key_Kana_Lock, "無変換"},	// Note 19
+	{140, Qt::NoModifier, (Qt::Key)0, "I18N6"},		// Note 20
+	{141, Qt::NoModifier, (Qt::Key)0, "I18N7"},		// Note 21
+	{142, Qt::NoModifier, (Qt::Key)0, "I18N8"},		// Note 22
+	{143, Qt::NoModifier, (Qt::Key)0, "I18N9"},		// Note 22
+	{144, Qt::NoModifier, (Qt::Key)0, "LANG1"},		// Note 25
+	{145, Qt::NoModifier, (Qt::Key)0, "LANG2"},		// Note 26
+	{146, Qt::NoModifier, (Qt::Key)0, "LANG3"},		// Note 30
+	{147, Qt::NoModifier, (Qt::Key)0, "LANG4"},		// Note 31
+	{148, Qt::NoModifier, (Qt::Key)0, "LANG5"},		// Note 32
+	{149, Qt::NoModifier, (Qt::Key)0, "LANG6"},		// Note 8
+	{150, Qt::NoModifier, (Qt::Key)0, "LANG7"},		// Note 8
+	{151, Qt::NoModifier, (Qt::Key)0, "LANG8"},		// Note 8
+	{152, Qt::NoModifier, (Qt::Key)0, "LANG9"},		// Note 8
+	{153, Qt::NoModifier, (Qt::Key)0, "AltErase"},		// Note 7
+	{154, Qt::NoModifier, Qt::Key_SysReq, "SysReq"},	// Note 1
+	{155, Qt::NoModifier, Qt::Key_Cancel, "Cancel"},
+	{156, Qt::NoModifier, Qt::Key_Clear, "Clear"},
+	{157, Qt::NoModifier, (Qt::Key)0, "Prior"},
+	{158, Qt::NoModifier, (Qt::Key)0, "Return"},
+	{159, Qt::NoModifier, (Qt::Key)0, "Separator"},
+	{160, Qt::NoModifier, (Qt::Key)0, "Out"},
+	{161, Qt::NoModifier, (Qt::Key)0, "Oper"},
+	{162, Qt::NoModifier, (Qt::Key)0, "Clear"},
+	{163, Qt::NoModifier, (Qt::Key)0, "CrSel"},
+	{164, Qt::NoModifier, (Qt::Key)0, "ExSel"},
+	// 165-175	Reserved
+	{176, Qt::KeypadModifier, (Qt::Key)0, "KP00"},
+	{177, Qt::KeypadModifier, (Qt::Key)0, "KP000"},
+	{178, Qt::NoModifier, (Qt::Key)0, "Thousands"},		// Note 33
+	{179, Qt::NoModifier, (Qt::Key)0, "Decimal"},		// Note 34
+	{180, Qt::NoModifier, (Qt::Key)0, "Currency"},		// Note 34
+	{181, Qt::NoModifier, (Qt::Key)0, "CurrencySub"},	// Note 34
+	{182, Qt::KeypadModifier, Qt::Key_BracketLeft, "KP("},
+	{183, Qt::KeypadModifier, Qt::Key_BracketRight, "KP)"},
+	{184, Qt::KeypadModifier, Qt::Key_BraceLeft, "KP{"},
+	{185, Qt::KeypadModifier, Qt::Key_BraceRight, "KP}"},
+	{186, Qt::KeypadModifier, Qt::Key_Tab, "KPTab"},
+	{187, Qt::KeypadModifier, Qt::Key_Backspace, "KPBackspace"},
+	{188, Qt::KeypadModifier, Qt::Key_A, "KPA"},
+	{189, Qt::KeypadModifier, Qt::Key_B, "KPB"},
+	{190, Qt::KeypadModifier, Qt::Key_C, "KPC"},
+	{191, Qt::KeypadModifier, Qt::Key_D, "KPD"},
+	{192, Qt::KeypadModifier, Qt::Key_E, "KPE"},
+	{193, Qt::KeypadModifier, Qt::Key_F, "KPF"},
+	{194, Qt::KeypadModifier, (Qt::Key)0, "KPXOR"},
+	{195, Qt::KeypadModifier, (Qt::Key)0, "KP^"},
+	{196, Qt::KeypadModifier, Qt::Key_Percent, "KP%"},
+	{197, Qt::KeypadModifier, (Qt::Key)0, "KP<"},
+	{198, Qt::KeypadModifier, (Qt::Key)0, "KP>"},
+	{199, Qt::KeypadModifier, Qt::Key_Ampersand, "KP&"},
+	{200, Qt::KeypadModifier, (Qt::Key)0, "KP&&"},
+	{201, Qt::KeypadModifier, (Qt::Key)0, "KP|"},
+	{202, Qt::KeypadModifier, (Qt::Key)0, "KP||"},
+	{203, Qt::KeypadModifier, Qt::Key_Colon, "KP:"},
+	{204, Qt::KeypadModifier, (Qt::Key)0, "KP#"},
+	{205, Qt::KeypadModifier, Qt::Key_Space, "KPSpace"},
+	{206, Qt::KeypadModifier, Qt::Key_At, "KP@"},
+	{207, Qt::KeypadModifier, (Qt::Key)0, "KP!"},
+	{208, Qt::KeypadModifier, (Qt::Key)0, "KPMemStore"},
+	{209, Qt::KeypadModifier, (Qt::Key)0, "KPMemRecall"},
+	{210, Qt::KeypadModifier, (Qt::Key)0, "KPMemClear"},
+	{211, Qt::KeypadModifier, (Qt::Key)0, "KPMemAdd"},
+	{212, Qt::KeypadModifier, (Qt::Key)0, "KPMemSubtract"},
+	{213, Qt::KeypadModifier, (Qt::Key)0, "KPMemMultiply"},
+	{214, Qt::KeypadModifier, (Qt::Key)0, "KPMemDivide"},
+	{215, Qt::KeypadModifier, (Qt::Key)0, "KP+"},
+	{216, Qt::KeypadModifier, (Qt::Key)0, "KPClear"},
+	{217, Qt::KeypadModifier, (Qt::Key)0, "KPClearEntry"},
+	{218, Qt::KeypadModifier, (Qt::Key)0, "KPBinary"},
+	{219, Qt::KeypadModifier, (Qt::Key)0, "KPOctal"},
+	{220, Qt::KeypadModifier, (Qt::Key)0, "KPDecimal"},
+	{221, Qt::KeypadModifier, (Qt::Key)0, "KPHexadecimal"},
+	// 222-223	Reserved
+	{224, Qt::ControlModifier, Qt::Key_Control, "LCtrl"},
+	{225, Qt::ShiftModifier, Qt::Key_Shift, "LShift"},
+	{226, Qt::AltModifier, Qt::Key_Alt, "LAlt"},
+	{227, Qt::NoModifier, Qt::Key_Meta, "LSuper"},	// Note 10;23
+	{228, Qt::ControlModifier, Qt::Key_Control, "RCtrl"},
+	{229, Qt::ShiftModifier, Qt::Key_Shift, "RShift"},
+	{230, Qt::AltModifier, Qt::Key_Alt, "RAlt"},
+	{231, Qt::NoModifier, Qt::Key_Meta, "RSuper"},	// Note 10;23
+	// 232-65535	Reserved
 };
 
-uint8_t keyboardUsage(const Qt::KeyboardModifiers modifiers, const Qt::Key key)
+uint16_t keyboardUsage(const Qt::KeyboardModifiers modifiers, const Qt::Key key)
 {
-	for (auto &k: keyboard) {
-		if (k.modifiers == modifiers && k.key == key)
-			return k.usage;
+	if (key == 0)
+		return 0;
+	for (auto &i: id) {
+		if (i.modifiers == modifiers && i.key == key)
+			return i.usage;
 	}
 	return 0;
 }
 
-const char *keyboardString(const uint8_t usage)
+const char *keyboardString(const uint16_t usage)
 {
-	for (auto &k: keyboard) {
-		if (k.usage == usage)
-			return k.string;
+	for (auto &i: id) {
+		if (i.usage == usage)
+			return i.string;
 	}
 	return 0;
 }

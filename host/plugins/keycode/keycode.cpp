@@ -37,7 +37,7 @@ Keycode::Keycode(hid_device *dev, QWidget *parent) : PluginWidget(parent)
 
 void Keycode::update(int btn)
 {
-	uint8_t code;
+	uint16_t code;
 	auto m = QApplication::queryKeyboardModifiers();
 	if (m & Qt::ControlModifier) {
 		bool ok;
