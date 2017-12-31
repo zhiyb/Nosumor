@@ -1,0 +1,13 @@
+# KiCAD files
+*.cmp
+*.mod
+*.net
+*.txt
+*-cache*
+*-bak*
+*.bak
+*-lib-table
+# Eagle files
+*.lbr
+*.brd
+modified_eagle_files/
