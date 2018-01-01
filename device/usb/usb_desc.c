@@ -1,5 +1,6 @@
 #include <malloc.h>
 #include <string.h>
+#include <vendor.h>
 #include <vendor_defs.h>
 #include "../debug.h"
 #include "usb_desc.h"
@@ -59,8 +60,12 @@ static desc_t usb_desc_device(usb_t *usb)
 	pd->bMaxPacketSize0 = usb_ep0_max_size(usb->base);
 	pd->iManufacturer = usb_desc_add_string(usb, 0, LANG_EN_US, "zhiyb");
 	pd->iProduct = usb_desc_add_string(usb, 0, LANG_EN_US, PRODUCT_NAME);
+	// Construct serial number from UID
+	char uid[25];
+	vendor_uid_str(uid);
 	// Valid serial number characters are [0-9A-F]
-	pd->iSerialNumber = usb_desc_add_string(usb, 0, LANG_EN_US, SW_VERSION_STR);
+	pd->iSerialNumber = usb_desc_add_string(usb, 0, LANG_EN_US, uid);
+
 	usb->desc.dev.p = pd;
 	usb->desc.dev.size = pd->bLength;
 	return usb->desc.dev;

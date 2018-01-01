@@ -92,3 +92,20 @@ void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp)
 		break;
 	}
 }
+
+static char toHex(char c)
+{
+	return (c < 10 ? '0' : 'a' - 10) + c;
+}
+
+void vendor_uid_str(char *s)
+{
+	// Construct serial number string from device UID
+	char *c = s;
+	uint8_t *p = (void *)UID + 11u;
+	for (uint32_t i = 12; i != 0; i--) {
+		*c++ = toHex(*p >> 4u);
+		*c++ = toHex(*p-- & 0x0f);
+	}
+	*c = 0;
+}

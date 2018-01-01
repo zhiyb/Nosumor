@@ -9,6 +9,9 @@ extern "C" {
 
 void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp);
 
+// 25 bytes space (null-terminated) required
+void vendor_uid_str(char *s);
+
 #ifdef __cplusplus
 }
 #endif
