@@ -130,11 +130,16 @@ static scsi_ret_t inquiry_vital(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 	}
 
 	scsi_ret_t ret = {data, data->length, 0};
+	// Endianness conversion
+	data->length = __REV16(data->length);
 	return ret;
 }
 
 static scsi_ret_t inquiry(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 {
+	// Endianness conversion
+	cmd->length = __REV16(cmd->length);
+
 	if (cmd->info & CMD_INQUIRY_EVPD_Msk) {
 		// Vital product data information
 		if (cmd->info & CMD_INQUIRY_CMDDT_Msk) {
@@ -185,6 +190,9 @@ static scsi_ret_t request_sense(scsi_t *scsi, cmd_REQUEST_SENSE_t *cmd)
 
 static scsi_ret_t read_capacity_10(scsi_t *scsi, cmd_READ_CAPACITY_10_t *cmd)
 {
+	// Endianness conversion
+	cmd->lbaddr = __REV(cmd->lbaddr);
+
 	if (cmd->pmi) {
 		return unimplemented(scsi);
 	} else {
@@ -195,16 +203,23 @@ static scsi_ret_t read_capacity_10(scsi_t *scsi, cmd_READ_CAPACITY_10_t *cmd)
 		// TODO: Actual size
 		// Simulates: 128MB
 		data_READ_CAPACITY_10_t *data = (data_READ_CAPACITY_10_t *)scsi->buf;
-		data->lbaddr = 262143;
+		data->lbaddr = 128 * 1024 * 1024 / 512 - 1;
 		data->lbsize = 512;
 
 		scsi_ret_t ret = {data, 8, 0};
+		// Endianness conversion
+		data->lbaddr = __REV(data->lbaddr);
+		data->lbsize = __REV(data->lbsize);
 		return ret;
 	}
 }
 
 static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 {
+	// Endianness conversion
+	cmd->lbaddr = __REV(cmd->lbaddr);
+	cmd->length = __REV16(cmd->length);
+
 	if (cmd->flags != 0)
 		dbgbkpt();
 
