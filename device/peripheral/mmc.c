@@ -84,6 +84,50 @@ static inline void mmc_gpio_init()
 	while (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY));
 }
 
+static uint32_t mmc_command(uint32_t cmd, uint32_t arg, uint32_t *stat)
+{
+	// Send CMD8
+	MMC->ICR = SDMMC_ICR_CMDSENTC_Msk | SDMMC_ICR_CMDRENDC_Msk |
+			SDMMC_ICR_CCRCFAILC_Msk | SDMMC_ICR_CTIMEOUTC_Msk;
+	MMC->ARG = arg;
+	MMC->CMD = cmd | SDMMC_CMD_CPSMEN_Msk;
+	while (!(MMC->STA & SDMMC_STA_CMDACT_Msk));
+
+	if (!(cmd & SDMMC_CMD_WAITRESP_0)) {
+		// No response expected
+		while (!(MMC->STA & SDMMC_STA_CMDSENT_Msk));
+		if (stat)
+			*stat = MMC->STA;
+		return MMC->RESPCMD;
+	}
+
+	while (!(MMC->STA & (SDMMC_STA_CMDREND_Msk |
+			     SDMMC_STA_CCRCFAIL_Msk | SDMMC_STA_CTIMEOUT_Msk)));
+	if (stat)
+		*stat = MMC->STA;
+	return MMC->RESP1;
+}
+
+static uint32_t mmc_app_command(uint32_t cmd, uint32_t rca, uint32_t arg, uint32_t *stat)
+{
+	uint32_t s;
+	uint32_t resp = mmc_command(APP_CMD, rca, &s);
+	if (!(s & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
+		if (stat)
+			*stat = s;
+		dbgbkpt();
+		return 0;
+	}
+	return mmc_command(cmd, arg, stat);
+}
+
+uint32_t mmc_capacity()
+{
+	return capacity;
+}
+
+/* FatFs interface functions */
+
 DSTATUS mmc_disk_init()
 {
 	if (stat & STA_NOINIT) {
@@ -265,44 +309,35 @@ DRESULT mmc_disk_read(BYTE *buff, DWORD sector, UINT count)
 	return RES_ERROR;
 }
 
-static uint32_t mmc_command(uint32_t cmd, uint32_t arg, uint32_t *stat)
+/* SCSI interface functions */
+
+uint8_t scsi_buf[64 * 1024];
+
+uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize)
 {
-	// Send CMD8
-	MMC->ICR = SDMMC_ICR_CMDSENTC_Msk | SDMMC_ICR_CMDRENDC_Msk |
-			SDMMC_ICR_CCRCFAILC_Msk | SDMMC_ICR_CTIMEOUTC_Msk;
-	MMC->ARG = arg;
-	MMC->CMD = cmd | SDMMC_CMD_CPSMEN_Msk;
-	while (!(MMC->STA & SDMMC_STA_CMDACT_Msk));
-
-	if (!(cmd & SDMMC_CMD_WAITRESP_0)) {
-		// No response expected
-		while (!(MMC->STA & SDMMC_STA_CMDSENT_Msk));
-		if (stat)
-			*stat = MMC->STA;
-		return MMC->RESPCMD;
-	}
-
-	while (!(MMC->STA & (SDMMC_STA_CMDREND_Msk |
-			     SDMMC_STA_CCRCFAIL_Msk | SDMMC_STA_CTIMEOUT_Msk)));
-	if (stat)
-		*stat = MMC->STA;
-	return MMC->RESP1;
+	*lbnum = capacity;
+	*lbsize = 512ul;
+	return 0;
 }
 
-static uint32_t mmc_app_command(uint32_t cmd, uint32_t rca, uint32_t arg, uint32_t *stat)
+void *scsi_read(scsi_t *scsi, uint32_t offset, uint32_t *length)
 {
-	uint32_t s;
-	uint32_t resp = mmc_command(APP_CMD, rca, &s);
-	if (!(s & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
-		if (stat)
-			*stat = s;
+	// TODO: Partial read
+	if (*length > sizeof(scsi_buf))
 		dbgbkpt();
-		return 0;
+
+	offset /= 512ul;
+	void *p = scsi_buf;
+	uint32_t i = (*length + 511ul) / 512ul;
+	while (i--) {
+		// TODO: Multi-sector read
+		mmc_disk_read(p, offset++, 1);
+		p += 512ul;
 	}
-	return mmc_command(cmd, arg, stat);
+	return scsi_buf;
 }
 
-uint32_t mmc_capacity()
+uint32_t scsi_write(scsi_t *scsi, uint32_t offset, uint32_t length, const void *p)
 {
-	return capacity;
+	return length;
 }
