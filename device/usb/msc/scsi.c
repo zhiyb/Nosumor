@@ -7,6 +7,9 @@
 #include "scsi_defs.h"
 
 #define SCSI_BUF_SIZE	64u
+#define RAM_DISK_BLOCK	512u
+#define RAM_DISK_SIZE	(64u * 1024)
+#define RAM_DISK_BLOCKS	(RAM_DISK_SIZE / RAM_DISK_BLOCK)
 
 // SCSI device info
 typedef struct scsi_t {
@@ -19,6 +22,8 @@ typedef struct scsi_t {
 		uint8_t ascq;
 	} sense;
 } scsi_t;
+
+uint8_t ram_disk[RAM_DISK_SIZE] ALIGN(4);
 
 scsi_t *scsi_init()
 {
@@ -201,10 +206,9 @@ static scsi_ret_t read_capacity_10(scsi_t *scsi, cmd_READ_CAPACITY_10_t *cmd)
 			return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
 
 		// TODO: Actual size
-		// Simulates: 128MB
 		data_READ_CAPACITY_10_t *data = (data_READ_CAPACITY_10_t *)scsi->buf;
-		data->lbaddr = 128 * 1024 * 1024 / 512 - 1;
-		data->lbsize = 512;
+		data->lbsize = RAM_DISK_BLOCK;
+		data->lbaddr = RAM_DISK_BLOCKS - 1;
 
 		scsi_ret_t ret = {data, 8, Good};
 		// Endianness conversion
@@ -224,7 +228,7 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 		dbgbkpt();
 
 	// Logical block address check
-	if (cmd->lbaddr > 262143) {
+	if (cmd->lbaddr >= RAM_DISK_BLOCKS) {
 		dbgbkpt();
 		// 21/00  DZT RO   BK    LOGICAL BLOCK ADDRESS OUT OF RANGE
 		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x21, 0x00);
@@ -234,20 +238,20 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 		dbgbkpt();
 
 	// Transfer length check
-	if (cmd->lbaddr + (cmd->length + 511) / 512 > 262143) {
+	if (cmd->lbaddr + (cmd->length + RAM_DISK_BLOCKS - 1) / RAM_DISK_BLOCKS >= RAM_DISK_BLOCKS) {
 		dbgbkpt();
 		// 21/00  DZT RO   BK    LOGICAL BLOCK ADDRESS OUT OF RANGE
 		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x21, 0x00);
 	}
 
-	dbgprintf("[SCSI] Read %u bytes from %lu.\n", cmd->length, cmd->lbaddr);
+	dbgprintf("[SCSI] Read %u blocks from %lu.\n", cmd->length, cmd->lbaddr);
 
 	scsi_ret_t ret = {0, 0, Good};
 	if (cmd->length == 0)
 		return ret;
 
-	ret.p = (void *)FLASH_BASE;
-	ret.length = cmd->length;
+	ret.p = ram_disk;
+	ret.length = cmd->length * RAM_DISK_BLOCK;
 	return ret;
 }
 
