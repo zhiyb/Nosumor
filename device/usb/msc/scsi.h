@@ -9,10 +9,12 @@ extern "C" {
 
 typedef struct scsi_t scsi_t;
 
+typedef enum {Good = 0, Failure, Read, Write} scsi_state_t;
+
 typedef struct scsi_ret_t {
 	void *p;
 	uint32_t length;
-	uint8_t failure;
+	scsi_state_t state;
 } scsi_ret_t;
 
 scsi_t *scsi_init();

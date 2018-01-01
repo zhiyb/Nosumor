@@ -40,7 +40,7 @@ static scsi_ret_t sense_fixed(scsi_t *scsi, uint8_t response, uint8_t status,
 	data->sense = asc;
 	data->qualifier = ascq;
 
-	scsi_ret_t ret = {data, 7 + data->additional, 1};
+	scsi_ret_t ret = {data, 7 + data->additional, Failure};
 	return ret;
 }
 
@@ -82,7 +82,7 @@ static scsi_ret_t unimplemented(scsi_t *scsi)
 
 static scsi_ret_t test_unit_ready(scsi_t *scsi, cmd_TEST_UNIT_READY_t *cmd)
 {
-	scsi_ret_t ret = {0, 0, 0};
+	scsi_ret_t ret = {0, 0, Good};
 	return ret;
 }
 
@@ -108,7 +108,7 @@ static scsi_ret_t inquiry_standard(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 	strcpy((void *)data->product, PRODUCT_NAME);
 	memcpy(data->revision, SW_VERSION_STR, 4);
 
-	scsi_ret_t ret = {data, 4 + data->additional, 0};
+	scsi_ret_t ret = {data, 4 + data->additional, Good};
 	return ret;
 }
 
@@ -129,7 +129,7 @@ static scsi_ret_t inquiry_vital(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
 	}
 
-	scsi_ret_t ret = {data, data->length, 0};
+	scsi_ret_t ret = {data, data->length, Good};
 	// Endianness conversion
 	data->length = __REV16(data->length);
 	return ret;
@@ -182,7 +182,7 @@ static scsi_ret_t request_sense(scsi_t *scsi, cmd_REQUEST_SENSE_t *cmd)
 		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
 		ret = sense_fixed(scsi, 0x70, GOOD, NO_SENSE, 0x00, 0x00);
 
-	ret.failure = 0;
+	ret.state = Good;
 	if (ret.length > cmd->length)
 		ret.length = cmd->length;
 	return ret;
@@ -206,7 +206,7 @@ static scsi_ret_t read_capacity_10(scsi_t *scsi, cmd_READ_CAPACITY_10_t *cmd)
 		data->lbaddr = 128 * 1024 * 1024 / 512 - 1;
 		data->lbsize = 512;
 
-		scsi_ret_t ret = {data, 8, 0};
+		scsi_ret_t ret = {data, 8, Good};
 		// Endianness conversion
 		data->lbaddr = __REV(data->lbaddr);
 		data->lbsize = __REV(data->lbsize);
@@ -242,7 +242,7 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 
 	dbgprintf("[SCSI] Read %u bytes from %lu.\n", cmd->length, cmd->lbaddr);
 
-	scsi_ret_t ret = {0, 0, 0};
+	scsi_ret_t ret = {0, 0, Good};
 	if (cmd->length == 0)
 		return ret;
 
