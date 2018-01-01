@@ -1,4 +1,5 @@
 #include <malloc.h>
+#include <string.h>
 #include <debug.h>
 #include "../usb.h"
 #include "../usb_structs.h"
@@ -175,7 +176,7 @@ usb_msc_t *usb_msc_init(usb_t *usb)
 
 void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 {
-	if (!msc->buf_size)
+	if (!msc || !msc->buf_size)
 		return;
 
 	cbw_t *cbw = &msc->buf.cbw;
