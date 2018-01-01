@@ -243,6 +243,7 @@ scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
 	switch (cmd->op) {
 	case READ_FORMAT_CAPACITIES:
 	case MODE_SENSE_6:
+	case SYNCHRONIZE_CACHE_10:
 		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
 		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
 	}
