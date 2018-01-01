@@ -126,6 +126,50 @@ uint32_t mmc_capacity()
 	return capacity;
 }
 
+static uint32_t mmc_read_block(void *p, uint32_t block)
+{
+	uint32_t stat, resp;
+	while (MMC->STA & (SDMMC_STA_CMDACT_Msk | SDMMC_STA_TXACT_Msk | SDMMC_STA_RXACT_Msk));
+	resp = mmc_command(READ_SINGLE_BLOCK, ccs ? block : block * 512u, &stat);
+	if (!(stat & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
+		dbgbkpt();
+		return 0u;
+	}
+	MMC->DLEN = 512ul;
+	MMC->DCTRL = SDMMC_DCTRL_SDIOEN_Msk | SDMMC_DCTRL_RWSTART_Msk |
+			SDMMC_DCTRL_DTDIR_Msk | SDMMC_DCTRL_DTEN_Msk |
+			(9ul << SDMMC_DCTRL_DBLOCKSIZE_Pos);
+	uint32_t count = 512u / 4u;
+	while (count--) {
+		while (!(MMC->STA & SDMMC_STA_RXDAVL_Msk));
+		*(uint32_t *)p = MMC->FIFO;
+		p += 4u;
+	}
+	return 1u;
+}
+
+static uint32_t mmc_write_block(const void *p, uint32_t block)
+{
+	uint32_t stat, resp;
+	while (MMC->STA & (SDMMC_STA_CMDACT_Msk | SDMMC_STA_TXACT_Msk | SDMMC_STA_RXACT_Msk));
+	resp = mmc_command(WRITE_BLOCK, ccs ? block : block * 512u, &stat);
+	if (!(stat & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
+		dbgbkpt();
+		return 0u;
+	}
+	MMC->DLEN = 512ul;
+	MMC->DCTRL = SDMMC_DCTRL_SDIOEN_Msk | SDMMC_DCTRL_RWSTART_Msk |
+			SDMMC_DCTRL_DTEN_Msk |
+			(9ul << SDMMC_DCTRL_DBLOCKSIZE_Pos);
+	uint32_t count = 512u / 4u;
+	while (count--) {
+		while (MMC->STA & SDMMC_STA_TXFIFOF_Msk);
+		MMC->FIFO = *(uint32_t *)p;
+		p += 4u;
+	}
+	return 1u;
+}
+
 /* FatFs interface functions */
 
 DSTATUS mmc_disk_init()
@@ -287,22 +331,8 @@ DRESULT mmc_disk_read(BYTE *buff, DWORD sector, UINT count)
 	if (stat)
 		return RES_ERROR;
 	if (count == 1u) {
-		uint32_t stat, resp;
-		resp = mmc_command(READ_SINGLE_BLOCK, ccs ? sector : sector * 512u, &stat);
-		if (!(stat & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
-			dbgbkpt();
+		if (mmc_read_block(buff, sector) != count)
 			return RES_ERROR;
-		}
-		MMC->DLEN = 512ul;
-		MMC->DCTRL = SDMMC_DCTRL_SDIOEN_Msk | SDMMC_DCTRL_RWSTART_Msk |
-				SDMMC_DCTRL_DTDIR_Msk | SDMMC_DCTRL_DTEN_Msk |
-				(9ul << SDMMC_DCTRL_DBLOCKSIZE_Pos);
-		count = 512u / 4u;
-		while (count--) {
-			while (!(MMC->STA & SDMMC_STA_RXDAVL_Msk));
-			*(uint32_t *)buff = MMC->FIFO;
-			buff += 4u;
-		}
 		return RES_OK;
 	}
 	dbgbkpt();
@@ -324,20 +354,31 @@ void *scsi_read(scsi_t *scsi, uint32_t offset, uint32_t *length)
 {
 	// TODO: Partial read
 	if (*length > sizeof(scsi_buf))
-		dbgbkpt();
+		panic();
 
 	offset /= 512ul;
 	void *p = scsi_buf;
-	uint32_t i = (*length + 511ul) / 512ul;
-	while (i--) {
-		// TODO: Multi-sector read
-		mmc_disk_read(p, offset++, 1);
-		p += 512ul;
-	}
+	// TODO: Multi-sector read
+	for (uint32_t i = *length / 512ul; i; i--, p += 512ul)
+		mmc_read_block(p, offset++);
 	return scsi_buf;
 }
 
 uint32_t scsi_write(scsi_t *scsi, uint32_t offset, uint32_t length, const void *p)
 {
+	// Check sector alignment
+	if (length & (512ul - 1ul)) {
+		dbgbkpt();
+		return 0;
+	} else if (offset & (512ul - 1ul)) {
+		dbgbkpt();
+		return 0;
+	}
+
+	offset /= 512ul;
+	// TODO: Multi-sector write
+	for (uint32_t i = length / 512ul; i; i--)
+		mmc_write_block(p, offset++);
+
 	return length;
 }
