@@ -13,10 +13,19 @@
 
 // SCSI device info
 typedef struct scsi_t {
+	// SCSI state (next packet)
+	scsi_state_t state;
+	// Next transfer address
+	uint32_t offset;
+	// Remaining transfer length (read/write)
+	uint32_t length;
+	// Data output buffer
 	uint8_t buf[SCSI_BUF_SIZE] ALIGN(4);
+
 	struct {
 		// Control mode page (0ah), D_SENSE
 		uint8_t type;
+		uint8_t status;
 		uint8_t sense;
 		uint8_t asc;
 		uint8_t ascq;
@@ -184,6 +193,7 @@ static scsi_ret_t request_sense(scsi_t *scsi, cmd_REQUEST_SENSE_t *cmd)
 	if (cmd->desc)
 		ret = unimplemented(scsi);
 	else
+		// TODO: Actual sense data
 		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
 		ret = sense_fixed(scsi, 0x70, GOOD, NO_SENSE, 0x00, 0x00);
 
@@ -244,7 +254,7 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x21, 0x00);
 	}
 
-	dbgprintf("[SCSI] Read %u blocks from %lu.\n", cmd->length, cmd->lbaddr);
+	dbgprintf(ESC_GREEN "[SCSI] Read %u blocks from %lu.\n", cmd->length, cmd->lbaddr);
 
 	scsi_ret_t ret = {0, 0, Good};
 	if (cmd->length == 0)
@@ -253,6 +263,48 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 	ret.p = ram_disk;
 	ret.length = cmd->length * RAM_DISK_BLOCK;
 	return ret;
+}
+
+static scsi_ret_t write_10(scsi_t *scsi, cmd_WRITE_10_t *cmd)
+{
+	// Endianness conversion
+	cmd->lbaddr = __REV(cmd->lbaddr);
+	cmd->length = __REV16(cmd->length);
+
+	if (cmd->flags != 0)
+		dbgbkpt();
+
+	// Logical block address check
+	if (cmd->lbaddr >= RAM_DISK_BLOCKS) {
+		dbgbkpt();
+		// 21/00  DZT RO   BK    LOGICAL BLOCK ADDRESS OUT OF RANGE
+		scsi->sense.status = CHECK_CONDITION;
+		scsi->sense.sense = ILLEGAL_REQUEST;
+		scsi->sense.asc = 0x21;
+		scsi->sense.ascq = 0x00;
+		return (scsi_ret_t){0, 0, Failure};
+	}
+
+	if (cmd->group != 0)
+		dbgbkpt();
+
+	// Transfer length check
+	if (cmd->lbaddr + (cmd->length + RAM_DISK_BLOCKS - 1) / RAM_DISK_BLOCKS >= RAM_DISK_BLOCKS) {
+		dbgbkpt();
+		// 21/00  DZT RO   BK    LOGICAL BLOCK ADDRESS OUT OF RANGE
+		scsi->sense.status = CHECK_CONDITION;
+		scsi->sense.sense = ILLEGAL_REQUEST;
+		scsi->sense.asc = 0x21;
+		scsi->sense.ascq = 0x00;
+		return (scsi_ret_t){0, 0, Failure};
+	}
+
+	dbgprintf(ESC_RED "[SCSI] Write %u blocks from %lu.\n", cmd->length, cmd->lbaddr);
+
+	scsi->offset = cmd->lbaddr * RAM_DISK_BLOCK;
+	scsi->length = cmd->length * RAM_DISK_BLOCK;
+	scsi->state = Write;
+	return (scsi_ret_t){0, 0, Write};
 }
 
 scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
@@ -283,10 +335,36 @@ scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
 		return read_capacity_10(scsi, (cmd_READ_CAPACITY_10_t *)cmd);
 	case READ_10:
 		return read_10(scsi, (cmd_READ_10_t *)cmd);
+	case WRITE_10:
+		return write_10(scsi, (cmd_WRITE_10_t *)cmd);
 	default:
 		// Unsupported commands
 		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
 		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
 	}
-	return unimplemented(scsi);
+}
+
+scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint8_t size)
+{
+	if (scsi->state != Write) {
+		dbgbkpt();
+		return Failure;
+	}
+
+	if (scsi->length < size) {
+		dbgbkpt();
+		return Failure;
+	}
+
+	// Transfer data
+	dbgprintf(ESC_RED "[SCSI] Writing %u bytes from %lu, remaining: %lu.\n", size, scsi->offset, scsi->length);
+	memcpy(ram_disk + scsi->offset, pdata, size);
+
+	// Update offset
+	scsi->offset += size;
+	scsi->length -= size;
+	if (scsi->length)
+		return Write;
+	scsi->state = Good;
+	return Good;
 }

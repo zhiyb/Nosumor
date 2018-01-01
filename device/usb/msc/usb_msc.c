@@ -36,10 +36,11 @@ typedef struct PACKED csw_t {
 } csw_t;
 
 typedef struct usb_msc_t {
+	int ep_in, ep_out;
 	scsi_t *scsi;
 	scsi_state_t scsi_state;
-	int ep_in, ep_out;
-	uint8_t lun_max, buf_valid;
+	uint32_t buf_size;
+	uint8_t lun_max;
 	union {
 		cbw_t cbw;
 		uint8_t raw[MSC_OUT_MAX_SIZE];
@@ -103,7 +104,7 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 		dbgbkpt();
 	memcpy(&data->buf, data->outbuf, size);
 	// Enqueue packets
-	data->buf_valid = 1;
+	data->buf_size = size;
 }
 
 static void usbif_config(usb_t *usb, void *pdata)
@@ -174,16 +175,25 @@ usb_msc_t *usb_msc_init(usb_t *usb)
 
 void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 {
-	if (!msc->buf_valid)
+	if (!msc->buf_size)
 		return;
-
-	if (msc->scsi_state == Write) {
-		dbgbkpt();
-		return;
-	}
 
 	cbw_t *cbw = &msc->buf.cbw;
 	csw_t *csw = &msc->inbuf.csw;
+
+	if (msc->scsi_state == Write) {
+		uint32_t size = msc->buf_size;
+		msc->scsi_state = scsi_data(msc->scsi, msc->buf.raw, size);
+		// Receive new packets
+		msc->buf_size = 0;
+		usb_ep_out_transfer(usb->base, msc->ep_out, &msc->outbuf, 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
+		// Update Command Status Wrapper (CSW)
+		csw->dCSWDataResidue -= size;
+		// Send Command Status Wrapper (CSW) when transfer finished
+		if (msc->scsi_state != Write)
+			goto s_csw;
+		return;
+	}
 
 	// Command block wrapper (CBW) processing
 	if (cbw->dCBWSignature != 0x43425355) {
@@ -211,7 +221,7 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	// Process SCSI CBW
 	scsi_ret_t ret = scsi_cmd(msc->scsi, cbw->CBWCB, cbw->bCBWCBLength);
 	// Receive new packets
-	msc->buf_valid = 0;
+	msc->buf_size = 0;
 	usb_ep_out_transfer(usb->base, msc->ep_out, &msc->outbuf, 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
 	// Data process
 	if (dir == CBW_DIR_IN) {
@@ -222,9 +232,9 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	msc->scsi_state = ret.state;
 
 	// Prepare CSW
-	csw->dCSWTag = cbw->dCBWTag;
-	csw->bCSWStatus = ret.state == Failure;
 	csw->dCSWDataResidue = cbw->dCBWDataTransferLength - ret.length;
+s_csw:	csw->dCSWTag = cbw->dCBWTag;
+	csw->bCSWStatus = msc->scsi_state == Failure;
 	// Send CSW when transfer finished
 	if (msc->scsi_state == Good || msc->scsi_state == Failure)
 		usb_ep_in_transfer(usb->base, msc->ep_in, csw, 13);

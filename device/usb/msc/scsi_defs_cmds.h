@@ -170,6 +170,16 @@ typedef struct PACKED cmd_READ_10_t {
 	uint8_t control;
 } cmd_READ_10_t;
 
+// WRITE (10)
+typedef struct PACKED cmd_WRITE_10_t {
+	uint8_t op;			// 2ah
+	uint8_t flags;			// [7:5] WRPROTECT; [4:0] DPO, FUA, Reserved, FUA_NV, Obsolete
+	uint32_t lbaddr;		// Logical Block Address
+	uint8_t group;			// Group Number
+	uint16_t length;		// Transfer length
+	uint8_t control;
+} cmd_WRITE_10_t;
+
 // Command sizes
 static const uint8_t cmd_size[256] = {
 	[INQUIRY] = 6u,
@@ -184,6 +194,7 @@ static const uint8_t cmd_size[256] = {
 	[TEST_UNIT_READY] = 6u,
 	[SYNCHRONIZE_CACHE_10] = 10u,
 	[START_STOP_UNIT] = 6u,
+	[WRITE_10] = 10u,
 	[READ_FORMAT_CAPACITIES] = 10u,
 };
 
