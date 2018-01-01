@@ -34,10 +34,8 @@
 #define BOOTLOADER_FUNC	((void (*)())*(uint32_t *)(BOOTLOADER_BASE + 4u))
 
 usb_t usb;	// Shared with PVD
-#ifdef DEBUG
-static usb_msc_t *usb_msc;
-#endif
-static usb_hid_if_t *usb_hid_vendor;
+static usb_msc_t *usb_msc = 0;
+static usb_hid_if_t *usb_hid_vendor = 0;
 
 static inline void bootloader_check()
 {
@@ -104,10 +102,13 @@ static inline void init()
 	audio_init(&usb, audio);
 #endif
 
-#ifdef DEBUG
+	puts(ESC_CYAN "Initialising SD/MMC card...");
+	mmc_disk_init();
+	printf(ESC_YELLOW "Card capacity: " ESC_WHITE "%llu"
+	       ESC_YELLOW " bytes\n", (uint64_t)mmc_capacity() * 512ull);
 	puts(ESC_CYAN "Initialising USB mass storage...");
-	usb_msc = usb_msc_init(&usb);
-#endif
+	if (mmc_capacity() != 0)
+		usb_msc = usb_msc_init(&usb);
 
 	puts(ESC_CYAN "Initialising USB HID interface...");
 	usb_hid_t *hid = usb_hid_init(&usb);
@@ -184,15 +185,15 @@ static inline void fatfs_test()
 	}
 
 	puts(ESC_GREEN "FatFS tests completed");
-	printf(ESC_YELLOW "SD capacity: " ESC_WHITE "%llu"
-	       ESC_YELLOW " bytes\n", (uint64_t)mmc_capacity() * 512ull);
 }
 
 int main()
 {
 	init();
 #ifndef BOOTLOADER
+#ifdef DEBUG
 	fatfs_test();
+#endif
 #endif
 
 #ifdef DEBUG
@@ -239,9 +240,7 @@ int main()
 
 		// Process time consuming tasks
 		usb_process(&usb);
-#ifdef DEBUG
 		usb_msc_process(&usb, usb_msc);
-#endif
 		audio_process();
 		usb_hid_vendor_process(usb_hid_vendor, &vendor_process);
 		fflush(stdout);
