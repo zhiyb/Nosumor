@@ -7,6 +7,7 @@
 #define dbgexist()	(CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk)
 #define panic()		do { \
 	printf("\nPanic at %s():%d\n", __PRETTY_FUNCTION__, __LINE__); \
+	fflush(stdout); \
 	__BKPT(0); \
 } while (1)
 
@@ -18,7 +19,10 @@
 #define VARIANT	"DEBUG"
 
 #define dbgprintf	printf
-#define dbgbkpt()	__BKPT(0)
+#define dbgbkpt()	do { \
+	fflush(stdout); \
+	__BKPT(0); \
+} while (0)
 
 static inline int dbgcmd(int cmd, void *data)
 {
