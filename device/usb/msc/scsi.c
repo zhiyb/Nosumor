@@ -119,7 +119,7 @@ static scsi_ret_t inquiry_vital(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 		break;
 	default:
 		dbgbkpt();
-		// 24h/00h  DZTPROMAEBKVF  INVALID FIELD IN CDB
+		// 24/00  DZTPROMAEBKVF  INVALID FIELD IN CDB
 		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
 	}
 
@@ -134,13 +134,13 @@ static scsi_ret_t inquiry(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 		if (cmd->info & CMD_INQUIRY_CMDDT_Msk) {
 			dbgprintf("[SCSI]INQUIRY, Vital, Invalid.");
 			dbgbkpt();
-			// 24h/00h  DZTPROMAEBKVF  INVALID FIELD IN CDB
+			// 24/00  DZTPROMAEBKVF  INVALID FIELD IN CDB
 			return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
 		}
 		if (cmd->length < 4) {
 			dbgprintf("[SCSI]INQUIRY, Vital, Invalid length.");
 			dbgbkpt();
-			// 24h/00h  DZTPROMAEBKVF  INVALID FIELD IN CDB
+			// 24/00  DZTPROMAEBKVF  INVALID FIELD IN CDB
 			return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
 		}
 		return inquiry_vital(scsi, cmd);
@@ -149,13 +149,13 @@ static scsi_ret_t inquiry(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 		if (cmd->page != 0) {
 			dbgprintf("[SCSI]INQUIRY, Standard, Invalid.");
 			dbgbkpt();
-			// 24h/00h  DZTPROMAEBKVF  INVALID FIELD IN CDB
+			// 24/00  DZTPROMAEBKVF  INVALID FIELD IN CDB
 			return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
 		}
 		if (cmd->length < 5) {
 			dbgprintf("[SCSI]INQUIRY, Standard, Invalid length.");
 			dbgbkpt();
-			// 24h/00h  DZTPROMAEBKVF  INVALID FIELD IN CDB
+			// 24/00  DZTPROMAEBKVF  INVALID FIELD IN CDB
 			return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
 		}
 		return inquiry_standard(scsi, cmd);
@@ -168,7 +168,7 @@ static scsi_ret_t request_sense(scsi_t *scsi, cmd_REQUEST_SENSE_t *cmd)
 	if (cmd->desc)
 		ret = unimplemented(scsi);
 	else
-		// 00h/00h  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
+		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
 		ret = sense_fixed(scsi, 0x70, GOOD, NO_SENSE, 0x00, 0x00);
 
 	ret.failure = 0;
@@ -183,13 +183,13 @@ static scsi_ret_t read_capacity_10(scsi_t *scsi, cmd_READ_CAPACITY_10_t *cmd)
 		return unimplemented(scsi);
 	} else {
 		if (cmd->lbaddr != 0)
-			// 24h/00h  DZTPROMAEBKVF  INVALID FIELD IN CDB
+			// 24/00  DZTPROMAEBKVF  INVALID FIELD IN CDB
 			return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
 
 		// TODO: Actual size
 		// Simulates: 128MB
 		data_READ_CAPACITY_10_t *data = (data_READ_CAPACITY_10_t *)scsi->buf;
-		data->lbaddr = 262144;
+		data->lbaddr = 262143;
 		data->lbsize = 512;
 
 		scsi_ret_t ret = {data, 8, 0};
@@ -197,23 +197,59 @@ static scsi_ret_t read_capacity_10(scsi_t *scsi, cmd_READ_CAPACITY_10_t *cmd)
 	}
 }
 
+static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
+{
+	if (cmd->flags != 0)
+		dbgbkpt();
+
+	// Logical block address check
+	if (cmd->lbaddr > 262143) {
+		dbgbkpt();
+		// 21/00  DZT RO   BK    LOGICAL BLOCK ADDRESS OUT OF RANGE
+		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x21, 0x00);
+	}
+
+	if (cmd->group != 0)
+		dbgbkpt();
+
+	// Transfer length check
+	if (cmd->lbaddr + (cmd->length + 511) / 512 > 262143) {
+		dbgbkpt();
+		// 21/00  DZT RO   BK    LOGICAL BLOCK ADDRESS OUT OF RANGE
+		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x21, 0x00);
+	}
+
+	dbgprintf("[SCSI] Read %u bytes from %lu.\n", cmd->length, cmd->lbaddr);
+
+	scsi_ret_t ret = {0, 0, 0};
+	if (cmd->length == 0)
+		return ret;
+
+	dbgbkpt();
+}
+
 scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
 {
 	memset(scsi->buf, 0, sizeof(scsi->buf));
+
+	// Unsupported commands
 	cmd_t *cmd = (cmd_t *)pdata;
 	switch (cmd->op) {
 	case READ_FORMAT_CAPACITIES:
+	case MODE_SENSE_6:
 		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
 		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
 	}
 
+	// Command size check
 	if (size < cmd_size[cmd->op]) {
-		dbgprintf("[SCSI]Invalid cmd size.");
+		dbgprintf("[SCSI] Invalid cmd size.");
 		dbgbkpt();
-		// 00h/00h  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
+		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
 		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
 	}
 
+	// Command handling
 	switch (cmd->op) {
 	case INQUIRY:
 		return inquiry(scsi, (cmd_INQUIRY_t *)cmd);
@@ -221,6 +257,8 @@ scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
 		return request_sense(scsi, (cmd_REQUEST_SENSE_t *)cmd);
 	case READ_CAPACITY_10:
 		return read_capacity_10(scsi, (cmd_READ_CAPACITY_10_t *)cmd);
+	case READ_10:
+		return read_10(scsi, (cmd_READ_10_t *)cmd);
 	}
 	return unimplemented(scsi);
 }

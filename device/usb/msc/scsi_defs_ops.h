@@ -144,6 +144,7 @@
 
 #define extended_CDB	0x7E
 #define variable_length_CDB__more_than_16_bytes	0x7F
+#define READ_32	0x7F
 
 #define XDWRITE_EXTENDED_16	0x80
 #define WRITE_FILEMARKS_16	0x80
