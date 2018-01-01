@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdlib.h>
 #include <macros.h>
 #include <debug.h>
 #include <vendor_defs.h>
@@ -9,30 +10,66 @@
 
 // SCSI device info
 typedef struct scsi_t {
-	uint8_t buf[SCSI_BUF_SIZE];
+	uint8_t buf[SCSI_BUF_SIZE] ALIGN(4);
+	struct {
+		// Control mode page (0ah), D_SENSE
+		uint8_t type;
+		uint8_t sense;
+		uint8_t asc;
+		uint8_t ascq;
+	} sense;
 } scsi_t;
 
 scsi_t *scsi_init()
 {
-	scsi_t *scsi = (scsi_t *)malloc(sizeof(scsi_t));
+	scsi_t *scsi = (scsi_t *)calloc(1u, sizeof(scsi_t));
 	if (!scsi)
 		panic();
 	return scsi;
 }
 
+static scsi_ret_t sense_fixed(scsi_t *scsi, uint8_t response, uint8_t status,
+			uint8_t sense, uint8_t asc, uint8_t ascq)
+{
+	sense_fixed_t *data = (sense_fixed_t *)scsi->buf;
+	// [7]: VALID; [6:0]: Response code
+	data->response = 0x80 | response;
+	// [7:4]: FILEMARK, EOM, ILI, RESERVED; [3:0]: Sense Key
+	data->key = sense;
+	data->additional = 7;
+	data->sense = asc;
+	data->qualifier = ascq;
+
+	scsi_ret_t ret = {data, 7 + data->additional, 1};
+	return ret;
+}
+
 static scsi_ret_t sense(scsi_t *scsi, uint8_t status,
 			uint8_t sense, uint8_t asc, uint8_t ascq)
 {
-	uint8_t response = 0;
+	uint8_t response;
+	if (status == CHECK_CONDITION)
+		// Current errors
+		response = 0x70;
+	else
+		// Deferred errors
+		response = 0x71;
+
+	// Descriptor format
+	if (scsi->sense.type)
+		response += 2;
+
+	// Special modes
 	if (asc == 0x29)
 		response = 0x70;
 	// MODE PARAMETERS CHANGED
 	else if (asc == 0x2a && ascq == 0x01)
 		response = 0x70;
 
-	if (sense == CHECK_CONDITION)
-		;
-	panic();
+	if (response != 0x70)
+		panic();
+	else
+		return sense_fixed(scsi, response, status, sense, asc, ascq);
 }
 
 static scsi_ret_t unimplemented(scsi_t *scsi)
@@ -64,7 +101,8 @@ static scsi_ret_t inquiry_standard(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 	memcpy(data->vendor, "ST MICRO", 8);
 	strcpy((void *)data->product, PRODUCT_NAME);
 	memcpy(data->revision, SW_VERSION_STR, 4);
-	scsi_ret_t ret = {.p = data, .length = 4 + data->additional};
+
+	scsi_ret_t ret = {data, 4 + data->additional, 0};
 	return ret;
 }
 
@@ -124,18 +162,36 @@ static scsi_ret_t inquiry(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 	}
 }
 
+static scsi_ret_t request_sense(scsi_t *scsi, cmd_REQUEST_SENSE_t *cmd)
+{
+	scsi_ret_t ret;
+	if (cmd->desc)
+		ret = unimplemented(scsi);
+	else
+		// 00h/00h  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
+		ret = sense_fixed(scsi, 0x70, GOOD, NO_SENSE, 0x00, 0x00);
+
+	ret.failure = 0;
+	if (ret.length > cmd->length)
+		ret.length = cmd->length;
+	return ret;
+}
+
 scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
 {
+	memset(scsi->buf, 0, sizeof(scsi->buf));
 	cmd_t *cmd = (cmd_t *)pdata;
-	if (size != cmd_size[cmd->op]) {
+	if (size < cmd_size[cmd->op]) {
 		dbgprintf("[SCSI]Invalid cmd size.");
 		dbgbkpt();
-		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
+		// 00h/00h  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
 		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
 	}
 	switch (cmd->op) {
 	case INQUIRY:
 		return inquiry(scsi, (cmd_INQUIRY_t *)cmd);
+	case REQUEST_SENSE:
+		return request_sense(scsi, (cmd_REQUEST_SENSE_t *)cmd);
 	}
 	return unimplemented(scsi);
 }

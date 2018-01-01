@@ -47,11 +47,11 @@
 /* Sense data formats */
 
 typedef struct PACKED sense_fixed_t {
-	uint8_t response;	// [7]: Valid INFORMATION field
+	uint8_t response;	// [7]: VALID; [6:0]: Response code
 	uint8_t OBSOLETE;
-	uint8_t key;		// [7:5]: Flags; Sense key
+	uint8_t key;		// [7:4]: Flags; Sense key
 	uint32_t info;		// INFORMATION
-	uint8_t length;		// Additional sense length (n - 7)
+	uint8_t additional;	// Additional sense length (n - 7)
 	uint32_t cmd_info;	// Command-specific information
 	uint8_t sense;		// Additional sense code
 	uint8_t qualifier;	// Additional sense code qualifier
@@ -66,7 +66,7 @@ typedef struct PACKED sense_desc_t {
 	uint8_t sense;		// Additional sense code
 	uint8_t qualifier;	// Additional sense code qualifier
 	uint8_t RESERVED[3];
-	uint8_t length;		// Additional sense length (n - 7)
+	uint8_t additional;	// Additional sense length (n - 7)
 	// Sense data descriptor(s)
 	uint8_t desc[0];
 } sense_desc_t;

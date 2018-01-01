@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <macros.h>
+#include "scsi_defs_ops.h"
 
 /* Command types */
 
@@ -85,8 +86,18 @@ typedef union PACKED cmd_t {
 
 /* Additional command types */
 
+// REQUEST SENSE
+typedef struct PACKED cmd_REQUEST_SENSE_t {
+	uint8_t op;			// 03h
+	uint8_t desc;			// [0] DESC
+	uint16_t RESERVED1;
+	uint16_t length;		// Allocation Length
+	uint8_t control;
+} cmd_REQUEST_SENSE_t;
+
+// INQUIRY
 typedef struct PACKED cmd_INQUIRY_t {
-	uint8_t op;
+	uint8_t op;			// 12h
 	uint8_t info;			// [1] CMDDT (obsolete); [0] EVPD
 	uint8_t page;
 	uint16_t length;
@@ -119,11 +130,18 @@ typedef struct PACKED data_INQUIRY_STANDARD_t {
 } data_INQUIRY_STANDARD_t;
 
 typedef struct PACKED data_INQUIRY_VITAL_t {
+	uint8_t peripheral;		// [7:5] Qualifier; [4:0] Device Type
+	uint8_t page;			// Page Code
+	uint16_t length;		// Page Length
+	union {
+		uint8_t payload[0];
+	};
 } data_INQUIRY_VITAL_t;
 
 // Command sizes
 static const uint8_t cmd_size[256] = {
 	[INQUIRY] = 6u,
+	[REQUEST_SENSE] = 6u,
 };
 
 #endif // SCSI_DEFS_CMDS_H
