@@ -37,12 +37,13 @@ typedef struct PACKED csw_t {
 
 typedef struct usb_msc_t {
 	scsi_t *scsi;
+	scsi_state_t scsi_state;
 	int ep_in, ep_out;
-	uint8_t lun_max, cbw_valid;
+	uint8_t lun_max, buf_valid;
 	union {
 		cbw_t cbw;
 		uint8_t raw[MSC_OUT_MAX_SIZE];
-	} outbuf, buf[MSC_OUT_MAX_PKT] ALIGN(4);
+	} buf, outbuf[MSC_OUT_MAX_PKT] ALIGN(4);
 	union {
 		csw_t csw;
 		uint8_t raw[MSC_IN_MAX_SIZE];
@@ -86,21 +87,7 @@ static void epout_init(usb_t *usb, uint32_t n)
 	dev->DAINTMSK |= DAINTMSK_OUT(n);
 	// Receive packets
 	usb_msc_t *data = (usb_msc_t *)usb->epout[n].data;
-	usb_ep_out_transfer(usb->base, n, data->buf, 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
-}
-
-static void bulk_cbw(usb_t *usb, int n)
-{
-	usb_msc_t *data = (usb_msc_t *)usb->epout[n].data;
-	cbw_t *cbw = &data->outbuf.cbw;
-	if (cbw->dCBWSignature != 0x43425355) {
-		// TODO: Stall bulk pipes
-		dbgbkpt();
-		return;
-	}
-	if (data->cbw_valid)
-		panic();
-	data->cbw_valid = 1;
+	usb_ep_out_transfer(usb->base, n, data->outbuf, 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
 }
 
 static void epout_xfr_cplt(usb_t *usb, uint32_t n)
@@ -111,16 +98,12 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 	uint32_t siz = ep->DOEPTSIZ;
 	uint32_t pkt_cnt = MSC_OUT_MAX_PKT - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
 	uint32_t size = MSC_OUT_MAX_SIZE - FIELD(siz, USB_OTG_DOEPTSIZ_XFRSIZ);
-	// Copy packet
+	// Copy packets
 	if (pkt_cnt != 1u)
 		dbgbkpt();
-	if (size != 31u)
-		dbgbkpt();
-	memcpy(&data->outbuf, data->buf, size);
-	// Receive new packets
-	usb_ep_out_transfer(usb->base, n, data->buf, 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
-	// Command block wrapper (CBW) processing
-	bulk_cbw(usb, n);
+	memcpy(&data->buf, data->outbuf, size);
+	// Enqueue packets
+	data->buf_valid = 1;
 }
 
 static void usbif_config(usb_t *usb, void *pdata)
@@ -191,11 +174,23 @@ usb_msc_t *usb_msc_init(usb_t *usb)
 
 void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 {
-	if (!msc->cbw_valid)
+	if (!msc->buf_valid)
 		return;
 
-	cbw_t *cbw = &msc->outbuf.cbw;
+	if (msc->scsi_state == Write) {
+		dbgbkpt();
+		return;
+	}
+
+	cbw_t *cbw = &msc->buf.cbw;
 	csw_t *csw = &msc->inbuf.csw;
+
+	// Command block wrapper (CBW) processing
+	if (cbw->dCBWSignature != 0x43425355) {
+		// TODO: Stall bulk pipes
+		dbgbkpt();
+		return;
+	}
 
 	int dir = cbw->bmCBWFlags & CBW_DIR_Msk;
 	if (cbw->bCBWLUN > msc->lun_max) {
@@ -215,15 +210,22 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 
 	// Process SCSI CBW
 	scsi_ret_t ret = scsi_cmd(msc->scsi, cbw->CBWCB, cbw->bCBWCBLength);
-	msc->cbw_valid = 0;
-	csw->bCSWStatus = ret.failure;
-	if (ret.length > cbw->dCBWDataTransferLength)
-		ret.length = cbw->dCBWDataTransferLength;
-	if (dir == CBW_DIR_IN)
+	// Receive new packets
+	msc->buf_valid = 0;
+	usb_ep_out_transfer(usb->base, msc->ep_out, &msc->outbuf, 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
+	// Data process
+	if (dir == CBW_DIR_IN) {
+		if (ret.length > cbw->dCBWDataTransferLength)
+			ret.length = cbw->dCBWDataTransferLength;
 		usb_ep_in_transfer(usb->base, msc->ep_in, ret.p, ret.length);
+	}
+	msc->scsi_state = ret.state;
 
-	// Send CSW
+	// Prepare CSW
 	csw->dCSWTag = cbw->dCBWTag;
+	csw->bCSWStatus = ret.state == Failure;
 	csw->dCSWDataResidue = cbw->dCBWDataTransferLength - ret.length;
-	usb_ep_in_transfer(usb->base, msc->ep_in, csw, 13);
+	// Send CSW when transfer finished
+	if (msc->scsi_state == Good || msc->scsi_state == Failure)
+		usb_ep_in_transfer(usb->base, msc->ep_in, csw, 13);
 }
