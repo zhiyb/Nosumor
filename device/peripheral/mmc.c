@@ -23,7 +23,7 @@ typedef union {
 } cid_t;
 
 static DSTATUS stat = STA_NOINIT;
-static uint32_t ccs = 0;
+static uint32_t ccs = 0, capacity = 0;
 
 // Send command to card, with optional status output
 // Returns short response
@@ -165,13 +165,38 @@ DSTATUS mmc_disk_init()
 
 	// Initialised, switch to high-speed clock
 	uint32_t clk;
-	if (!ccs)	// DS, up to 25MHz
+	if (!ccs)	// SDSC, up to 25MHz
 		clk = CEIL(clkSDMMC1(), 25000000ul) - 2ul;
-	else		// HS, up to 50MHz
+	else		// SDHC/SDXC, up to 50MHz
 		clk = SDMMC_CLKCR_BYPASS_Msk;
 	// Flow control, 4-bit bus, power saving, clock enable
 	MMC->CLKCR = SDMMC_CLKCR_HWFC_EN_Msk | (0b01ul << SDMMC_CLKCR_WIDBUS_Pos) |
-			SDMMC_CLKCR_CLKEN_Msk | clk;
+			SDMMC_CLKCR_PWRSAV_Msk | SDMMC_CLKCR_CLKEN_Msk | clk;
+
+	// Read CSD register
+	mmc_command(SEND_CSD, rca, &sta);
+	if (!(sta & SDMMC_STA_CMDREND_Msk)) {
+		dbgbkpt();
+		return sta;
+	}
+
+	if ((MMC->RESP1 >> 30u) == 0u) {	// CSD V1
+		// Calculate card capacity from CSD register
+		// [73:62] C_SIZE[12]
+		uint32_t size = (((MMC->RESP2 << 2u) | (MMC->RESP3 >> 30u))
+				 & 0x0fffu) + 1u;
+		// [49:47] C_SIZE_MULT[3]
+		uint32_t mult = 1ul << (((MMC->RESP3 >> 15u) & 0x07u) + 2u);
+		// [83:80] READ_BL_LEN[4]
+		uint32_t len = 1ul << ((MMC->RESP2 >> 16u) & 0x0fu);
+		dbgprintf(ESC_CYAN "size: %lu, mult: %lu, len: %lu\n", size, mult, len);
+		capacity = size * mult * len / 512ul;
+	} else {				// CSD V2
+		// Calculate card capacity from CSD register
+		// [69:48] C_SIZE[22]
+		capacity = ((((MMC->RESP2 << 16u) | (MMC->RESP3 >> 16u))
+			     & 0x003ffffful) + 1ul) * 1024ul;
+	}
 
 	// Select card
 	resp = mmc_command(SELECT_CARD, rca, &sta);
@@ -275,4 +300,9 @@ static uint32_t mmc_app_command(uint32_t cmd, uint32_t rca, uint32_t arg, uint32
 		return 0;
 	}
 	return mmc_command(cmd, arg, stat);
+}
+
+uint32_t mmc_capacity()
+{
+	return capacity;
 }

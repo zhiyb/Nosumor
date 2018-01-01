@@ -17,6 +17,7 @@
 #include "peripheral/uart.h"
 #include "peripheral/keyboard.h"
 #include "peripheral/audio.h"
+#include "peripheral/mmc.h"
 // USB interfaces
 #include "usb/usb.h"
 #include "usb/audio2/usb_audio2.h"
@@ -183,6 +184,8 @@ static inline void fatfs_test()
 	}
 
 	puts(ESC_GREEN "FatFS tests completed");
+	printf(ESC_YELLOW "SD capacity: " ESC_WHITE "%llu"
+	       ESC_YELLOW " bytes\n", (uint64_t)mmc_capacity() * 512ull);
 }
 
 int main()
