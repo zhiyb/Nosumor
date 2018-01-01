@@ -21,6 +21,12 @@ scsi_t *scsi_init();
 scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size);
 scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size);
 
+// Return 0 for success
+extern uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize);
+// Returned address need to be aligned to 4-bytes boundary
+extern void *scsi_read(scsi_t *scsi, uint32_t offset, uint32_t *length);
+extern uint32_t scsi_write(scsi_t *scsi, uint32_t offset, uint32_t length, const void *p);
+
 #ifdef __cplusplus
 }
 #endif
