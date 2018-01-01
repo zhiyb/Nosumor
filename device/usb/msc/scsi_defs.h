@@ -5,7 +5,7 @@
 #include "scsi_defs_cmds.h"
 #include "scsi_defs_sense.h"
 
-// Qualifier(011b), Type(1fh): No peripheral device
-#define PERIPHERAL_TYPE	0x7f
+// Qualifier(000b), Type(00h): Direct access block device
+#define PERIPHERAL_TYPE	0x00
 
 #endif // SCSI_DEFS_H

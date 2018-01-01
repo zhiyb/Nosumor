@@ -138,10 +138,26 @@ typedef struct PACKED data_INQUIRY_VITAL_t {
 	};
 } data_INQUIRY_VITAL_t;
 
+// READ CAPACITY (10)
+typedef struct PACKED cmd_READ_CAPACITY_10_t {
+	uint8_t op;			// 25h
+	uint8_t RESERVED1;
+	uint32_t lbaddr;		// Logical Block Address
+	uint16_t RESERVED2;
+	uint8_t pmi;			// [0] PMI
+	uint8_t control;
+} cmd_READ_CAPACITY_10_t;
+
+typedef struct PACKED data_READ_CAPACITY_10_t {
+	uint32_t lbaddr;		// Logical Block Address
+	uint32_t lbsize;		// Block length in bytes
+} data_READ_CAPACITY_10_t;
+
 // Command sizes
 static const uint8_t cmd_size[256] = {
 	[INQUIRY] = 6u,
 	[REQUEST_SENSE] = 6u,
+	[READ_CAPACITY_10] = 10u,
 };
 
 #endif // SCSI_DEFS_CMDS_H

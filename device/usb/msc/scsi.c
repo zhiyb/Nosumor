@@ -177,21 +177,50 @@ static scsi_ret_t request_sense(scsi_t *scsi, cmd_REQUEST_SENSE_t *cmd)
 	return ret;
 }
 
+static scsi_ret_t read_capacity_10(scsi_t *scsi, cmd_READ_CAPACITY_10_t *cmd)
+{
+	if (cmd->pmi) {
+		return unimplemented(scsi);
+	} else {
+		if (cmd->lbaddr != 0)
+			// 24h/00h  DZTPROMAEBKVF  INVALID FIELD IN CDB
+			return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
+
+		// TODO: Actual size
+		// Simulates: 128MB
+		data_READ_CAPACITY_10_t *data = (data_READ_CAPACITY_10_t *)scsi->buf;
+		data->lbaddr = 262144;
+		data->lbsize = 512;
+
+		scsi_ret_t ret = {data, 8, 0};
+		return ret;
+	}
+}
+
 scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
 {
 	memset(scsi->buf, 0, sizeof(scsi->buf));
 	cmd_t *cmd = (cmd_t *)pdata;
+	switch (cmd->op) {
+	case READ_FORMAT_CAPACITIES:
+		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
+		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
+	}
+
 	if (size < cmd_size[cmd->op]) {
 		dbgprintf("[SCSI]Invalid cmd size.");
 		dbgbkpt();
 		// 00h/00h  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
 		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
 	}
+
 	switch (cmd->op) {
 	case INQUIRY:
 		return inquiry(scsi, (cmd_INQUIRY_t *)cmd);
 	case REQUEST_SENSE:
 		return request_sense(scsi, (cmd_REQUEST_SENSE_t *)cmd);
+	case READ_CAPACITY_10:
+		return read_capacity_10(scsi, (cmd_READ_CAPACITY_10_t *)cmd);
 	}
 	return unimplemented(scsi);
 }
