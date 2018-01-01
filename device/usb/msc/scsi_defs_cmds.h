@@ -86,6 +86,13 @@ typedef union PACKED cmd_t {
 
 /* Additional command types */
 
+// TEST UNIT READY
+typedef struct PACKED cmd_TEST_UNIT_READY_t {
+	uint8_t op;			// 00h
+	uint8_t RESERVED1[4];
+	uint8_t control;
+} cmd_TEST_UNIT_READY_t;
+
 // REQUEST SENSE
 typedef struct PACKED cmd_REQUEST_SENSE_t {
 	uint8_t op;			// 03h
@@ -174,6 +181,7 @@ static const uint8_t cmd_size[256] = {
 	[READ_12] = 12u,
 	[READ_16] = 16u,
 	[READ_32] = 32u,
+	[TEST_UNIT_READY] = 6u,
 };
 
 #endif // SCSI_DEFS_CMDS_H

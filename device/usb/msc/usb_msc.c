@@ -219,7 +219,8 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	csw->bCSWStatus = ret.failure;
 	if (ret.length > cbw->dCBWDataTransferLength)
 		ret.length = cbw->dCBWDataTransferLength;
-	usb_ep_in_transfer(usb->base, msc->ep_in, ret.p, ret.length);
+	if (dir == CBW_DIR_IN)
+		usb_ep_in_transfer(usb->base, msc->ep_in, ret.p, ret.length);
 
 	// Send CSW
 	csw->dCSWTag = cbw->dCBWTag;

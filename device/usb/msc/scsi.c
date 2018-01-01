@@ -80,6 +80,12 @@ static scsi_ret_t unimplemented(scsi_t *scsi)
 	return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
 }
 
+static scsi_ret_t test_unit_ready(scsi_t *scsi, cmd_TEST_UNIT_READY_t *cmd)
+{
+	scsi_ret_t ret = {0, 0, 0};
+	return ret;
+}
+
 static scsi_ret_t inquiry_standard(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 {
 	data_INQUIRY_STANDARD_t *data = (data_INQUIRY_STANDARD_t *)scsi->buf;
@@ -251,6 +257,8 @@ scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
 
 	// Command handling
 	switch (cmd->op) {
+	case TEST_UNIT_READY:
+		return test_unit_ready(scsi, (cmd_TEST_UNIT_READY_t *)cmd);
 	case INQUIRY:
 		return inquiry(scsi, (cmd_INQUIRY_t *)cmd);
 	case REQUEST_SENSE:
