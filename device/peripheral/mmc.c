@@ -174,6 +174,9 @@ static uint32_t mmc_write_block(const void *p, uint32_t block)
 
 DSTATUS mmc_disk_init()
 {
+	if (stat == 0)
+		return stat;
+
 	if (stat & STA_NOINIT) {
 		mmc_gpio_init();
 		// Initialise SDMMC module
@@ -277,7 +280,6 @@ DSTATUS mmc_disk_init()
 		uint32_t mult = 1ul << (((MMC->RESP3 >> 15u) & 0x07u) + 2u);
 		// [83:80] READ_BL_LEN[4]
 		uint32_t len = 1ul << ((MMC->RESP2 >> 16u) & 0x0fu);
-		dbgprintf(ESC_CYAN "size: %lu, mult: %lu, len: %lu\n", size, mult, len);
 		capacity = size * mult * len / 512ul;
 	} else {				// CSD V2
 		// Calculate card capacity from CSD register
