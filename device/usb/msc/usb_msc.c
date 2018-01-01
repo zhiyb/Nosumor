@@ -10,7 +10,7 @@
 #include "usb_msc_defs.h"
 #include "scsi.h"
 
-#define MSC_IN_MAX_SIZE		64u
+#define MSC_IN_MAX_SIZE		512u
 #define MSC_OUT_MAX_SIZE	64u
 #define MSC_OUT_MAX_PKT		1u
 
@@ -212,7 +212,7 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 		return;
 	}
 
-	dbgprintf(ESC_YELLOW "<CBW|%u|", !!dir);
+	dbgprintf(ESC_CYAN "<CBW|%u|%lu|", !!dir, cbw->dCBWDataTransferLength);
 	uint8_t *p = cbw->CBWCB;
 	for (int i = cbw->bCBWCBLength; i != 0; i--)
 		dbgprintf("%02x,", *p++);
