@@ -246,7 +246,9 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 	if (cmd->length == 0)
 		return ret;
 
-	dbgbkpt();
+	ret.p = (void *)FLASH_BASE;
+	ret.length = cmd->length;
+	return ret;
 }
 
 scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
@@ -259,6 +261,7 @@ scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
 	case READ_FORMAT_CAPACITIES:
 	case MODE_SENSE_6:
 	case SYNCHRONIZE_CACHE_10:
+	case START_STOP_UNIT:
 		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
 		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
 	}
