@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define PRODUCT_NAME	"Nosumor remake"
+
 #define SW_VERSION	0x0004
 #define SW_VERSION_STR	"0004"
 
