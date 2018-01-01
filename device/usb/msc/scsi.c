@@ -46,8 +46,7 @@ static scsi_ret_t unimplemented(scsi_t *scsi)
 static scsi_ret_t inquiry_standard(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 {
 	data_INQUIRY_STANDARD_t *data = (data_INQUIRY_STANDARD_t *)scsi->buf;
-	// Qualifier(011b), Type(1fh): No peripheral device
-	data->peripheral = 0x7f;
+	data->peripheral = PERIPHERAL_TYPE;
 	// RMB(0b): Not removable
 	data->peripheral_flags = 0;
 	// Version(0h)
@@ -71,8 +70,23 @@ static scsi_ret_t inquiry_standard(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 
 static scsi_ret_t inquiry_vital(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 {
-	// 24h/00h  DZTPROMAEBKVF  INVALID FIELD IN CDB
-	return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
+	data_INQUIRY_VITAL_t *data = (data_INQUIRY_VITAL_t *)scsi->buf;
+	data->peripheral = PERIPHERAL_TYPE;
+	data->page = cmd->page;
+	switch(cmd->page) {
+	// Unit Serial Number page
+	case 0x80:
+		data->length = 0x08;
+		memcpy(data->payload, SW_VERSION_STR, 4);
+		break;
+	default:
+		dbgbkpt();
+		// 24h/00h  DZTPROMAEBKVF  INVALID FIELD IN CDB
+		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
+	}
+
+	scsi_ret_t ret = {data, data->length, 0};
+	return ret;
 }
 
 static scsi_ret_t inquiry(scsi_t *scsi, cmd_INQUIRY_t *cmd)
