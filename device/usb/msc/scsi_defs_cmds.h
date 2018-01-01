@@ -184,6 +184,7 @@ static const uint8_t cmd_size[256] = {
 	[TEST_UNIT_READY] = 6u,
 	[SYNCHRONIZE_CACHE_10] = 10u,
 	[START_STOP_UNIT] = 6u,
+	[READ_FORMAT_CAPACITIES] = 10u,
 };
 
 #endif // SCSI_DEFS_CMDS_H

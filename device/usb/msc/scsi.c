@@ -257,21 +257,14 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 
 scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
 {
+	cmd_t *cmd = (cmd_t *)pdata;
 	memset(scsi->buf, 0, sizeof(scsi->buf));
 
-	// Unsupported commands
-	cmd_t *cmd = (cmd_t *)pdata;
-	switch (cmd->op) {
-	case READ_FORMAT_CAPACITIES:
-	case MODE_SENSE_6:
-	case SYNCHRONIZE_CACHE_10:
-	case START_STOP_UNIT:
-		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
-		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
-	}
-
 	// Command size check
-	if (size < cmd_size[cmd->op]) {
+	uint8_t s = cmd_size[cmd->op];
+	if (s == 0) {
+		return unimplemented(scsi);
+	} else if (size < cmd_size[cmd->op]) {
 		dbgprintf("[SCSI] Invalid cmd size.");
 		dbgbkpt();
 		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
@@ -290,6 +283,10 @@ scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
 		return read_capacity_10(scsi, (cmd_READ_CAPACITY_10_t *)cmd);
 	case READ_10:
 		return read_10(scsi, (cmd_READ_10_t *)cmd);
+	default:
+		// Unsupported commands
+		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
+		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
 	}
 	return unimplemented(scsi);
 }
