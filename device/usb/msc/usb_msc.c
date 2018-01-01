@@ -38,15 +38,15 @@ typedef struct PACKED csw_t {
 typedef struct usb_msc_t {
 	scsi_t *scsi;
 	int ep_in, ep_out;
+	uint8_t lun_max, cbw_valid;
 	union {
 		cbw_t cbw;
 		uint8_t raw[MSC_OUT_MAX_SIZE];
-	} outbuf, buf[MSC_OUT_MAX_PKT];
+	} outbuf, buf[MSC_OUT_MAX_PKT] ALIGN(4);
 	union {
 		csw_t csw;
 		uint8_t raw[MSC_IN_MAX_SIZE];
-	} inbuf;
-	uint8_t lun_max;
+	} inbuf ALIGN(4);
 } usb_msc_t;
 
 static void epin_init(usb_t *usb, uint32_t n)
@@ -93,43 +93,14 @@ static void bulk_cbw(usb_t *usb, int n)
 {
 	usb_msc_t *data = (usb_msc_t *)usb->epout[n].data;
 	cbw_t *cbw = &data->outbuf.cbw;
-	csw_t *csw = &data->inbuf.csw;
 	if (cbw->dCBWSignature != 0x43425355) {
+		// TODO: Stall bulk pipes
 		dbgbkpt();
 		return;
 	}
-	int dir = cbw->bmCBWFlags & CBW_DIR_Msk;
-	if (cbw->bCBWLUN > data->lun_max) {
-		dbgbkpt();
-		return;
-	}
-	if (cbw->bCBWCBLength < 1u || cbw->bCBWCBLength > 16u) {
-		dbgbkpt();
-		return;
-	}
-
-	// Process SCSI CBW
-	scsi_ret_t ret = scsi_cmd(data->scsi, cbw->CBWCB, cbw->bCBWCBLength);
-	if (!ret.p || !ret.length) {
-		dbgbkpt();
-		csw->bCSWStatus = 0x02;
-	} else {
-		if (ret.length > cbw->dCBWDataTransferLength)
-			ret.length = cbw->dCBWDataTransferLength;
-		usb_ep_in_transfer(usb->base, data->ep_in, ret.p, ret.length);
-		csw->bCSWStatus = ret.failure;
-	}
-
-	dbgprintf(ESC_YELLOW "<CBW|%u|", !!dir);
-	uint8_t *p = cbw->CBWCB;
-	for (int i = cbw->bCBWCBLength; i != 0; i--)
-		dbgprintf("%02x,", *p++);
-	dbgprintf(">");
-
-	// Send CSW
-	csw->dCSWTag = cbw->dCBWTag;
-	csw->dCSWDataResidue = cbw->dCBWDataTransferLength - ret.length;
-	usb_ep_in_transfer(usb->base, data->ep_in, csw, 13);
+	if (data->cbw_valid)
+		panic();
+	data->cbw_valid = 1;
 }
 
 static void epout_xfr_cplt(usb_t *usb, uint32_t n)
@@ -216,4 +187,42 @@ usb_msc_t *usb_msc_init(usb_t *usb)
 	};
 	usb_interface_register(usb, &usbif);
 	return data;
+}
+
+void usb_msc_process(usb_t *usb, usb_msc_t *msc)
+{
+	if (!msc->cbw_valid)
+		return;
+
+	cbw_t *cbw = &msc->outbuf.cbw;
+	csw_t *csw = &msc->inbuf.csw;
+
+	int dir = cbw->bmCBWFlags & CBW_DIR_Msk;
+	if (cbw->bCBWLUN > msc->lun_max) {
+		dbgbkpt();
+		return;
+	}
+	if (cbw->bCBWCBLength < 1u || cbw->bCBWCBLength > 16u) {
+		dbgbkpt();
+		return;
+	}
+
+	dbgprintf(ESC_YELLOW "<CBW|%u|", !!dir);
+	uint8_t *p = cbw->CBWCB;
+	for (int i = cbw->bCBWCBLength; i != 0; i--)
+		dbgprintf("%02x,", *p++);
+	dbgprintf(">");
+
+	// Process SCSI CBW
+	scsi_ret_t ret = scsi_cmd(msc->scsi, cbw->CBWCB, cbw->bCBWCBLength);
+	msc->cbw_valid = 0;
+	csw->bCSWStatus = ret.failure;
+	if (ret.length > cbw->dCBWDataTransferLength)
+		ret.length = cbw->dCBWDataTransferLength;
+	usb_ep_in_transfer(usb->base, msc->ep_in, ret.p, ret.length);
+
+	// Send CSW
+	csw->dCSWTag = cbw->dCBWTag;
+	csw->dCSWDataResidue = cbw->dCBWDataTransferLength - ret.length;
+	usb_ep_in_transfer(usb->base, msc->ep_in, csw, 13);
 }

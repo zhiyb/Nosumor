@@ -33,7 +33,10 @@
 #define BOOTLOADER_FUNC	((void (*)())*(uint32_t *)(BOOTLOADER_BASE + 4u))
 
 usb_t usb;	// Shared with PVD
-static usb_hid_if_t *hid_vendor;
+#ifdef DEBUG
+static usb_msc_t *usb_msc;
+#endif
+static usb_hid_if_t *usb_hid_vendor;
 
 static inline void bootloader_check()
 {
@@ -102,13 +105,13 @@ static inline void init()
 
 #ifdef DEBUG
 	puts(ESC_CYAN "Initialising USB mass storage...");
-	usb_msc_t *msc = usb_msc_init(&usb);
+	usb_msc = usb_msc_init(&usb);
 #endif
 
 	puts(ESC_CYAN "Initialising USB HID interface...");
 	usb_hid_t *hid = usb_hid_init(&usb);
 	usb_hid_if_t *hid_keyboard = usb_hid_keyboard_init(hid);
-	hid_vendor = usb_hid_vendor_init(hid);
+	usb_hid_vendor = usb_hid_vendor_init(hid);
 
 	puts(ESC_CYAN "Initialising keyboard...");
 	keyboard_init(hid_keyboard);
@@ -233,8 +236,11 @@ int main()
 
 		// Process time consuming tasks
 		usb_process(&usb);
+#ifdef DEBUG
+		usb_msc_process(&usb, usb_msc);
+#endif
 		audio_process();
-		usb_hid_vendor_process(hid_vendor, &vendor_process);
+		usb_hid_vendor_process(usb_hid_vendor, &vendor_process);
 		fflush(stdout);
 #ifdef DEBUG
 		if ((s & mask) == mask) {
