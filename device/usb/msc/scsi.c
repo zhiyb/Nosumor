@@ -88,7 +88,7 @@ static scsi_ret_t sense(scsi_t *scsi, uint8_t status,
 
 static scsi_ret_t unimplemented(scsi_t *scsi)
 {
-	dbgprintf(ESC_YELLOW "[SCSI]Unimplemented.");
+	dbgprintf(ESC_YELLOW "[SCSI] Unimplemented");
 	// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
 	return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
 }
@@ -156,13 +156,13 @@ static scsi_ret_t inquiry(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 	if (cmd->info & CMD_INQUIRY_EVPD_Msk) {
 		// Vital product data information
 		if (cmd->info & CMD_INQUIRY_CMDDT_Msk) {
-			dbgprintf("[SCSI]INQUIRY, Vital, Invalid.");
+			dbgprintf("[SCSI] INQUIRY, Vital, Invalid");
 			dbgbkpt();
 			// 24/00  DZTPROMAEBKVF  INVALID FIELD IN CDB
 			return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
 		}
 		if (cmd->length < 4) {
-			dbgprintf("[SCSI]INQUIRY, Vital, Invalid length.");
+			dbgprintf("[SCSI] INQUIRY, Vital, Invalid length");
 			dbgbkpt();
 			// 24/00  DZTPROMAEBKVF  INVALID FIELD IN CDB
 			return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
@@ -171,13 +171,13 @@ static scsi_ret_t inquiry(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 	} else {
 		// Standard INQUIRY data
 		if (cmd->page != 0) {
-			dbgprintf("[SCSI]INQUIRY, Standard, Invalid.");
+			dbgprintf("[SCSI] INQUIRY, Standard, Invalid");
 			dbgbkpt();
 			// 24/00  DZTPROMAEBKVF  INVALID FIELD IN CDB
 			return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
 		}
 		if (cmd->length < 5) {
-			dbgprintf("[SCSI]INQUIRY, Standard, Invalid length.");
+			dbgprintf("[SCSI] INQUIRY, Standard, Invalid length");
 			dbgbkpt();
 			// 24/00  DZTPROMAEBKVF  INVALID FIELD IN CDB
 			return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
@@ -253,7 +253,7 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x21, 0x00);
 	}
 
-	dbgprintf(ESC_GREEN "[SCSI] Read %u blocks from %lu.\n", cmd->length, cmd->lbaddr);
+	dbgprintf(ESC_GREEN "[SCSI] Read %u blocks from %lu\n", cmd->length, cmd->lbaddr);
 
 	scsi_ret_t ret = {0, 0, Good};
 	if (cmd->length == 0)
@@ -298,7 +298,7 @@ static scsi_ret_t write_10(scsi_t *scsi, cmd_WRITE_10_t *cmd)
 		return (scsi_ret_t){0, 0, Failure};
 	}
 
-	dbgprintf(ESC_RED "[SCSI] Write %u blocks from %lu.\n", cmd->length, cmd->lbaddr);
+	dbgprintf(ESC_RED "[SCSI] Write %u blocks from %lu\n", cmd->length, cmd->lbaddr);
 
 	scsi->offset = cmd->lbaddr * RAM_DISK_BLOCK;
 	scsi->length = cmd->length * RAM_DISK_BLOCK;
@@ -316,7 +316,7 @@ scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
 	if (s == 0) {
 		return unimplemented(scsi);
 	} else if (size < cmd_size[cmd->op]) {
-		dbgprintf("[SCSI] Invalid cmd size.");
+		dbgprintf("[SCSI] Invalid cmd size");
 		dbgbkpt();
 		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
 		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
@@ -343,7 +343,7 @@ scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
 	}
 }
 
-scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint8_t size)
+scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 {
 	if (scsi->state != Write) {
 		dbgbkpt();
@@ -356,12 +356,12 @@ scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint8_t size)
 	}
 
 	// Transfer data
-	dbgprintf(ESC_RED "[SCSI] Writing %u bytes from %lu, remaining: %lu.\n", size, scsi->offset, scsi->length);
+	dbgprintf(ESC_RED "[SCSI] Writing %lu bytes from %lu, remaining: %lu\n", size, scsi->offset, scsi->length);
 	memcpy(ram_disk + scsi->offset, pdata, size);
 
 	// Update offset
-	scsi->offset += size;
 	scsi->length -= size;
+	scsi->offset += size;
 	if (scsi->length)
 		return Write;
 	scsi->state = Good;

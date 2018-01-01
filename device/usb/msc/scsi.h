@@ -19,7 +19,7 @@ typedef struct scsi_ret_t {
 
 scsi_t *scsi_init();
 scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size);
-scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint8_t size);
+scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size);
 
 #ifdef __cplusplus
 }

@@ -11,7 +11,7 @@
 #include "scsi.h"
 
 #define MSC_IN_MAX_SIZE		512u
-#define MSC_OUT_MAX_SIZE	64u
+#define MSC_OUT_MAX_SIZE	512u
 #define MSC_OUT_MAX_PKT		1u
 
 #define CBW_DIR_Msk	0x80
@@ -181,6 +181,7 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	cbw_t *cbw = &msc->buf.cbw;
 	csw_t *csw = &msc->inbuf.csw;
 
+	dbgprintf(ESC_GREY "<%lu>", msc->buf_size);
 	if (msc->scsi_state == Write) {
 		uint32_t size = msc->buf_size;
 		msc->scsi_state = scsi_data(msc->scsi, msc->buf.raw, size);
@@ -233,8 +234,8 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 
 	// Prepare CSW
 	csw->dCSWDataResidue = cbw->dCBWDataTransferLength - ret.length;
-s_csw:	csw->dCSWTag = cbw->dCBWTag;
-	csw->bCSWStatus = msc->scsi_state == Failure;
+	csw->dCSWTag = cbw->dCBWTag;
+s_csw:	csw->bCSWStatus = msc->scsi_state == Failure;
 	// Send CSW when transfer finished
 	if (msc->scsi_state == Good || msc->scsi_state == Failure)
 		usb_ep_in_transfer(usb->base, msc->ep_in, csw, 13);
