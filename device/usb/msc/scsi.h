@@ -12,6 +12,7 @@ typedef struct scsi_t scsi_t;
 typedef struct scsi_ret_t {
 	void *p;
 	uint32_t length;
+	uint8_t failure;
 } scsi_ret_t;
 
 scsi_t *scsi_init();

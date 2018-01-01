@@ -1,5 +1,7 @@
+#include <string.h>
 #include <macros.h>
 #include <debug.h>
+#include <vendor_defs.h>
 #include "scsi.h"
 #include "scsi_defs.h"
 
@@ -12,12 +14,24 @@ typedef struct scsi_t {
 
 scsi_t *scsi_init()
 {
-	return 0;
+	scsi_t *scsi = (scsi_t *)malloc(sizeof(scsi_t));
+	if (!scsi)
+		panic();
+	return scsi;
 }
 
 static scsi_ret_t sense(scsi_t *scsi, uint8_t status,
 			uint8_t sense, uint8_t asc, uint8_t ascq)
 {
+	uint8_t response = 0;
+	if (asc == 0x29)
+		response = 0x70;
+	// MODE PARAMETERS CHANGED
+	else if (asc == 0x2a && ascq == 0x01)
+		response = 0x70;
+
+	if (sense == CHECK_CONDITION)
+		;
 	panic();
 }
 
@@ -27,6 +41,38 @@ static scsi_ret_t unimplemented(scsi_t *scsi)
 	dbgbkpt();
 	// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
 	return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
+}
+
+static scsi_ret_t inquiry_standard(scsi_t *scsi, cmd_INQUIRY_t *cmd)
+{
+	data_INQUIRY_STANDARD_t *data = (data_INQUIRY_STANDARD_t *)scsi->buf;
+	// Qualifier(011b), Type(1fh): No peripheral device
+	data->peripheral = 0x7f;
+	// RMB(0b): Not removable
+	data->peripheral_flags = 0;
+	// Version(0h)
+	data->version = 0x00;
+	// NORMACA(0b), HISUP(0b), Format(2h)
+	data->response = 0x02;
+	// Remaining bytes
+	data->additional = 0x20;
+	// SCCS, ACC, TPGS[2], 3PC, Reserved[2], PROTECT
+	data->flags[0] = 0x00;
+	// BQUE (obs), ENCSERV, VS, MULTIP, MCHNGR, Obs, Obs, ADDR16(a)
+	data->flags[1] = 0x80;
+	// Obs, Obs, WBUS16(a), SYNC(a), LINKED (obs), Obs, CMDQUE, VS
+	data->flags[2] = 0x00;
+	memcpy(data->vendor, "ST MICRO", 8);
+	strcpy((void *)data->product, PRODUCT_NAME);
+	memcpy(data->revision, SW_VERSION_STR, 4);
+	scsi_ret_t ret = {.p = data, .length = 4 + data->additional};
+	return ret;
+}
+
+static scsi_ret_t inquiry_vital(scsi_t *scsi, cmd_INQUIRY_t *cmd)
+{
+	// 24h/00h  DZTPROMAEBKVF  INVALID FIELD IN CDB
+	return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
 }
 
 static scsi_ret_t inquiry(scsi_t *scsi, cmd_INQUIRY_t *cmd)
@@ -45,8 +91,7 @@ static scsi_ret_t inquiry(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 			// 24h/00h  DZTPROMAEBKVF  INVALID FIELD IN CDB
 			return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
 		}
-		dbgbkpt();
-		return unimplemented(scsi);
+		return inquiry_vital(scsi, cmd);
 	} else {
 		// Standard INQUIRY data
 		if (cmd->page != 0) {
@@ -61,8 +106,7 @@ static scsi_ret_t inquiry(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 			// 24h/00h  DZTPROMAEBKVF  INVALID FIELD IN CDB
 			return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
 		}
-		dbgbkpt();
-		return unimplemented(scsi);
+		return inquiry_standard(scsi, cmd);
 	}
 }
 

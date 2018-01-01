@@ -59,10 +59,11 @@ static void epin_init(usb_t *usb, uint32_t n)
 	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
 	dev->DAINTMSK |= DAINTMSK_IN(n);
 	// Configure endpoint
-	ep->DIEPCTL = EP_TYP_BULK | (n << USB_OTG_DIEPCTL_TXFNUM_Pos) |
+	ep->DIEPCTL = USB_OTG_DIEPCTL_USBAEP_Msk | EP_TYP_BULK |
+			(n << USB_OTG_DIEPCTL_TXFNUM_Pos) |
 			(MSC_IN_MAX_SIZE << USB_OTG_DIEPCTL_MPSIZ_Pos);
 	// Initialise buffers
-	usb_msc_t *data = (usb_msc_t *)usb->epout[n].data;
+	usb_msc_t *data = (usb_msc_t *)usb->epin[n].data;
 	csw_t *csw = &data->inbuf.csw;
 	csw->dCSWSignature = 0x53425355;
 }
@@ -70,7 +71,7 @@ static void epin_init(usb_t *usb, uint32_t n)
 static void epin_xfr_cplt(usb_t *usb, uint32_t n)
 {
 	usb_msc_t *data = (usb_msc_t *)usb->epin[n].data;
-	dbgbkpt();
+	//dbgbkpt();
 }
 
 static void epout_init(usb_t *usb, uint32_t n)
@@ -93,20 +94,42 @@ static void bulk_cbw(usb_t *usb, int n)
 	usb_msc_t *data = (usb_msc_t *)usb->epout[n].data;
 	cbw_t *cbw = &data->outbuf.cbw;
 	csw_t *csw = &data->inbuf.csw;
-	if (cbw->dCBWSignature != 0x43425355)
+	if (cbw->dCBWSignature != 0x43425355) {
 		dbgbkpt();
-	csw->dCSWTag = cbw->dCBWTag;
+		return;
+	}
 	int dir = cbw->bmCBWFlags & CBW_DIR_Msk;
-	if (cbw->bCBWLUN > data->lun_max)
+	if (cbw->bCBWLUN > data->lun_max) {
 		dbgbkpt();
-	if (cbw->bCBWCBLength < 1u || cbw->bCBWCBLength > 16u)
+		return;
+	}
+	if (cbw->bCBWCBLength < 1u || cbw->bCBWCBLength > 16u) {
 		dbgbkpt();
+		return;
+	}
+
+	// Process SCSI CBW
+	scsi_ret_t ret = scsi_cmd(data->scsi, cbw->CBWCB, cbw->bCBWCBLength);
+	if (!ret.p || !ret.length) {
+		dbgbkpt();
+		csw->bCSWStatus = 0x02;
+	} else {
+		if (ret.length > cbw->dCBWDataTransferLength)
+			ret.length = cbw->dCBWDataTransferLength;
+		usb_ep_in_transfer(usb->base, data->ep_in, ret.p, ret.length);
+		csw->bCSWStatus = ret.failure;
+	}
+
 	dbgprintf(ESC_YELLOW "<CBW|%u|", !!dir);
 	uint8_t *p = cbw->CBWCB;
 	for (int i = cbw->bCBWCBLength; i != 0; i--)
 		dbgprintf("%02x,", *p++);
 	dbgprintf(">");
-	scsi_cmd(data->scsi, cbw->CBWCB, cbw->bCBWCBLength);
+
+	// Send CSW
+	csw->dCSWTag = cbw->dCBWTag;
+	csw->dCSWDataResidue = cbw->dCBWDataTransferLength - ret.length;
+	usb_ep_in_transfer(usb->base, data->ep_in, csw, 13);
 }
 
 static void epout_xfr_cplt(usb_t *usb, uint32_t n)
