@@ -23,7 +23,7 @@ typedef struct PACKED {
 
 #define OTP	((otp_t *)FLASH_OTP_BASE)
 
-static vendor_report_t report;
+static vendor_report_t report SECTION(.dtcm);
 
 static void ping(usb_hid_if_t *hid)
 {
