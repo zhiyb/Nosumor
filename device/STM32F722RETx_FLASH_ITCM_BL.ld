@@ -33,7 +33,8 @@
 ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
-_estack = 0x20040000;    /* end of RAM */
+_estack = 0x20040000;       /* end of RAM */
+__heap_end__ = 0x20010000;  /* end of DTCM */
 /* Generate a link error if heap and stack don't fit into RAM */
 _Min_Heap_Size = 0x400;      /* required amount of heap  */
 _Min_Stack_Size = 0x1000; /* required amount of stack */
@@ -41,10 +42,11 @@ _Min_Stack_Size = 0x1000; /* required amount of stack */
 /* Specify the memory areas */
 MEMORY
 {
-	IRAM (xrw)	: ORIGIN = 0x00000000, LENGTH = 16k
-	RAM (xrw)	: ORIGIN = 0x20000000, LENGTH = 256k
-	FLASH (rx)	: ORIGIN = 0x00200000, LENGTH = 512k
-	BL_FLASH (rx)	: ORIGIN = 0x00260000, LENGTH = 128k
+    IRAM (xrw)      : ORIGIN = 0x00000000, LENGTH = 16k
+    DTCM (xrw)      : ORIGIN = 0x20000000, LENGTH = 64k
+    RAM (xrw)       : ORIGIN = 0x20010000, LENGTH = 192k
+    FLASH (rx)      : ORIGIN = 0x00200000, LENGTH = 512k
+    BL_FLASH (rx)   : ORIGIN = 0x00260000, LENGTH = 128k
 }
 
 /* Define output sections */
@@ -125,6 +127,17 @@ SECTIONS
     _eiram = .;
   } >IRAM AT >BL_FLASH
 
+  /* Special RAM sections */
+  .dtcm :
+  {
+    . = ALIGN(4);
+    *(.dtcm)
+    *(.dtcm*)
+
+    . = ALIGN(4);
+    __heap_start__ = .;
+  } >DTCM
+
   /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);
 
@@ -160,18 +173,25 @@ SECTIONS
     __bss_end__ = _ebss;
   } >RAM
 
-  /* User_heap_stack section, used to check that there is enough RAM left */
-  ._user_heap_stack :
+  /* User_stack section, used to check that there is enough RAM left */
+  ._user_stack :
+  {
+    . = ALIGN(8);
+    PROVIDE ( end = . );
+    PROVIDE ( _end = . );
+    . = . + _Min_Stack_Size;
+    . = ALIGN(8);
+  } >RAM
+
+  /* User_heap section, used to check that there is enough RAM left */
+  ._user_heap :
   {
     . = ALIGN(8);
     PROVIDE ( end = . );
     PROVIDE ( _end = . );
     . = . + _Min_Heap_Size;
-    . = . + _Min_Stack_Size;
     . = ALIGN(8);
-  } >RAM
-
-
+  } >DTCM
 
   /* Remove information from the standard libraries */
   /DISCARD/ :

@@ -45,16 +45,13 @@ extern int errno;
 extern int __io_putchar(int ch) __attribute__((weak));
 extern int __io_getchar(void) __attribute__((weak));
 
-#ifndef FreeRTOS
-  register char * stack_ptr asm("sp");
-#endif
-
-
 register char * stack_ptr asm("sp");
 
 char *__env[1] = { 0 };
 char **environ = __env;
 
+extern void *__heap_start__;
+extern void *__heap_end__;
 
 /* Functions */
 void initialise_monitor_handles()
@@ -103,18 +100,17 @@ int _write(int file, char *ptr, int len)
 
 caddr_t _sbrk(int incr)
 {
-	extern char end asm("end");
-	static char *heap_end;
-	char *prev_heap_end;
+	//extern char end asm("end");
+	static void *heap_end = &__heap_start__;
+	void *prev_heap_end;
 
-	if (heap_end == 0)
-		heap_end = &end;
+	//if (heap_end == 0)
+	//	heap_end = &end;
 
 	prev_heap_end = heap_end;
-	if (heap_end + incr > stack_ptr)
+	if (heap_end + incr > (void *)&__heap_end__ /*stack_ptr*/)
 	{
-//		write(1, "Heap and stack collision\n", 25);
-//		abort();
+		asm("bkpt 0");
 		errno = ENOMEM;
 		return (caddr_t) -1;
 	}
