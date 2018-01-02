@@ -9,7 +9,7 @@
 #include "vendor_defs.h"
 #include "flash.h"
 
-#define UID	((uint32_t *)0x1ff07a10)
+#define UID	((uint32_t *)UID_BASE)
 
 typedef struct PACKED {
 	union PACKED {
