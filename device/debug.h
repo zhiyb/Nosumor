@@ -5,11 +5,6 @@
 #include <stdio.h>
 
 #define dbgexist()	(CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk)
-#define panic()		do { \
-	printf("\nPanic at %s():%d\n", __PRETTY_FUNCTION__, __LINE__); \
-	fflush(stdout); \
-	__BKPT(0); \
-} while (1)
 
 #ifdef DEBUG
 
@@ -23,6 +18,11 @@
 	fflush(stdout); \
 	__BKPT(0); \
 } while (0)
+#define panic()		do { \
+	printf("\nPanicked at %s:%d: %s()\n", __FILE__, __LINE__, __PRETTY_FUNCTION__); \
+	fflush(stdout); \
+	__BKPT(0); \
+} while (1)
 
 static inline int dbgcmd(int cmd, void *data)
 {
@@ -54,6 +54,12 @@ static inline void dbgsystem(char *cmd)
 
 #define dbgprintf(...)	((void)0)
 #define dbgbkpt()	((void)0)
+#define panic()		do { \
+	printf("\nPanicked  at %d: %s()\n", __LINE__, __PRETTY_FUNCTION__); \
+	fflush(stdout); \
+	__BKPT(0); \
+} while (1)
+
 #define dbgputs(str)	((void)0)
 #define dbgputc(str)	((void)0)
 #define dbgsystem(str)	((void)0)
