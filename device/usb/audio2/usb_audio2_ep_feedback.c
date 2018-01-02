@@ -25,7 +25,7 @@ typedef struct {
 	int ep;
 } epdata_t;
 
-static epdata_t epdata = {0};
+static epdata_t epdata SECTION(.dtcm);
 
 static void epin_init(usb_t *usb, uint32_t n)
 {
@@ -105,6 +105,7 @@ static void feedback_update(uint32_t tick)
 
 int usb_audio2_ep_feedback_register(usb_t *usb)
 {
+	memset(&epdata, 0, sizeof(epdata));
 	epdata.usb = usb;
 	const epin_t epin = {
 		.data = &epdata,

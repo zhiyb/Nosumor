@@ -143,10 +143,6 @@ uint32_t mmc_capacity()
 
 static uint32_t mmc_read_block(void *p, uint32_t block)
 {
-	SDMMC_TypeDef *sdmmc = MMC;
-	DMA_Stream_TypeDef *stream = STREAM;
-	DMA_TypeDef *dma = DMA2;
-
 	MMC->ICR = SDMMC_STA_CMDREND_Msk |
 			SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_RXOVERRC_Msk;
 
@@ -376,7 +372,7 @@ DRESULT mmc_disk_read(BYTE *buff, DWORD sector, UINT count)
 
 /* SCSI interface functions */
 
-uint8_t scsi_buf[64 * 1024];
+uint8_t scsi_buf[64 * 1024] ALIGN(32);
 
 uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize)
 {
@@ -391,11 +387,15 @@ void *scsi_read(scsi_t *scsi, uint32_t offset, uint32_t *length)
 	if (*length > sizeof(scsi_buf))
 		panic();
 
+	// Invalidate data cache for DMA operation
+	SCB_InvalidateDCache_by_Addr((void *)scsi_buf, *length);
+
 	offset /= 512ul;
 	void *p = scsi_buf;
 	// TODO: Multi-sector read
 	for (uint32_t i = *length / 512ul; i; i--, p += 512ul)
 		mmc_read_block(p, offset++);
+
 	return scsi_buf;
 }
 
@@ -409,6 +409,9 @@ uint32_t scsi_write(scsi_t *scsi, uint32_t offset, uint32_t length, const void *
 		dbgbkpt();
 		return 0;
 	}
+
+	// Flush data cache for DMA operation
+	SCB_CleanDCache_by_Addr((void *)scsi_buf, length);
 
 	offset /= 512ul;
 	// TODO: Multi-sector write

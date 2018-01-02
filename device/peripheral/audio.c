@@ -25,7 +25,7 @@ static struct {
 	// Data counter
 	uint32_t cnt_transfer, cnt_data;
 	int32_t offset;
-} data;
+} data SECTION(.dtcm);
 
 void audio_init_config();
 void audio_usb_config(usb_t *usb, usb_audio_t *audio);

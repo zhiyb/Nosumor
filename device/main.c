@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <ctype.h>
 #include <inttypes.h>
 #include <stm32f722xx.h>
@@ -77,6 +78,8 @@ static inline void init()
 #ifndef BOOTLOADER
 	bootloader_check();
 #endif
+	SCB_EnableICache();
+	SCB_EnableDCache();
 	rcc_init();
 	NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUPING);
 	__enable_irq();
@@ -143,10 +146,11 @@ static inline void init()
 
 static inline void fatfs_test()
 {
+	static FATFS fs SECTION(.dtcm);
+	memset(&fs, 0, sizeof(fs));
 	puts(ESC_CYAN "Testing FatFS...");
 
 	// Mount volume
-	FATFS fs;
 	FRESULT res;
 	if ((res = f_mount(&fs, "SD:", 1)) != FR_OK) {
 		printf(ESC_RED "f_mount: %d\n", res);
@@ -241,8 +245,8 @@ int main()
 		// Process time consuming tasks
 		usb_process(&usb);
 		usb_msc_process(&usb, usb_msc);
-		audio_process();
 		usb_hid_vendor_process(usb_hid_vendor, &vendor_process);
+		audio_process();
 		fflush(stdout);
 #ifdef DEBUG
 		if ((s & mask) == mask) {
