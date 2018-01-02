@@ -114,7 +114,7 @@ void audio_init(usb_t *usb, usb_audio_t *audio)
 	STREAM_TX->CR = 0ul;
 	// Memory to peripheral, circular, 32bit -> 16bit, very high priority
 	STREAM_TX->CR = (3ul << DMA_SxCR_CHSEL_Pos) | (0b11ul << DMA_SxCR_PL_Pos) |
-			(0b11ul << DMA_SxCR_MSIZE_Pos) | (0b01ul << DMA_SxCR_PSIZE_Pos) |
+			(0b10ul << DMA_SxCR_MSIZE_Pos) | (0b01ul << DMA_SxCR_PSIZE_Pos) |
 			(0b01ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk | DMA_SxCR_CIRC_Msk;
 	// Peripheral address
 	STREAM_TX->PAR = (uint32_t)&SPI1->DR;
