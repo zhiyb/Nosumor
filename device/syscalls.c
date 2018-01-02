@@ -50,8 +50,10 @@ register char * stack_ptr asm("sp");
 char *__env[1] = { 0 };
 char **environ = __env;
 
-extern void *__heap_start__;
-extern void *__heap_end__;
+extern char __heap_start__;
+extern char __heap_end__;
+
+static char *heap_end = &__heap_start__;
 
 /* Functions */
 void initialise_monitor_handles()
@@ -101,14 +103,13 @@ int _write(int file, char *ptr, int len)
 caddr_t _sbrk(int incr)
 {
 	//extern char end asm("end");
-	static void *heap_end = &__heap_start__;
-	void *prev_heap_end;
+	char *prev_heap_end;
 
-	//if (heap_end == 0)
-	//	heap_end = &end;
+	if (heap_end == 0)
+		heap_end = &__heap_start__;
 
 	prev_heap_end = heap_end;
-	if (heap_end + incr > (void *)&__heap_end__ /*stack_ptr*/)
+	if (heap_end + incr > &__heap_end__ /*stack_ptr*/)
 	{
 		asm("bkpt 0");
 		errno = ENOMEM;
@@ -118,6 +119,16 @@ caddr_t _sbrk(int incr)
 	heap_end += incr;
 
 	return (caddr_t) prev_heap_end;
+}
+
+size_t heap_usage()
+{
+	return heap_end - &__heap_start__;
+}
+
+size_t heap_size()
+{
+	return &__heap_end__ - &__heap_start__;
 }
 
 int _close(int file)

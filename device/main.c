@@ -34,6 +34,11 @@
 #define BOOTLOADER_BASE	0x00260000
 #define BOOTLOADER_FUNC	((void (*)())*(uint32_t *)(BOOTLOADER_BASE + 4u))
 
+#ifdef DEBUG
+extern size_t heap_usage();
+extern size_t heap_size();
+#endif
+
 usb_t usb;	// Shared with PVD
 static usb_msc_t *usb_msc = 0;
 static usb_hid_if_t *usb_hid_vendor = 0;
@@ -203,12 +208,15 @@ int main()
 #ifdef DEBUG
 	uint32_t mask = keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4];
 #endif
+#ifdef DEBUG
 	struct {
 		uint32_t tick, audio, data, feedback;
 	} cnt, prev = {
 		systick_cnt(), audio_transfer_cnt(),
 		audio_data_cnt(), usb_audio2_feedback_cnt(),
 	};
+	size_t heap = 0;
+#endif
 	for (;;) {
 		uint32_t s = keyboard_status();
 		int up = s & (keyboard_masks[0] | keyboard_masks[1]);
@@ -248,7 +256,17 @@ int main()
 		usb_hid_vendor_process(usb_hid_vendor, &vendor_process);
 		audio_process();
 		fflush(stdout);
+
 #ifdef DEBUG
+		if (heap != heap_usage()) {
+			dbgprintf(ESC_YELLOW "[HEAP]: "
+				  ESC_WHITE "%.2f%%" ESC_YELLOW ", "
+				  ESC_WHITE "%u/%u" ESC_YELLOW " bytes\n",
+				  (float)heap_usage() * 100.f / (float)heap_size(),
+				  heap_usage(), heap_size());
+			heap = heap_usage();
+		}
+
 		if ((s & mask) == mask) {
 			usb_connect(&usb, 0);
 			while (keyboard_status());
