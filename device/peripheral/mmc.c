@@ -8,6 +8,7 @@
 #include "../debug.h"
 
 #define MMC	SDMMC1
+#define STREAM	DMA2_Stream3
 
 typedef union {
 	struct PACKED {
@@ -31,7 +32,7 @@ static uint32_t mmc_command(uint32_t cmd, uint32_t arg, uint32_t *stat);
 // RCA: [31:16] RCA, [15:0] stuff bits
 static uint32_t mmc_app_command(uint32_t cmd, uint32_t rca, uint32_t arg, uint32_t *stat);
 
-static inline void mmc_gpio_init()
+static inline void mmc_base_init()
 {
 	// Enable IO compensation cell
 	if (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY)) {
@@ -82,6 +83,20 @@ static inline void mmc_gpio_init()
 	GPIO_AFRL(GPIOD, 2, 12);	// AF12: SDMMC1
 	// Wait for IO compensation cell
 	while (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY));
+
+	// DMA initialisation
+	RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN_Msk;
+	// Disable stream
+	STREAM->CR = 0ul;
+	// Peripheral to memory, 32bit -> 32bit, burst of 4 beats, low priority
+	STREAM->CR = (4ul << DMA_SxCR_CHSEL_Pos) | (0b00ul << DMA_SxCR_PL_Pos) |
+			(0b01ul << DMA_SxCR_MBURST_Pos) | (0b01ul << DMA_SxCR_PBURST_Pos) |
+			(0b10ul << DMA_SxCR_MSIZE_Pos) | (0b10ul << DMA_SxCR_PSIZE_Pos) |
+			(0b00ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk | DMA_SxCR_PFCTRL_Msk;
+	// Peripheral address
+	STREAM->PAR = (uint32_t)&MMC->FIFO;
+	// FIFO control
+	STREAM->FCR = DMA_SxFCR_DMDIS_Msk | (0b11 << DMA_SxFCR_FTH_Pos);
 }
 
 static uint32_t mmc_command(uint32_t cmd, uint32_t arg, uint32_t *stat)
@@ -128,23 +143,41 @@ uint32_t mmc_capacity()
 
 static uint32_t mmc_read_block(void *p, uint32_t block)
 {
-	uint32_t stat, resp;
-	while (MMC->STA & (SDMMC_STA_CMDACT_Msk | SDMMC_STA_TXACT_Msk | SDMMC_STA_RXACT_Msk));
-	resp = mmc_command(READ_SINGLE_BLOCK, ccs ? block : block * 512u, &stat);
-	if (!(stat & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
-		dbgbkpt();
-		return 0u;
-	}
+	SDMMC_TypeDef *sdmmc = MMC;
+	DMA_Stream_TypeDef *stream = STREAM;
+	DMA_TypeDef *dma = DMA2;
+
+	MMC->ICR = SDMMC_STA_CMDREND_Msk |
+			SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_RXOVERRC_Msk;
+
+	// Clear DMA interrupts
+	DMA2->LIFCR = DMA_LIFCR_CTCIF3_Msk | DMA_LIFCR_CHTIF3_Msk |
+			DMA_LIFCR_CTEIF3_Msk | DMA_LIFCR_CDMEIF3_Msk;
+	// Memory address
+	STREAM->M0AR = (uint32_t)p;
+	// Enable DMA stream
+	STREAM->CR |= DMA_SxCR_EN_Msk;
+
+	// SDMMC data length
 	MMC->DLEN = 512ul;
-	MMC->DCTRL = SDMMC_DCTRL_SDIOEN_Msk | SDMMC_DCTRL_RWSTART_Msk |
-			SDMMC_DCTRL_DTDIR_Msk | SDMMC_DCTRL_DTEN_Msk |
+
+	// Enable SDMMC data transfer
+	MMC->DCTRL = SDMMC_DCTRL_DTDIR_Msk | SDMMC_DCTRL_DTEN_Msk |
+			SDMMC_DCTRL_DMAEN_Msk |
 			(9ul << SDMMC_DCTRL_DBLOCKSIZE_Pos);
-	uint32_t count = 512u / 4u;
-	while (count--) {
-		while (!(MMC->STA & SDMMC_STA_RXDAVL_Msk));
-		*(uint32_t *)p = MMC->FIFO;
-		p += 4u;
-	}
+
+	// Send READ command
+	MMC->ARG = ccs ? block : block * 512u;
+	MMC->CMD = READ_SINGLE_BLOCK | SDMMC_CMD_CPSMEN_Msk;
+	while (!(MMC->STA & SDMMC_STA_CMDREND_Msk));
+
+	// Wait for data block received
+	while (!(MMC->STA & SDMMC_STA_DBCKEND_Msk));
+	// Wait for receive FIFO empty
+	while (MMC->FIFOCNT);
+	// Check for receive FIFO overrun
+	if (MMC->STA & SDMMC_STA_RXOVERR_Msk)
+		dbgbkpt();
 	return 1u;
 }
 
@@ -178,7 +211,7 @@ DSTATUS mmc_disk_init()
 		return stat;
 
 	if (stat & STA_NOINIT) {
-		mmc_gpio_init();
+		mmc_base_init();
 		// Initialise SDMMC module
 		RCC->APB2ENR |= RCC_APB2ENR_SDMMC1EN_Msk;
 	}
