@@ -40,12 +40,12 @@ typedef struct usb_msc_t {
 	int ep_in, ep_out;
 	scsi_t *scsi;
 	scsi_state_t scsi_state;
-	uint32_t buf_size;
-	uint8_t lun_max;
+	uint32_t buf_size[2];
+	uint8_t lun_max, outbuf;
 	union {
 		cbw_t cbw;
 		uint8_t raw[MSC_OUT_MAX_SIZE];
-	} buf ALIGN(16);
+	} buf[2] ALIGN(16);
 	union {
 		csw_t csw;
 		uint8_t raw[MSC_IN_MAX_SIZE];
@@ -60,7 +60,7 @@ static void epin_init(usb_t *usb, uint32_t n)
 	usb->base->DIEPTXF[n - 1] = DIEPTXF(addr, size);
 	// Unmask interrupts
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
-	ep->DIEPINT = USB_OTG_DIEPINT_XFRC_Msk;
+	ep->DIEPINT = 0;
 	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
 	dev->DAINTMSK |= DAINTMSK_IN(n);
 	// Configure endpoint
@@ -73,10 +73,12 @@ static void epin_init(usb_t *usb, uint32_t n)
 	csw->dCSWSignature = 0x53425355;
 }
 
-static void epin_xfr_cplt(usb_t *usb, uint32_t n)
+static void epout_swap(usb_t *usb, uint32_t n)
 {
-	usb_msc_t *data = (usb_msc_t *)usb->epin[n].data;
-	//dbgbkpt();
+	// Receive packets
+	usb_msc_t *data = (usb_msc_t *)usb->epout[n].data;
+	usb_ep_out_transfer(usb->base, n, &data->buf[data->outbuf], 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
+	data->outbuf = !data->outbuf;
 }
 
 static void epout_init(usb_t *usb, uint32_t n)
@@ -90,8 +92,7 @@ static void epout_init(usb_t *usb, uint32_t n)
 	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
 	dev->DAINTMSK |= DAINTMSK_OUT(n);
 	// Receive packets
-	usb_msc_t *data = (usb_msc_t *)usb->epout[n].data;
-	usb_ep_out_transfer(usb->base, n, &data->buf, 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
+	epout_swap(usb, n);
 }
 
 static void epout_xfr_cplt(usb_t *usb, uint32_t n)
@@ -102,11 +103,15 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 	uint32_t siz = ep->DOEPTSIZ;
 	uint32_t pkt_cnt = MSC_OUT_MAX_PKT - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
 	uint32_t size = MSC_OUT_MAX_SIZE - FIELD(siz, USB_OTG_DOEPTSIZ_XFRSIZ);
-	// Copy packets
+	// Enqueue packets
 	if (pkt_cnt != 1u)
 		dbgbkpt();
-	// Enqueue packets
-	data->buf_size = size;
+	data->buf_size[!data->outbuf] = size;
+	// Check alternative buffer availability
+	if (data->buf_size[data->outbuf])
+		return;
+	// Receive packets
+	epout_swap(usb, n);
 }
 
 static void usbif_config(usb_t *usb, void *pdata)
@@ -117,7 +122,7 @@ static void usbif_config(usb_t *usb, void *pdata)
 		.data = data,
 		.init = &epin_init,
 		//.halt = &epin_halt,
-		.xfr_cplt = &epin_xfr_cplt,
+		//.xfr_cplt = &epin_xfr_cplt,
 	};
 	const epout_t epout = {
 		.data = data,
@@ -176,21 +181,22 @@ usb_msc_t *usb_msc_init(usb_t *usb)
 
 void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 {
-	if (!msc || !msc->buf_size)
+	if (!msc || !msc->buf_size[msc->outbuf])
 		return;
 
-	cbw_t *cbw = &msc->buf.cbw;
+	cbw_t *cbw = &msc->buf[msc->outbuf].cbw;
 	csw_t *csw = &msc->inbuf.csw;
 
 	if (msc->scsi_state == Write) {
-		uint32_t size = msc->buf_size;
-		msc->scsi_state = scsi_data(msc->scsi, msc->buf.raw, size);
-		// Receive new packets
-		msc->buf_size = 0;
-		usb_ep_out_transfer(usb->base, msc->ep_out, &msc->buf, 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
+		uint32_t size = msc->buf_size[msc->outbuf];
+		msc->scsi_state = scsi_data(msc->scsi, msc->buf[msc->outbuf].raw, size);
+		msc->buf_size[msc->outbuf] = 0;
+		// Check alternative buffer status
+		if (msc->buf_size[!msc->outbuf])
+			epout_swap(usb, msc->ep_out);
 		// Update Command Status Wrapper (CSW)
 		csw->dCSWDataResidue -= size;
-		// Send Command Status Wrapper (CSW) when transfer finished
+		// Send Command Status Wrapper (CSW) after transfer finished
 		if (msc->scsi_state != Write)
 			goto s_csw;
 		return;
@@ -215,10 +221,11 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 
 	// Process SCSI CBW
 	scsi_ret_t ret = scsi_cmd(msc->scsi, cbw->CBWCB, cbw->bCBWCBLength);
-	// Receive new packets
-	msc->buf_size = 0;
-	usb_ep_out_transfer(usb->base, msc->ep_out, &msc->buf, 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
-	// Data process
+	msc->buf_size[msc->outbuf] = 0;
+	// Check alternative buffer status
+	if (msc->buf_size[!msc->outbuf])
+		epout_swap(usb, msc->ep_out);
+	// Data transfer
 	if (dir == CBW_DIR_IN) {
 		if (ret.length > cbw->dCBWDataTransferLength)
 			ret.length = cbw->dCBWDataTransferLength;
@@ -230,7 +237,7 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	csw->dCSWDataResidue = cbw->dCBWDataTransferLength - ret.length;
 	csw->dCSWTag = cbw->dCBWTag;
 s_csw:	csw->bCSWStatus = msc->scsi_state == Failure;
-	// Send CSW when transfer finished
+	// Send CSW after transfer finished
 	if (msc->scsi_state == Good || msc->scsi_state == Failure)
 		usb_ep_in_transfer(usb->base, msc->ep_in, csw, 13);
 }
