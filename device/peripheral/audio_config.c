@@ -48,7 +48,12 @@ void audio_init_config()
 {
 	static const uint8_t cmd[] = {
 		0x00, 0x00,		// Page 0
+#if HWVER == 0x0002
+		0x33, 0x04,		// GPIO1 in input mode
+		0x04, 0x0b,		// GPIO1 => PLL => CODEC
+#else
 		0x04, 0x03,		// MCLK => PLL => CODEC
+#endif
 		0x05, 0x91,		// PLL enabled, P = 1, R = 1
 		0x06, 0x05,		// PLL J = 5
 		0x07, 1200u >> 8u,	// PLL D = .1200

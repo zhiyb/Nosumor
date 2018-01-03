@@ -14,6 +14,8 @@ Project {
         property bool itcm: false
         property bool bootloader: false
 
+        cpp.defines: ["HWVER=0x0002"]
+
         cpp.commonCompilerFlags: [
             "-Wno-unused-parameter",
             "-Wno-unused-function",

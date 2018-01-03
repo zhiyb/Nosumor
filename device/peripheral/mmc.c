@@ -42,9 +42,15 @@ static inline void mmc_base_init()
 	// Initialise GPIOs
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN_Msk |
 			RCC_AHB1ENR_GPIOCEN_Msk | RCC_AHB1ENR_GPIODEN_Msk;
+#if HWVER == 0x0002
+	// PA12, CD, input
+	GPIO_MODER(GPIOA, 12, 0b00);
+	GPIO_PUPDR(GPIOA, 12, GPIO_PUPDR_UP);
+#else
 	// PA15, CD, input
 	GPIO_MODER(GPIOA, 15, 0b00);
 	GPIO_PUPDR(GPIOA, 15, GPIO_PUPDR_UP);
+#endif
 	// PC8, D0, alternative function
 	GPIO_MODER(GPIOC, 8, 0b10);
 	GPIO_PUPDR(GPIOC, 8, GPIO_PUPDR_UP);
@@ -213,8 +219,13 @@ DSTATUS mmc_disk_init()
 	}
 
 	// Switch opens when card inserted
+#if HWVER == 0x0002
+	if (GPIOA->IDR & (1ul << 12))
+		stat = STA_ERROR;
+#else
 	if (GPIOA->IDR & (1ul << 15))
 		stat = STA_ERROR;
+#endif
 	else {
 		// Stop card clock
 		MMC->POWER = 0b00ul << SDMMC_POWER_PWRCTRL_Pos;
