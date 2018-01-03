@@ -30,14 +30,14 @@ uint32_t clkSDMMC1()
 {
 	if (RCC->DCKCFGR2 & RCC_DCKCFGR2_SDMMC1SEL_Msk)
 		return clkAHB();
-	return 72ul * 1000 * 1000;
+	return 54ul * 1000 * 1000;
 }
 
 uint32_t clkSDMMC2()
 {
-	if (RCC->DCKCFGR2 & RCC_DCKCFGR2_SDMMC1SEL_Msk)
+	if (RCC->DCKCFGR2 & RCC_DCKCFGR2_SDMMC2SEL_Msk)
 		return clkAHB();
-	return 72ul * 1000 * 1000;
+	return 54ul * 1000 * 1000;
 }
 
 static inline void mco1_init()
@@ -66,9 +66,9 @@ void rcc_init()
 	// Disable PLL
 	RCC->CR &= ~RCC_CR_PLLON;
 	while (RCC->CR & RCC_CR_PLLRDY);
-	// Configure PLL (HSE, PLLM = 12, PLLN = 270, PLLP = 2, PLLQ = 6)
+	// Configure PLL (HSE, PLLM = 12, PLLN = 270, PLLP = 2, PLLQ = 8)
 	RCC->PLLCFGR = (12u << RCC_PLLCFGR_PLLM_Pos) | (270u << RCC_PLLCFGR_PLLN_Pos) |
-			(0u << RCC_PLLCFGR_PLLP_Pos) | (6u << RCC_PLLCFGR_PLLQ_Pos) |
+			(0u << RCC_PLLCFGR_PLLP_Pos) | (8u << RCC_PLLCFGR_PLLQ_Pos) |
 			RCC_PLLCFGR_PLLSRC_HSE;
 	// Enable power controller
 	RCC->APB1ENR |= RCC_APB1ENR_PWREN;
