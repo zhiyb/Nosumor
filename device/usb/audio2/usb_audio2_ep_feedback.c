@@ -99,8 +99,8 @@ static void feedback_update(uint32_t tick)
 	if (diff) {
 		data->cnt = EP_UPDATES;
 		epin_update(data->usb, data->ep);
+		dbgprintf(ESC_BLUE "[UAC2] Feedback: %ld\n", data->acc);
 	}
-	dbgprintf("|%ld", data->acc);
 }
 
 int usb_audio2_ep_feedback_register(usb_t *usb)

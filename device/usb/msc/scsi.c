@@ -363,7 +363,6 @@ scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 	scsi_capacity(scsi, &lbnum, &lbsize);
 
 	// Transfer data
-	dbgprintf(ESC_RED "[SCSI] Writing %lu bytes from %lu, remaining: %lu\n", size, scsi->offset, scsi->length);
 	size = scsi_write(scsi, scsi->offset, size, pdata);
 
 	// Update offset

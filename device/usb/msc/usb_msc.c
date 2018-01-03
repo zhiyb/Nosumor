@@ -11,8 +11,8 @@
 #include "usb_msc_defs.h"
 #include "scsi.h"
 
-#define MSC_IN_MAX_SIZE		512u
-#define MSC_OUT_MAX_SIZE	512u
+#define MSC_IN_MAX_SIZE		1024u
+#define MSC_OUT_MAX_SIZE	1024u
 #define MSC_OUT_MAX_PKT		1u
 
 #define CBW_DIR_Msk	0x80
@@ -182,7 +182,6 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	cbw_t *cbw = &msc->buf.cbw;
 	csw_t *csw = &msc->inbuf.csw;
 
-	dbgprintf(ESC_GREY "<%lu>", msc->buf_size);
 	if (msc->scsi_state == Write) {
 		uint32_t size = msc->buf_size;
 		msc->scsi_state = scsi_data(msc->scsi, msc->buf.raw, size);
@@ -213,12 +212,6 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 		dbgbkpt();
 		return;
 	}
-
-	dbgprintf(ESC_CYAN "<CBW|%u|%lu|", !!dir, cbw->dCBWDataTransferLength);
-	uint8_t *p = cbw->CBWCB;
-	for (int i = cbw->bCBWCBLength; i != 0; i--)
-		dbgprintf("%02x,", *p++);
-	dbgprintf(">");
 
 	// Process SCSI CBW
 	scsi_ret_t ret = scsi_cmd(msc->scsi, cbw->CBWCB, cbw->bCBWCBLength);

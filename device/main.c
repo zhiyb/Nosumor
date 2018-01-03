@@ -110,14 +110,6 @@ static inline void init()
 	audio_init(&usb, audio);
 #endif
 
-	puts(ESC_CYAN "Initialising SD/MMC card...");
-	mmc_disk_init();
-	printf(ESC_YELLOW "Card capacity: " ESC_WHITE "%llu"
-	       ESC_YELLOW " bytes\n", (uint64_t)mmc_capacity() * 512ull);
-	puts(ESC_CYAN "Initialising USB mass storage...");
-	if (mmc_capacity() != 0)
-		usb_msc = usb_msc_init(&usb);
-
 	puts(ESC_CYAN "Initialising USB HID interface...");
 	usb_hid_t *hid = usb_hid_init(&usb);
 	usb_hid_if_t *hid_keyboard = usb_hid_keyboard_init(hid);
@@ -125,6 +117,14 @@ static inline void init()
 
 	puts(ESC_CYAN "Initialising keyboard...");
 	keyboard_init(hid_keyboard);
+
+	puts(ESC_CYAN "Initialising SD/MMC card...");
+	mmc_disk_init();
+	printf(ESC_YELLOW "Card capacity: " ESC_WHITE "%llu"
+	       ESC_YELLOW " bytes\n", (uint64_t)mmc_capacity() * 512ull);
+	puts(ESC_CYAN "Initialising USB mass storage...");
+	if (mmc_capacity() != 0)
+		usb_msc = usb_msc_init(&usb);
 
 	puts(ESC_CYAN "Initialising LEDs...");
 	// RGB:	PA0(R), PA1(G), PA2(B)			| TIM5_CH123
@@ -207,8 +207,6 @@ int main()
 
 #ifdef DEBUG
 	uint32_t mask = keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4];
-#endif
-#ifdef DEBUG
 	struct {
 		uint32_t tick, audio, data, feedback;
 	} cnt, prev = {

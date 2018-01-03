@@ -6,8 +6,10 @@
 uint32_t usb_ram_alloc(usb_t *usb, uint32_t *size)
 {
 	*size = (*size + 3ul) & ~3ul;	// Align to 32-bit words
-	if (usb->top + *size >= usb_ram_size(usb))
+	if (usb->top + *size >= usb_ram_size(usb)) {
+		dbgbkpt();
 		*size = usb->max - usb->top - 1;
+	}
 	uint32_t addr = usb->top;
 	usb->top += *size;
 	return addr;
