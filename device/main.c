@@ -209,9 +209,10 @@ int main()
 	uint32_t mask = keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4];
 	struct {
 		uint32_t tick, audio, data, feedback;
+		uint32_t blocks;
 	} cnt, prev = {
 		systick_cnt(), audio_transfer_cnt(),
-		audio_data_cnt(), usb_audio2_feedback_cnt(),
+		audio_data_cnt(), usb_audio2_feedback_cnt(), mmc_statistics(),
 	};
 	size_t heap = 0;
 #endif
@@ -271,7 +272,6 @@ int main()
 			usb_connect(&usb, 1);
 		}
 
-#if 0
 		// Every 1024 systick ticks
 		cnt.tick = systick_cnt();
 		if ((cnt.tick - prev.tick) & ~(1023ul)) {
@@ -302,8 +302,15 @@ int main()
 			       diff / div, diff & (div - 1u));
 			// Audio data offset
 			printf(ESC_YELLOW " => " ESC_WHITE "%ld\n", audio_buffering());
+
+			// SDMMC statistics
+			cnt.blocks = mmc_statistics();
+			diff = cnt.blocks - prev.blocks;
+			if (diff)
+				printf(ESC_YELLOW "SDMMC: " ESC_WHITE "%lu"
+				       ESC_YELLOW " blocks\n", diff);
+			prev.blocks = cnt.blocks;
 		}
-#endif
 #endif
 	}
 	return 0;

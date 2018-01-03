@@ -24,7 +24,7 @@ typedef union {
 } cid_t;
 
 static DSTATUS stat = STA_NOINIT;
-static uint32_t ccs = 0, capacity = 0;
+static uint32_t ccs = 0, capacity = 0, blocks = 0;
 
 // Send command to card, with optional status output
 // Returns short response
@@ -147,6 +147,11 @@ uint32_t mmc_capacity()
 	return capacity;
 }
 
+uint32_t mmc_statistics()
+{
+	return blocks;
+}
+
 static uint32_t mmc_read_block(void *p, uint32_t block)
 {
 	MMC->ICR = SDMMC_ICR_CMDRENDC_Msk | SDMMC_ICR_CTIMEOUTC_Msk |
@@ -182,10 +187,8 @@ static uint32_t mmc_read_block(void *p, uint32_t block)
 	while (!(MMC->STA & SDMMC_STA_DBCKEND_Msk));
 	// Wait for receive FIFO empty
 	while (MMC->FIFOCNT);
-	// Check for receive FIFO overrun
-	if (MMC->STA & SDMMC_STA_RXOVERR_Msk)
-		dbgbkpt();
-	while (MMC->STA & (SDMMC_STA_RXACT_Msk));
+	while (MMC->STA & SDMMC_STA_RXACT_Msk);
+	blocks++;
 	return 1u;
 }
 
@@ -221,7 +224,8 @@ static uint32_t mmc_write_block(const void *p, uint32_t block)
 
 	// Wait for data block transmission
 	while (!(MMC->STA & SDMMC_STA_DBCKEND_Msk));
-	while (MMC->STA & (SDMMC_STA_TXACT_Msk));
+	while (MMC->STA & SDMMC_STA_TXACT_Msk);
+	blocks++;
 	return 1u;
 }
 

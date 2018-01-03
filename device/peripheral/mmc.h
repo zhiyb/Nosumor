@@ -8,6 +8,8 @@
 
 // Unit: 512 bytes
 uint32_t mmc_capacity();
+// Blocks transferred
+uint32_t mmc_statistics();
 
 // FatFs interface functions
 DSTATUS mmc_disk_init();
