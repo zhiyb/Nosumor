@@ -12,8 +12,6 @@
 typedef struct scsi_t {
 	// SCSI state (next packet)
 	scsi_state_t state;
-	// Next transfer address
-	uint32_t offset;
 	// Remaining transfer length (read/write)
 	uint32_t length;
 	// Data output buffer
@@ -303,9 +301,10 @@ static scsi_ret_t write_10(scsi_t *scsi, cmd_WRITE_10_t *cmd)
 
 	dbgprintf(ESC_RED "[SCSI] Write %u blocks from %lu\n", cmd->length, cmd->lbaddr);
 
-	scsi->offset = cmd->lbaddr * lbsize;
 	scsi->length = cmd->length * lbsize;
 	scsi->state = Write;
+	// TODO: Error checking
+	scsi_write_start(scsi, cmd->lbaddr * lbsize, scsi->length);
 	return (scsi_ret_t){0, 0, Write};
 }
 
@@ -363,13 +362,14 @@ scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 	scsi_capacity(scsi, &lbnum, &lbsize);
 
 	// Transfer data
-	size = scsi_write(scsi, scsi->offset, size, pdata);
+	size = scsi_write_data(scsi, size, pdata);
 
 	// Update offset
 	scsi->length -= size;
-	scsi->offset += size;
 	if (scsi->length)
 		return Write;
+	// TODO: Error checking
+	scsi_write_stop(scsi);
 	scsi->state = Good;
 	return Good;
 }

@@ -25,6 +25,7 @@ typedef union {
 
 static DSTATUS stat = STA_NOINIT;
 static uint32_t ccs = 0, capacity = 0, blocks = 0, rca = 0;
+enum {MMCIdle = 0, MMCRead, MMCWrite, MMCMulti = 0x80} status;
 
 // Send command to card, with optional status output
 // Returns short response
@@ -157,6 +158,16 @@ static uint32_t mmc_read_block(void *p, uint32_t start, uint32_t count)
 	if (count == 0)
 		return 0u;
 
+	// Polling for card busy
+	uint32_t resp, stat;
+	do {
+		resp = mmc_command(SEND_STATUS, rca, &stat);
+		if (!(stat & SDMMC_STA_CMDREND_Msk)) {
+			dbgbkpt();
+			return 0;
+		}
+	} while (resp >> 9u != 4u);
+
 	// Clear SDMMC flags
 	MMC->ICR = SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_DATAENDC_Msk |
 			SDMMC_ICR_RXOVERRC_Msk;
@@ -186,7 +197,6 @@ static uint32_t mmc_read_block(void *p, uint32_t start, uint32_t count)
 		start *= 512u;
 
 	// Send command
-	uint32_t stat, resp;
 	resp = mmc_command(count == 1 ? READ_SINGLE_BLOCK : READ_MULTIPLE_BLOCK, start, &stat);
 	if (!(stat & SDMMC_STA_CMDREND_Msk)) {
 		dbgbkpt();
@@ -210,34 +220,38 @@ static uint32_t mmc_read_block(void *p, uint32_t start, uint32_t count)
 	return count;
 }
 
-static uint32_t mmc_write_block(const void *p, uint32_t start, uint32_t count)
+static uint32_t mmc_write_start(uint32_t start, uint32_t count)
 {
 	if (count == 0)
 		return 0u;
 
+	// Polling for card busy
+	uint32_t stat, resp;
+	do {
+		resp = mmc_command(SEND_STATUS, rca, &stat);
+		if (!(stat & SDMMC_STA_CMDREND_Msk)) {
+			dbgbkpt();
+			return 0;
+		}
+	} while (resp >> 9u != 4u);
+
 	// Clear SDMMC flags
 	MMC->ICR = SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_DATAENDC_Msk |
-			SDMMC_ICR_TXUNDERRC_Msk;
-
+			SDMMC_ICR_TXUNDERRC_Msk | SDMMC_ICR_RXOVERRC_Msk;
+	// Stop DPSM
+	MMC->DCTRL = 0;
 	// Clear DMA interrupts
 	DMA2->LIFCR = DMA_LIFCR_CTCIF3_Msk | DMA_LIFCR_CHTIF3_Msk |
 			DMA_LIFCR_CTEIF3_Msk | DMA_LIFCR_CDMEIF3_Msk;
-	// Set memory address
-	STREAM->M0AR = (uint32_t)p;
 	// Memory to peripheral, 32bit -> 32bit, burst of 4 beats, low priority
 	STREAM->CR = (4ul << DMA_SxCR_CHSEL_Pos) | (0b00ul << DMA_SxCR_PL_Pos) |
-			(0b00ul << DMA_SxCR_MBURST_Pos) | (0b01ul << DMA_SxCR_PBURST_Pos) |
+			(0b01ul << DMA_SxCR_MBURST_Pos) | (0b01ul << DMA_SxCR_PBURST_Pos) |
 			(0b10ul << DMA_SxCR_MSIZE_Pos) | (0b10ul << DMA_SxCR_PSIZE_Pos) |
 			(0b01ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk | DMA_SxCR_PFCTRL_Msk;
-	// Enable DMA stream
-	STREAM->CR |= DMA_SxCR_EN_Msk;
 
 	// Correct start address for SDSC cards
 	if (ccs == 0)
 		start *= 512u;
-
-	// Send commands
-	uint32_t stat, resp;
 
 	// Pre-erase blocks
 	if (count != 1) {
@@ -255,35 +269,70 @@ static uint32_t mmc_write_block(const void *p, uint32_t start, uint32_t count)
 		return 0;
 	}
 
+	// Update status
+	dbgprintf(ESC_RED "[MMC] Start writing: %lu + %lu\n", start, count);
+	status = (count == 1 ? 0 : MMCMulti) | MMCWrite;
+	return count;
+}
+
+static uint32_t mmc_write_data(const void *p, uint32_t count)
+{
+	SDMMC_TypeDef *mmc = MMC;
+	DMA_TypeDef *dma = DMA2;
+	DMA_Stream_TypeDef *stream = STREAM;
+	SCB_CleanInvalidateDCache();
+	dbgprintf(ESC_RED "[MMC] Writing data: %p => %lu\n", p, count);
+
 	// Set transfer length
 	MMC->DLEN = count * 512ul;
-	// Enable data transfer
-	MMC->DCTRL = SDMMC_DCTRL_DTEN_Msk | SDMMC_DCTRL_DMAEN_Msk |
+	// Setup data transfer
+	MMC->DCTRL = SDMMC_DCTRL_DTEN_Msk | /*SDMMC_DCTRL_DMAEN_Msk |*/
 			(9ul << SDMMC_DCTRL_DBLOCKSIZE_Pos);
 
-	// Wait for data block reception
+	// Data transfer
+	for (uint32_t i = count * (512ul / 4ul); i; i--, p += 4u) {
+		while (!(MMC->STA & SDMMC_STA_TXFIFOHE_Msk));
+		MMC->FIFO = *(uint32_t *)p;
+	}
+	// Wait for data block transmission
 	while (!(MMC->STA & SDMMC_STA_DATAEND_Msk));
+	while (MMC->STA & SDMMC_STA_TXACT_Msk);
 
+	// Statistics
+	blocks += count;
+	return count;
+}
+
+static uint32_t mmc_write_stop()
+{
 	// Stop transmission for multiple block operation
-	if (count != 1) {
+	if (status & MMCMulti) {
+		// Wait for data block transmission
+		while (!(MMC->STA & SDMMC_STA_DATAEND_Msk));
+
+		uint32_t resp, stat;
 		resp = mmc_command(STOP_TRANSMISSION, 0, &stat);
 		if (!(stat & SDMMC_STA_CMDREND_Msk)) {
 			dbgbkpt();
+			status = MMCIdle;
 			return 0;
 		}
 	}
 
-	// Polling for card busy
-	do {
-		resp = mmc_command(SEND_STATUS, rca, &stat);
-		if (!(stat & SDMMC_STA_CMDREND_Msk)) {
-			dbgbkpt();
-			return 0;
-		}
-	} while (resp >> 9u != 4u);
+	// Clear SDMMC flags
+	MMC->ICR = SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_DATAENDC_Msk |
+			SDMMC_ICR_TXUNDERRC_Msk | SDMMC_ICR_RXOVERRC_Msk;
 
-	// Statistics
-	blocks += count;
+	dbgprintf(ESC_RED "[MMC] Data transfer finished\n");
+	status = MMCIdle;
+	return 1;
+}
+
+static uint32_t mmc_write_block(const void *p, uint32_t start, uint32_t count)
+{
+	mmc_write_start(start, count);
+	mmc_write_data(p, count);
+	mmc_write_stop();
 	return count;
 }
 
@@ -482,17 +531,30 @@ void *scsi_read(scsi_t *scsi, uint32_t offset, uint32_t *length)
 	return scsi_buf;
 }
 
-uint32_t scsi_write(scsi_t *scsi, uint32_t offset, uint32_t length, const void *p)
+uint32_t scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 {
-	// Check sector alignment
-	if (length & (512ul - 1ul)) {
+	// Check block alignment
+	if (size & (512ul - 1ul)) {
 		dbgbkpt();
 		return 0;
 	} else if (offset & (512ul - 1ul)) {
 		dbgbkpt();
 		return 0;
 	}
+	return mmc_write_start(offset / 512ul, size / 512ul) * 512ul;
+}
 
-	length = mmc_write_block(p, offset / 512ul, length / 512ul) * 512ul;
-	return length;
+uint32_t scsi_write_data(scsi_t *scsi, uint32_t length, const void *p)
+{
+	// Check block alignment
+	if (length & (512ul - 1ul)) {
+		dbgbkpt();
+		return 0;
+	}
+	return mmc_write_data(p, length / 512ul) * 512ul;
+}
+
+uint32_t scsi_write_stop(scsi_t *scsi)
+{
+	return mmc_write_stop();
 }
