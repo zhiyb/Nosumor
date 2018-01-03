@@ -45,12 +45,14 @@ typedef struct usb_msc_t {
 	union {
 		cbw_t cbw;
 		uint8_t raw[MSC_OUT_MAX_SIZE];
-	} buf, outbuf[MSC_OUT_MAX_PKT] ALIGN(4);
+	} buf ALIGN(16);
 	union {
 		csw_t csw;
 		uint8_t raw[MSC_IN_MAX_SIZE];
 	} inbuf ALIGN(4);
 } usb_msc_t;
+
+static usb_msc_t msc ALIGN(16) SECTION(.dtcm);
 
 static void epin_init(usb_t *usb, uint32_t n)
 {
@@ -89,7 +91,7 @@ static void epout_init(usb_t *usb, uint32_t n)
 	dev->DAINTMSK |= DAINTMSK_OUT(n);
 	// Receive packets
 	usb_msc_t *data = (usb_msc_t *)usb->epout[n].data;
-	usb_ep_out_transfer(usb->base, n, data->outbuf, 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
+	usb_ep_out_transfer(usb->base, n, &data->buf, 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
 }
 
 static void epout_xfr_cplt(usb_t *usb, uint32_t n)
@@ -103,7 +105,6 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 	// Copy packets
 	if (pkt_cnt != 1u)
 		dbgbkpt();
-	memcpy(&data->buf, data->outbuf, size);
 	// Enqueue packets
 	data->buf_size = size;
 }
@@ -160,9 +161,8 @@ static void usbif_setup_class(usb_t *usb, void *pdata, uint32_t ep, setup_t pkt)
 
 usb_msc_t *usb_msc_init(usb_t *usb)
 {
-	usb_msc_t *data = calloc(1u, sizeof(usb_msc_t));
-	if (!data)
-		panic();
+	usb_msc_t *data = &msc;
+	memset(data, 0, sizeof(usb_msc_t));
 	data->scsi = scsi_init();
 	// Audio control interface
 	const usb_if_t usbif = {
@@ -188,7 +188,7 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 		msc->scsi_state = scsi_data(msc->scsi, msc->buf.raw, size);
 		// Receive new packets
 		msc->buf_size = 0;
-		usb_ep_out_transfer(usb->base, msc->ep_out, &msc->outbuf, 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
+		usb_ep_out_transfer(usb->base, msc->ep_out, &msc->buf, 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
 		// Update Command Status Wrapper (CSW)
 		csw->dCSWDataResidue -= size;
 		// Send Command Status Wrapper (CSW) when transfer finished
@@ -224,7 +224,7 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	scsi_ret_t ret = scsi_cmd(msc->scsi, cbw->CBWCB, cbw->bCBWCBLength);
 	// Receive new packets
 	msc->buf_size = 0;
-	usb_ep_out_transfer(usb->base, msc->ep_out, &msc->outbuf, 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
+	usb_ep_out_transfer(usb->base, msc->ep_out, &msc->buf, 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
 	// Data process
 	if (dir == CBW_DIR_IN) {
 		if (ret.length > cbw->dCBWDataTransferLength)

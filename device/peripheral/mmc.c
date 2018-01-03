@@ -149,19 +149,24 @@ uint32_t mmc_capacity()
 
 static uint32_t mmc_read_block(void *p, uint32_t block)
 {
-	MMC->ICR = SDMMC_STA_CMDREND_Msk |
-			SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_RXOVERRC_Msk;
+	MMC->ICR = SDMMC_ICR_CMDRENDC_Msk | SDMMC_ICR_CTIMEOUTC_Msk |
+			SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_TXUNDERRC_Msk;
+
+	// SDMMC data length
+	MMC->DLEN = 512ul;
 
 	// Clear DMA interrupts
 	DMA2->LIFCR = DMA_LIFCR_CTCIF3_Msk | DMA_LIFCR_CHTIF3_Msk |
 			DMA_LIFCR_CTEIF3_Msk | DMA_LIFCR_CDMEIF3_Msk;
+	// Peripheral to memory, 32bit -> 32bit, burst of 4 beats, low priority
+	STREAM->CR = (4ul << DMA_SxCR_CHSEL_Pos) | (0b00ul << DMA_SxCR_PL_Pos) |
+			(0b01ul << DMA_SxCR_MBURST_Pos) | (0b01ul << DMA_SxCR_PBURST_Pos) |
+			(0b10ul << DMA_SxCR_MSIZE_Pos) | (0b10ul << DMA_SxCR_PSIZE_Pos) |
+			(0b00ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk | DMA_SxCR_PFCTRL_Msk;
 	// Memory address
 	STREAM->M0AR = (uint32_t)p;
 	// Enable DMA stream
 	STREAM->CR |= DMA_SxCR_EN_Msk;
-
-	// SDMMC data length
-	MMC->DLEN = 512ul;
 
 	// Enable SDMMC data transfer
 	MMC->DCTRL = SDMMC_DCTRL_DTDIR_Msk | SDMMC_DCTRL_DTEN_Msk |
@@ -173,35 +178,50 @@ static uint32_t mmc_read_block(void *p, uint32_t block)
 	MMC->CMD = READ_SINGLE_BLOCK | SDMMC_CMD_CPSMEN_Msk;
 	while (!(MMC->STA & SDMMC_STA_CMDREND_Msk));
 
-	// Wait for data block received
+	// Wait for data block reception
 	while (!(MMC->STA & SDMMC_STA_DBCKEND_Msk));
 	// Wait for receive FIFO empty
 	while (MMC->FIFOCNT);
 	// Check for receive FIFO overrun
 	if (MMC->STA & SDMMC_STA_RXOVERR_Msk)
 		dbgbkpt();
+	while (MMC->STA & (SDMMC_STA_RXACT_Msk));
 	return 1u;
 }
 
 static uint32_t mmc_write_block(const void *p, uint32_t block)
 {
-	uint32_t stat, resp;
-	while (MMC->STA & (SDMMC_STA_CMDACT_Msk | SDMMC_STA_TXACT_Msk | SDMMC_STA_RXACT_Msk));
-	resp = mmc_command(WRITE_BLOCK, ccs ? block : block * 512u, &stat);
-	if (!(stat & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
-		dbgbkpt();
-		return 0u;
-	}
+	MMC->ICR = SDMMC_ICR_CMDRENDC_Msk | SDMMC_ICR_CTIMEOUTC_Msk |
+			SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_TXUNDERRC_Msk;
+
+	// SDMMC data length
 	MMC->DLEN = 512ul;
-	MMC->DCTRL = SDMMC_DCTRL_SDIOEN_Msk | SDMMC_DCTRL_RWSTART_Msk |
-			SDMMC_DCTRL_DTEN_Msk |
+
+	// Clear DMA interrupts
+	DMA2->LIFCR = DMA_LIFCR_CTCIF3_Msk | DMA_LIFCR_CHTIF3_Msk |
+			DMA_LIFCR_CTEIF3_Msk | DMA_LIFCR_CDMEIF3_Msk;
+	// Memory to peripheral, 32bit -> 32bit, burst of 4 beats, low priority
+	STREAM->CR = (4ul << DMA_SxCR_CHSEL_Pos) | (0b00ul << DMA_SxCR_PL_Pos) |
+			(0b00ul << DMA_SxCR_MBURST_Pos) | (0b01ul << DMA_SxCR_PBURST_Pos) |
+			(0b10ul << DMA_SxCR_MSIZE_Pos) | (0b10ul << DMA_SxCR_PSIZE_Pos) |
+			(0b01ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk | DMA_SxCR_PFCTRL_Msk;
+	// Memory address
+	STREAM->M0AR = (uint32_t)p;
+	// Enable DMA stream
+	STREAM->CR |= DMA_SxCR_EN_Msk;
+
+	// Send WRITE command
+	MMC->ARG = ccs ? block : block * 512u;
+	MMC->CMD = WRITE_BLOCK | SDMMC_CMD_CPSMEN_Msk;
+	while (!(MMC->STA & SDMMC_STA_CMDREND_Msk));
+
+	// Enable SDMMC data transfer
+	MMC->DCTRL = SDMMC_DCTRL_DTEN_Msk | SDMMC_DCTRL_DMAEN_Msk |
 			(9ul << SDMMC_DCTRL_DBLOCKSIZE_Pos);
-	uint32_t count = 512u / 4u;
-	while (count--) {
-		while (MMC->STA & SDMMC_STA_TXFIFOF_Msk);
-		MMC->FIFO = *(uint32_t *)p;
-		p += 4u;
-	}
+
+	// Wait for data block transmission
+	while (!(MMC->STA & SDMMC_STA_DBCKEND_Msk));
+	while (MMC->STA & (SDMMC_STA_TXACT_Msk));
 	return 1u;
 }
 
@@ -240,6 +260,8 @@ DSTATUS mmc_disk_init()
 	MMC->CLKCR = SDMMC_CLKCR_CLKEN_Msk | (CEIL(clkSDMMC1(), 400000ul) - 2ul);
 	// Start card clock
 	MMC->POWER = 0b11ul << SDMMC_POWER_PWRCTRL_Pos;
+	// For write operation, the minimum timeout is 250ms
+	MMC->DTIMER = clkSDMMC1() / 4ul;
 	systick_delay(2);
 
 	// Reset card
@@ -355,10 +377,6 @@ DSTATUS mmc_disk_init()
 		return sta;
 	}
 
-	// Set data access configurations
-	// TODO: Read optimal timeout values from CSD register
-	MMC->DTIMER = clkSDMMC1() / 10ul;
-
 	stat = 0;
 	return stat;
 }
@@ -421,12 +439,9 @@ uint32_t scsi_write(scsi_t *scsi, uint32_t offset, uint32_t length, const void *
 		return 0;
 	}
 
-	// Flush data cache for DMA operation
-	SCB_CleanDCache_by_Addr((void *)scsi_buf, length);
-
 	offset /= 512ul;
 	// TODO: Multi-sector write
-	for (uint32_t i = length / 512ul; i; i--)
+	for (uint32_t i = length / 512ul; i; i--, p += 512ul)
 		mmc_write_block(p, offset++);
 
 	return length;
