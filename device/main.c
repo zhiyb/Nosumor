@@ -208,110 +208,115 @@ int main()
 #ifdef DEBUG
 	uint32_t mask = keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4];
 	struct {
-		uint32_t tick, audio, data, feedback;
-		uint32_t blocks;
-	} cnt, prev = {
+		uint32_t tick, audio, data, feedback, blocks;
+	} cur, diff, prev = {
 		systick_cnt(), audio_transfer_cnt(),
 		audio_data_cnt(), usb_audio2_feedback_cnt(), mmc_statistics(),
 	};
 	size_t heap = 0;
 #endif
-	for (;;) {
-		uint32_t s = keyboard_status();
-		int up = s & (keyboard_masks[0] | keyboard_masks[1]);
-		if (up)
-			GPIOA->ODR |= GPIO_ODR_ODR_10 | GPIO_ODR_ODR_11;
+loop:	;
+	uint32_t s = keyboard_status();
+	int up = s & (keyboard_masks[0] | keyboard_masks[1]);
+	if (up)
+		GPIOA->ODR |= GPIO_ODR_ODR_10 | GPIO_ODR_ODR_11;
+	else
+		GPIOA->ODR &= ~(GPIO_ODR_ODR_10 | GPIO_ODR_ODR_11);
+	if (s & keyboard_masks[0])
+		GPIOB->ODR &= ~GPIO_ODR_ODR_15;
+	else
+		GPIOB->ODR |= GPIO_ODR_ODR_15;
+	if (s & keyboard_masks[1])
+		GPIOB->ODR &= ~GPIO_ODR_ODR_14;
+	else
+		GPIOB->ODR |= GPIO_ODR_ODR_14;
+	int down = s & (keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4]);
+	if (up && !down) {
+		GPIOA->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_2 | GPIO_ODR_ODR_1);
+	} else {
+		if (s & keyboard_masks[2])
+			GPIOA->ODR &= ~GPIO_ODR_ODR_0;
 		else
-			GPIOA->ODR &= ~(GPIO_ODR_ODR_10 | GPIO_ODR_ODR_11);
-		if (s & keyboard_masks[0])
-			GPIOB->ODR &= ~GPIO_ODR_ODR_15;
+			GPIOA->ODR |= GPIO_ODR_ODR_0;
+		if (s & keyboard_masks[3])
+			GPIOA->ODR &= ~GPIO_ODR_ODR_2;
 		else
-			GPIOB->ODR |= GPIO_ODR_ODR_15;
-		if (s & keyboard_masks[1])
-			GPIOB->ODR &= ~GPIO_ODR_ODR_14;
+			GPIOA->ODR |= GPIO_ODR_ODR_2;
+		if (s & keyboard_masks[4])
+			GPIOA->ODR &= ~GPIO_ODR_ODR_1;
 		else
-			GPIOB->ODR |= GPIO_ODR_ODR_14;
-		int down = s & (keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4]);
-		if (up && !down) {
-			GPIOA->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_2 | GPIO_ODR_ODR_1);
-		} else {
-			if (s & keyboard_masks[2])
-				GPIOA->ODR &= ~GPIO_ODR_ODR_0;
-			else
-				GPIOA->ODR |= GPIO_ODR_ODR_0;
-			if (s & keyboard_masks[3])
-				GPIOA->ODR &= ~GPIO_ODR_ODR_2;
-			else
-				GPIOA->ODR |= GPIO_ODR_ODR_2;
-			if (s & keyboard_masks[4])
-				GPIOA->ODR &= ~GPIO_ODR_ODR_1;
-			else
-				GPIOA->ODR |= GPIO_ODR_ODR_1;
-		}
+			GPIOA->ODR |= GPIO_ODR_ODR_1;
+	}
 
-		// Process time consuming tasks
-		usb_process(&usb);
-		usb_msc_process(&usb, usb_msc);
-		usb_hid_vendor_process(usb_hid_vendor, &vendor_process);
-		audio_process();
-		fflush(stdout);
+	// Process time consuming tasks
+	usb_process(&usb);
+	usb_msc_process(&usb, usb_msc);
+	usb_hid_vendor_process(usb_hid_vendor, &vendor_process);
+	audio_process();
+	fflush(stdout);
 
 #ifdef DEBUG
-		if (heap != heap_usage()) {
-			dbgprintf(ESC_YELLOW "[HEAP]: "
-				  ESC_WHITE "%.2f%%" ESC_YELLOW ", "
-				  ESC_WHITE "%u/%u" ESC_YELLOW " bytes\n",
-				  (float)heap_usage() * 100.f / (float)heap_size(),
-				  heap_usage(), heap_size());
-			heap = heap_usage();
-		}
+	if ((s & mask) == mask) {
+		usb_connect(&usb, 0);
+		while (keyboard_status());
+		usb_connect(&usb, 1);
+	}
 
-		if ((s & mask) == mask) {
-			usb_connect(&usb, 0);
-			while (keyboard_status());
-			usb_connect(&usb, 1);
-		}
+	if (heap != heap_usage()) {
+		dbgprintf(ESC_YELLOW "[HEAP]: "
+			  ESC_WHITE "%.2f%%" ESC_YELLOW ", "
+			  ESC_WHITE "%u/%u" ESC_YELLOW " bytes\n",
+			  (float)heap_usage() * 100.f / (float)heap_size(),
+			  heap_usage(), heap_size());
+		heap = heap_usage();
+	}
 
-		// Every 1024 systick ticks
-		cnt.tick = systick_cnt();
-		if ((cnt.tick - prev.tick) & ~(1023ul)) {
-			prev.tick += 1024ul;
-			// Calculate audio frequency
-			cnt.audio = audio_transfer_cnt();
-			uint32_t diff = cnt.audio - prev.audio;
-			prev.audio = cnt.audio;
-			diff *= 1000ul;
+	// Every 1024 systick ticks
+	cur.tick = systick_cnt();
+	if ((cur.tick - prev.tick) & ~(1023ul)) {
+		// Update current values
+		cur.audio = audio_transfer_cnt();
+		cur.data = audio_data_cnt();
+		cur.feedback = usb_audio2_feedback_cnt();
+		cur.blocks = mmc_statistics();
+
+		// Calculate difference
+		diff.audio = (cur.audio - prev.audio) * 1000ul;
+		diff.data = (cur.data - prev.data) * 1000ul;
+		diff.feedback = (cur.feedback - prev.feedback) * 1000ul;
+		diff.blocks = cur.blocks - prev.blocks;
+
+		if (diff.audio && diff.data && diff.feedback) {
+			// Audio update frequency
 			uint32_t div = 1024ul * AUDIO_FRAME_TRANSFER;
 			printf(ESC_YELLOW "Audio freq: " ESC_WHITE "%lu+%lu",
-			       diff / div, diff & (div - 1u));
-			// Calculate audio data frequency
-			cnt.data = audio_data_cnt();
-			diff = cnt.data - prev.data;
-			prev.data = cnt.data;
-			diff *= 1000ul;
+			       diff.audio / div, diff.audio & (div - 1u));
+			// Audio data frequency
 			div = 1024ul;
 			printf(ESC_YELLOW " / " ESC_WHITE "%lu+%lu",
-			       diff / div, diff & (div - 1u));
-			// Calculate feedback frequency
-			cnt.feedback = usb_audio2_feedback_cnt();
-			diff = cnt.feedback - prev.feedback;
-			prev.feedback = cnt.feedback;
-			diff *= 1000ul;
+			       diff.data / div, diff.data & (div - 1u));
+			// Audio feedback frequency
 			div = 1024ul;
 			printf(ESC_YELLOW " / " ESC_WHITE "%lu+%lu",
-			       diff / div, diff & (div - 1u));
+			       diff.feedback / div, diff.feedback & (div - 1u));
 			// Audio data offset
-			printf(ESC_YELLOW " => " ESC_WHITE "%ld\n", audio_buffering());
-
-			// SDMMC statistics
-			cnt.blocks = mmc_statistics();
-			diff = cnt.blocks - prev.blocks;
-			if (diff)
-				printf(ESC_YELLOW "SDMMC: " ESC_WHITE "%lu"
-				       ESC_YELLOW " blocks\n", diff);
-			prev.blocks = cnt.blocks;
+			printf(ESC_YELLOW " => " ESC_WHITE "%ld\n",
+			       audio_buffering());
 		}
-#endif
+
+		// SDMMC statistics
+		if (diff.blocks)
+			printf(ESC_YELLOW "SDMMC: " ESC_WHITE "%lu"
+			       ESC_YELLOW " blocks\n", diff.blocks);
+
+		// Update previous values
+		prev.tick += 1024ul;
+		prev.audio = cur.audio;
+		prev.data = cur.data;
+		prev.feedback = cur.feedback;
+		prev.blocks = cur.blocks;
 	}
+#endif
+	goto loop;
 	return 0;
 }
