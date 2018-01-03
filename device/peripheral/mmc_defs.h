@@ -17,6 +17,8 @@
 #define SEND_CSD		(9u | RESP_LONG)	// R2
 #define SEND_CID		(10u | RESP_LONG)	// R2
 #define VOLTAGE_SWITCH		(11u | RESP_SHORT)	// R1
+#define STOP_TRANSMISSION	(12u | RESP_SHORT)	// R1b
+#define SEND_STATUS		(13u | RESP_SHORT)	// R1
 #define SET_BLOCKLEN		(16u | RESP_SHORT)	// R1
 #define READ_SINGLE_BLOCK	(17u | RESP_SHORT)	// R1
 #define READ_MULTIPLE_BLOCK	(18u | RESP_SHORT)	// R1

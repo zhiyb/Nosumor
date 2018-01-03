@@ -24,7 +24,7 @@ typedef union {
 } cid_t;
 
 static DSTATUS stat = STA_NOINIT;
-static uint32_t ccs = 0, capacity = 0, blocks = 0;
+static uint32_t ccs = 0, capacity = 0, blocks = 0, rca = 0;
 
 // Send command to card, with optional status output
 // Returns short response
@@ -107,26 +107,26 @@ static inline void mmc_base_init()
 
 static uint32_t mmc_command(uint32_t cmd, uint32_t arg, uint32_t *stat)
 {
-	// Send CMD8
-	MMC->ICR = SDMMC_ICR_CMDSENTC_Msk | SDMMC_ICR_CMDRENDC_Msk |
-			SDMMC_ICR_CCRCFAILC_Msk | SDMMC_ICR_CTIMEOUTC_Msk;
 	MMC->ARG = arg;
 	MMC->CMD = cmd | SDMMC_CMD_CPSMEN_Msk;
-	while (!(MMC->STA & SDMMC_STA_CMDACT_Msk));
 
-	if (!(cmd & SDMMC_CMD_WAITRESP_0)) {
+	if (!(cmd & SDMMC_CMD_WAITRESP_0))
 		// No response expected
 		while (!(MMC->STA & SDMMC_STA_CMDSENT_Msk));
-		if (stat)
-			*stat = MMC->STA;
-		return MMC->RESPCMD;
-	}
-
-	while (!(MMC->STA & (SDMMC_STA_CMDREND_Msk |
-			     SDMMC_STA_CCRCFAIL_Msk | SDMMC_STA_CTIMEOUT_Msk)));
+	else
+		while (!(MMC->STA & (SDMMC_STA_CMDREND_Msk |
+				     SDMMC_STA_CCRCFAIL_Msk |
+				     SDMMC_STA_CTIMEOUT_Msk)));
 	if (stat)
 		*stat = MMC->STA;
-	return MMC->RESP1;
+
+	// Clear flags
+	MMC->ICR = SDMMC_ICR_CMDSENTC_Msk | SDMMC_ICR_CMDRENDC_Msk |
+			SDMMC_ICR_CCRCFAILC_Msk | SDMMC_ICR_CTIMEOUTC_Msk;
+	if (!(cmd & SDMMC_CMD_WAITRESP_0))
+		return MMC->RESPCMD;
+	else
+		return MMC->RESP1;
 }
 
 static uint32_t mmc_app_command(uint32_t cmd, uint32_t rca, uint32_t arg, uint32_t *stat)
@@ -152,81 +152,139 @@ uint32_t mmc_statistics()
 	return blocks;
 }
 
-static uint32_t mmc_read_block(void *p, uint32_t block)
+static uint32_t mmc_read_block(void *p, uint32_t start, uint32_t count)
 {
-	MMC->ICR = SDMMC_ICR_CMDRENDC_Msk | SDMMC_ICR_CTIMEOUTC_Msk |
-			SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_TXUNDERRC_Msk;
+	if (count == 0)
+		return 0u;
 
-	// SDMMC data length
-	MMC->DLEN = 512ul;
+	// Clear SDMMC flags
+	MMC->ICR = SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_DATAENDC_Msk |
+			SDMMC_ICR_RXOVERRC_Msk;
 
 	// Clear DMA interrupts
 	DMA2->LIFCR = DMA_LIFCR_CTCIF3_Msk | DMA_LIFCR_CHTIF3_Msk |
 			DMA_LIFCR_CTEIF3_Msk | DMA_LIFCR_CDMEIF3_Msk;
+	// Set memory address
+	STREAM->M0AR = (uint32_t)p;
 	// Peripheral to memory, 32bit -> 32bit, burst of 4 beats, low priority
 	STREAM->CR = (4ul << DMA_SxCR_CHSEL_Pos) | (0b00ul << DMA_SxCR_PL_Pos) |
 			(0b01ul << DMA_SxCR_MBURST_Pos) | (0b01ul << DMA_SxCR_PBURST_Pos) |
 			(0b10ul << DMA_SxCR_MSIZE_Pos) | (0b10ul << DMA_SxCR_PSIZE_Pos) |
 			(0b00ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk | DMA_SxCR_PFCTRL_Msk;
-	// Memory address
-	STREAM->M0AR = (uint32_t)p;
 	// Enable DMA stream
 	STREAM->CR |= DMA_SxCR_EN_Msk;
 
-	// Enable SDMMC data transfer
+	// Set transfer length
+	MMC->DLEN = count * 512ul;
+	// Enable data transfer
 	MMC->DCTRL = SDMMC_DCTRL_DTDIR_Msk | SDMMC_DCTRL_DTEN_Msk |
 			SDMMC_DCTRL_DMAEN_Msk |
 			(9ul << SDMMC_DCTRL_DBLOCKSIZE_Pos);
 
-	// Send READ command
-	MMC->ARG = ccs ? block : block * 512u;
-	MMC->CMD = READ_SINGLE_BLOCK | SDMMC_CMD_CPSMEN_Msk;
-	while (!(MMC->STA & SDMMC_STA_CMDREND_Msk));
+	// Correct start address for SDSC cards
+	if (ccs == 0)
+		start *= 512u;
+
+	// Send command
+	uint32_t stat, resp;
+	resp = mmc_command(count == 1 ? READ_SINGLE_BLOCK : READ_MULTIPLE_BLOCK, start, &stat);
+	if (!(stat & SDMMC_STA_CMDREND_Msk)) {
+		dbgbkpt();
+		return 0;
+	}
 
 	// Wait for data block reception
-	while (!(MMC->STA & SDMMC_STA_DBCKEND_Msk));
-	// Wait for receive FIFO empty
-	while (MMC->FIFOCNT);
-	while (MMC->STA & SDMMC_STA_RXACT_Msk);
-	blocks++;
-	return 1u;
+	while (!(MMC->STA & SDMMC_STA_DATAEND_Msk));
+
+	// Stop transmission for multiple block operation
+	if (count != 1) {
+		resp = mmc_command(STOP_TRANSMISSION, 0, &stat);
+		if (!(stat & SDMMC_STA_CMDREND_Msk)) {
+			dbgbkpt();
+			return 0;
+		}
+	}
+
+	// Statistics
+	blocks += count;
+	return count;
 }
 
-static uint32_t mmc_write_block(const void *p, uint32_t block)
+static uint32_t mmc_write_block(const void *p, uint32_t start, uint32_t count)
 {
-	MMC->ICR = SDMMC_ICR_CMDRENDC_Msk | SDMMC_ICR_CTIMEOUTC_Msk |
-			SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_TXUNDERRC_Msk;
+	if (count == 0)
+		return 0u;
 
-	// SDMMC data length
-	MMC->DLEN = 512ul;
+	// Clear SDMMC flags
+	MMC->ICR = SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_DATAENDC_Msk |
+			SDMMC_ICR_TXUNDERRC_Msk;
 
 	// Clear DMA interrupts
 	DMA2->LIFCR = DMA_LIFCR_CTCIF3_Msk | DMA_LIFCR_CHTIF3_Msk |
 			DMA_LIFCR_CTEIF3_Msk | DMA_LIFCR_CDMEIF3_Msk;
+	// Set memory address
+	STREAM->M0AR = (uint32_t)p;
 	// Memory to peripheral, 32bit -> 32bit, burst of 4 beats, low priority
 	STREAM->CR = (4ul << DMA_SxCR_CHSEL_Pos) | (0b00ul << DMA_SxCR_PL_Pos) |
 			(0b00ul << DMA_SxCR_MBURST_Pos) | (0b01ul << DMA_SxCR_PBURST_Pos) |
 			(0b10ul << DMA_SxCR_MSIZE_Pos) | (0b10ul << DMA_SxCR_PSIZE_Pos) |
 			(0b01ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk | DMA_SxCR_PFCTRL_Msk;
-	// Memory address
-	STREAM->M0AR = (uint32_t)p;
 	// Enable DMA stream
 	STREAM->CR |= DMA_SxCR_EN_Msk;
 
-	// Send WRITE command
-	MMC->ARG = ccs ? block : block * 512u;
-	MMC->CMD = WRITE_BLOCK | SDMMC_CMD_CPSMEN_Msk;
-	while (!(MMC->STA & SDMMC_STA_CMDREND_Msk));
+	// Correct start address for SDSC cards
+	if (ccs == 0)
+		start *= 512u;
 
-	// Enable SDMMC data transfer
+	// Send commands
+	uint32_t stat, resp;
+
+	// Pre-erase blocks
+	if (count != 1) {
+		resp = mmc_app_command(SET_WR_BLK_ERASE_COUNT, rca, count, &stat);
+		if (!(stat & (SDMMC_STA_CMDREND_Msk))) {
+			dbgbkpt();
+			return 0;
+		}
+	}
+
+	// Start writing
+	resp = mmc_command(count == 1 ? WRITE_BLOCK : WRITE_MULTIPLE_BLOCK, start, &stat);
+	if (!(stat & (SDMMC_STA_CMDREND_Msk))) {
+		dbgbkpt();
+		return 0;
+	}
+
+	// Set transfer length
+	MMC->DLEN = count * 512ul;
+	// Enable data transfer
 	MMC->DCTRL = SDMMC_DCTRL_DTEN_Msk | SDMMC_DCTRL_DMAEN_Msk |
 			(9ul << SDMMC_DCTRL_DBLOCKSIZE_Pos);
 
-	// Wait for data block transmission
-	while (!(MMC->STA & SDMMC_STA_DBCKEND_Msk));
-	while (MMC->STA & SDMMC_STA_TXACT_Msk);
-	blocks++;
-	return 1u;
+	// Wait for data block reception
+	while (!(MMC->STA & SDMMC_STA_DATAEND_Msk));
+
+	// Stop transmission for multiple block operation
+	if (count != 1) {
+		resp = mmc_command(STOP_TRANSMISSION, 0, &stat);
+		if (!(stat & SDMMC_STA_CMDREND_Msk)) {
+			dbgbkpt();
+			return 0;
+		}
+	}
+
+	// Polling for card busy
+	do {
+		resp = mmc_command(SEND_STATUS, rca, &stat);
+		if (!(stat & SDMMC_STA_CMDREND_Msk)) {
+			dbgbkpt();
+			return 0;
+		}
+	} while (resp >> 9u != 4u);
+
+	// Statistics
+	blocks += count;
+	return count;
 }
 
 /* FatFs interface functions */
@@ -264,8 +322,8 @@ DSTATUS mmc_disk_init()
 	MMC->CLKCR = SDMMC_CLKCR_CLKEN_Msk | (CEIL(clkSDMMC1(), 400000ul) - 2ul);
 	// Start card clock
 	MMC->POWER = 0b11ul << SDMMC_POWER_PWRCTRL_Pos;
-	// For write operation, the minimum timeout is 250ms
-	MMC->DTIMER = clkSDMMC1() / 4ul;
+	// The last busy in any write operation up to 500ms
+	MMC->DTIMER = clkSDMMC1() / 2ul;
 	systick_delay(2);
 
 	// Reset card
@@ -307,7 +365,7 @@ DSTATUS mmc_disk_init()
 	// Read CID register
 	mmc_command(ALL_SEND_CID, 0, &sta);
 	// Publish relative address
-	uint32_t rca = mmc_command(SEND_RELATIVE_ADDR, 0, &sta);
+	rca = mmc_command(SEND_RELATIVE_ADDR, 0, &sta);
 	if (!(sta & SDMMC_STA_CMDREND_Msk) || (rca & STAT_ERROR)) {
 		dbgbkpt();
 		return sta;
@@ -328,6 +386,7 @@ DSTATUS mmc_disk_init()
 		clk = SDMMC_CLKCR_BYPASS_Msk;
 	// Flow control, 4-bit bus, power saving, clock enable
 	MMC->CLKCR = SDMMC_CLKCR_HWFC_EN_Msk | (0b01ul << SDMMC_CLKCR_WIDBUS_Pos) |
+			SDMMC_CLKCR_NEGEDGE_Msk |
 			SDMMC_CLKCR_PWRSAV_Msk | SDMMC_CLKCR_CLKEN_Msk | clk;
 
 	// Read CSD register
@@ -394,13 +453,9 @@ DRESULT mmc_disk_read(BYTE *buff, DWORD sector, UINT count)
 {
 	if (stat)
 		return RES_ERROR;
-	if (count == 1u) {
-		if (mmc_read_block(buff, sector) != count)
-			return RES_ERROR;
-		return RES_OK;
-	}
-	dbgbkpt();
-	return RES_ERROR;
+	if (mmc_read_block(buff, sector, count) != count)
+		return RES_ERROR;
+	return RES_OK;
 }
 
 /* SCSI interface functions */
@@ -423,12 +478,7 @@ void *scsi_read(scsi_t *scsi, uint32_t offset, uint32_t *length)
 	// Invalidate data cache for DMA operation
 	SCB_InvalidateDCache_by_Addr((void *)scsi_buf, *length);
 
-	offset /= 512ul;
-	void *p = scsi_buf;
-	// TODO: Multi-sector read
-	for (uint32_t i = *length / 512ul; i; i--, p += 512ul)
-		mmc_read_block(p, offset++);
-
+	*length = mmc_read_block(scsi_buf, offset / 512ul, *length / 512ul) * 512ul;
 	return scsi_buf;
 }
 
@@ -443,10 +493,6 @@ uint32_t scsi_write(scsi_t *scsi, uint32_t offset, uint32_t length, const void *
 		return 0;
 	}
 
-	offset /= 512ul;
-	// TODO: Multi-sector write
-	for (uint32_t i = length / 512ul; i; i--, p += 512ul)
-		mmc_write_block(p, offset++);
-
+	length = mmc_write_block(p, offset / 512ul, length / 512ul) * 512ul;
 	return length;
 }
