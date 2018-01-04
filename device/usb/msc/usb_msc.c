@@ -40,7 +40,7 @@ typedef struct usb_msc_t {
 	int ep_in, ep_out;
 	scsi_t *scsi;
 	scsi_state_t scsi_state;
-	uint32_t buf_size[2];
+	volatile uint32_t buf_size[2];
 	uint8_t lun_max, outbuf;
 	union {
 		cbw_t cbw;
@@ -194,11 +194,13 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 		// Check with SCSI again if currently busy
 		if (msc->scsi_state & SCSIBusy)
 			return;
+		__disable_irq();
 		// Mark buffer as available
 		msc->buf_size[msc->outbuf] = 0;
 		// Check alternative buffer status
 		if (msc->buf_size[!msc->outbuf])
 			epout_swap(usb, msc->ep_out);
+		__enable_irq();
 		// Update Command Status Wrapper (CSW)
 		csw->dCSWDataResidue -= size;
 		// Send Command Status Wrapper (CSW) after transfer finished
@@ -226,10 +228,12 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 
 	// Process SCSI CBW
 	scsi_ret_t ret = scsi_cmd(msc->scsi, cbw->CBWCB, cbw->bCBWCBLength);
+	__disable_irq();
 	msc->buf_size[msc->outbuf] = 0;
 	// Check alternative buffer status
 	if (msc->buf_size[!msc->outbuf])
 		epout_swap(usb, msc->ep_out);
+	__enable_irq();
 	// Data transfer
 	if (dir == CBW_DIR_IN) {
 		if (ret.length > cbw->dCBWDataTransferLength)
