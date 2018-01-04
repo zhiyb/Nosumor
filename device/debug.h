@@ -16,6 +16,7 @@
 #define dbgprintf	printf
 #define dbgbkpt()	do { \
 	fflush(stdout); \
+	SCB_CleanInvalidateDCache(); \
 	__BKPT(0); \
 } while (0)
 #define panic()		do { \
