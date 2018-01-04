@@ -45,12 +45,19 @@ static inline void mco1_init()
 	// MCO1: HSE / 1
 	RCC->CFGR = (RCC->CFGR & ~(RCC_CFGR_MCO1 | RCC_CFGR_MCO1PRE)) |
 			(0b10 << RCC_CFGR_MCO1_Pos) | (0 << RCC_CFGR_MCO1PRE_Pos);
+	// Enable IO compensation cell
+	if (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY)) {
+		RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+		SYSCFG->CMPCR |= SYSCFG_CMPCR_CMP_PD;
+	}
 	// Configure GPIOs
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 	GPIO_MODER(GPIOA, 8, 0b10);	// 10: Alternative function mode
-	GPIO_OTYPER_PP(GPIOA, 8);
-	GPIO_OSPEEDR(GPIOA, 8, 0b01);	// Medium speed (25MHz)
+	GPIO_OTYPER_PP(GPIOA, 8);	// Output push-pull
+	GPIO_OSPEEDR(GPIOA, 8, 0b10);	// High speed (50~100MHz)
 	GPIO_AFRH(GPIOA, 8, 0);		// AF0: MCO1
+	// Wait for IO compensation cell
+	while (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY));
 }
 
 void rcc_init()
