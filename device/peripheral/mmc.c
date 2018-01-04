@@ -25,7 +25,7 @@ typedef union {
 
 static DSTATUS stat = STA_NOINIT;
 static uint32_t ccs = 0, capacity = 0, blocks = 0, rca = 0;
-enum {MMCIdle = 0, MMCRead, MMCWrite, MMCMulti = 0x80} status;
+enum {MMCIdle = 0, MMCRead, MMCWrite, MMCMulti = 0x80} status = MMCIdle;
 
 // Send command to card, with optional status output
 // Returns short response
@@ -314,6 +314,11 @@ static uint32_t mmc_busy()
 		return 0;
 }
 
+static uint32_t mmc_transferred()
+{
+	return 0xffffu - STREAM->NDTR;
+}
+
 static uint32_t mmc_stop()
 {
 	if (!(status & (MMCWrite | MMCRead))) {
@@ -369,7 +374,6 @@ static uint32_t mmc_write_block(const void *p, uint32_t start, uint32_t count)
 
 static uint32_t mmc_read_block(void *p, uint32_t start, uint32_t count)
 {
-	status = MMCIdle;
 	if (mmc_read_prepare() == 0) {
 		dbgbkpt();
 		return 0;
@@ -488,7 +492,6 @@ DSTATUS mmc_disk_init()
 		clk = SDMMC_CLKCR_BYPASS_Msk;
 	// Flow control, 4-bit bus, power saving, clock enable
 	MMC->CLKCR = SDMMC_CLKCR_HWFC_EN_Msk | (0b01ul << SDMMC_CLKCR_WIDBUS_Pos) |
-			SDMMC_CLKCR_NEGEDGE_Msk |
 			SDMMC_CLKCR_PWRSAV_Msk | SDMMC_CLKCR_CLKEN_Msk | clk;
 
 	// Read CSD register
@@ -562,7 +565,7 @@ DRESULT mmc_disk_read(BYTE *buff, DWORD sector, UINT count)
 
 /* SCSI interface functions */
 
-uint8_t scsi_buf[64 * 1024] ALIGN(32);
+uint8_t scsi_buf[64 * 1024] ALIGN(32), *scsi_ptr;
 
 uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize)
 {
@@ -571,17 +574,58 @@ uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize)
 	return 0;
 }
 
-void *scsi_read(scsi_t *scsi, uint32_t offset, uint32_t *length)
+uint32_t scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 {
-	// TODO: Partial read
-	if (*length > sizeof(scsi_buf))
-		panic();
+	// Check block alignment
+	if (size & (512ul - 1ul)) {
+		dbgbkpt();
+		return 0;
+	} else if (offset & (512ul - 1ul)) {
+		dbgbkpt();
+		return 0;
+	}
 
 	// Invalidate data cache for DMA operation
-	SCB_InvalidateDCache_by_Addr((void *)scsi_buf, *length);
+	SCB_InvalidateDCache_by_Addr((void *)scsi_buf, size);
 
-	*length = mmc_read_block(scsi_buf, offset / 512ul, *length / 512ul) * 512ul;
-	return scsi_buf;
+	uint32_t start = offset / 512ul, count = size / 512ul;
+	if (mmc_read_prepare() == 0) {
+		dbgbkpt();
+		return 0;
+	}
+	if (mmc_data(scsi_buf, count) != count) {
+		dbgbkpt();
+		return 0;
+	}
+	if (mmc_read_start(start, count) != count) {
+		dbgbkpt();
+		return 0;
+	}
+	scsi_ptr = scsi_buf;
+	return size;
+}
+
+uint32_t scsi_read_available(scsi_t *scsi)
+{
+	return mmc_transferred() * 4ul - (scsi_ptr - scsi_buf);
+}
+
+void *scsi_read_data(scsi_t *scsi, uint32_t *length)
+{
+	if (*length + (scsi_ptr - scsi_buf) > sizeof(scsi_buf)) {
+		dbgbkpt();
+		*length = 0;
+		return 0;
+	}
+
+	void *p = scsi_ptr;
+	scsi_ptr += *length / sizeof(*scsi_ptr);
+	return p;
+}
+
+uint32_t scsi_read_stop(scsi_t *scsi)
+{
+	return mmc_stop();
 }
 
 uint32_t scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size)

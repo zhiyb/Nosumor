@@ -39,7 +39,6 @@ typedef struct PACKED csw_t {
 typedef struct usb_msc_t {
 	int ep_in, ep_out;
 	scsi_t *scsi;
-	scsi_state_t scsi_state;
 	volatile uint32_t buf_size[2];
 	uint8_t lun_max, outbuf;
 	union {
@@ -181,18 +180,33 @@ usb_msc_t *usb_msc_init(usb_t *usb)
 
 void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 {
-	if (!msc || !msc->buf_size[msc->outbuf])
+	if (!msc)
 		return;
 
-	cbw_t *cbw = &msc->buf[msc->outbuf].cbw;
+	// Process SCSI initiated packets
 	csw_t *csw = &msc->inbuf.csw;
+	scsi_ret_t ret = scsi_process(msc->scsi, MSC_IN_MAX_SIZE);
+	if (ret.length) {
+		usb_ep_in_transfer(usb->base, msc->ep_in, ret.p, ret.length);
+		// Update Command Status Wrapper (CSW)
+		csw->dCSWDataResidue -= ret.length;
+		// Send CSW after transfer finished
+		if (ret.state == SCSIGood || ret.state == SCSIFailure)
+			goto s_csw;
+		return;
+	}
 
-	if ((msc->scsi_state & ~SCSIBusy) == SCSIWrite) {
+	// Process USB packets
+	if (!msc->buf_size[msc->outbuf])
+		return;
+
+	// Data packet
+	if ((ret.state & ~SCSIBusy) == SCSIWrite) {
 		uint32_t size = msc->buf_size[msc->outbuf];
-		msc->scsi_state = scsi_data(msc->scsi,
-					    msc->buf[msc->outbuf].raw, size);
+		ret.state = scsi_data(msc->scsi,
+				      msc->buf[msc->outbuf].raw, size);
 		// Check with SCSI again if currently busy
-		if (msc->scsi_state & SCSIBusy)
+		if (ret.state & SCSIBusy)
 			return;
 		__disable_irq();
 		// Mark buffer as available
@@ -201,15 +215,16 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 		if (msc->buf_size[!msc->outbuf])
 			epout_swap(usb, msc->ep_out);
 		__enable_irq();
-		// Update Command Status Wrapper (CSW)
+		// Update CSW
 		csw->dCSWDataResidue -= size;
-		// Send Command Status Wrapper (CSW) after transfer finished
-		if (msc->scsi_state != SCSIWrite)
+		// Send CSW after transfer finished
+		if (ret.state == SCSIGood || ret.state == SCSIFailure)
 			goto s_csw;
 		return;
 	}
 
 	// Command block wrapper (CBW) processing
+	cbw_t *cbw = &msc->buf[msc->outbuf].cbw;
 	if (cbw->dCBWSignature != 0x43425355) {
 		// TODO: Stall bulk pipes
 		dbgbkpt();
@@ -226,27 +241,27 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 		return;
 	}
 
-	// Process SCSI CBW
-	scsi_ret_t ret = scsi_cmd(msc->scsi, cbw->CBWCB, cbw->bCBWCBLength);
+	// Process SCSI commands
+	ret = scsi_cmd(msc->scsi, cbw->CBWCB, cbw->bCBWCBLength);
 	__disable_irq();
 	msc->buf_size[msc->outbuf] = 0;
 	// Check alternative buffer status
 	if (msc->buf_size[!msc->outbuf])
 		epout_swap(usb, msc->ep_out);
 	__enable_irq();
-	// Data transfer
-	if (dir == CBW_DIR_IN) {
+	// SCSI data transfer
+	if (dir == CBW_DIR_IN &&
+			(ret.state == SCSIGood || ret.state == SCSIFailure)) {
 		if (ret.length > cbw->dCBWDataTransferLength)
 			ret.length = cbw->dCBWDataTransferLength;
 		usb_ep_in_transfer(usb->base, msc->ep_in, ret.p, ret.length);
 	}
-	msc->scsi_state = ret.state;
 
 	// Prepare CSW
 	csw->dCSWDataResidue = cbw->dCBWDataTransferLength - ret.length;
 	csw->dCSWTag = cbw->dCBWTag;
-s_csw:	csw->bCSWStatus = msc->scsi_state == SCSIFailure;
+s_csw:	csw->bCSWStatus = ret.state == SCSIFailure;
 	// Send CSW after transfer finished
-	if (msc->scsi_state == SCSIGood || msc->scsi_state == SCSIFailure)
+	if (ret.state == SCSIGood || ret.state == SCSIFailure)
 		usb_ep_in_transfer(usb->base, msc->ep_in, csw, 13);
 }

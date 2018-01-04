@@ -306,8 +306,8 @@ loop:	;
 
 		// SDMMC statistics
 		if (diff.blocks)
-			printf(ESC_YELLOW "SDMMC: " ESC_WHITE "%lu"
-			       ESC_YELLOW " blocks\n", diff.blocks);
+			printf(ESC_YELLOW "SDMMC: " ESC_WHITE "%lu + %lu"
+			       ESC_YELLOW " blocks\n", prev.blocks, diff.blocks);
 
 		// Update previous values
 		prev.tick += 1024ul;

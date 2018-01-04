@@ -251,14 +251,16 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 
 	dbgprintf(ESC_GREEN "[SCSI] Read %u blocks from %lu\n", cmd->length, cmd->lbaddr);
 
-	scsi_ret_t ret = {0, 0, SCSIGood};
 	if (cmd->length == 0)
-		return ret;
+		return (scsi_ret_t){0, 0, SCSIGood};
 
-	ret.length = cmd->length * lbsize;
-	// TODO: Partial read
-	ret.p = scsi_read(scsi, cmd->lbaddr * lbsize, &ret.length);
-	return ret;
+	if (!scsi_read_start(scsi, cmd->lbaddr * lbsize, cmd->length * lbsize)) {
+		dbgbkpt();
+		return (scsi_ret_t){0, 0, SCSIFailure};
+	}
+	scsi->length = cmd->length * lbsize;
+	scsi->state = SCSIRead;
+	return (scsi_ret_t){0, 0, SCSIRead};
 }
 
 static scsi_ret_t write_10(scsi_t *scsi, cmd_WRITE_10_t *cmd)
@@ -371,15 +373,46 @@ scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 	if (scsi_write_busy(scsi)) {
 		scsi->state = SCSIWrite | SCSIBusy;
 	} else {
-		// Update offset
+		// Update status
 		scsi->length -= size;
 		if (scsi->length) {
 			scsi->state = SCSIWrite;
 		} else {
-			// TODO: Error checking
-			scsi_write_stop(scsi);
+			if (!scsi_write_stop(scsi))
+				dbgbkpt();
 			scsi->state = SCSIGood;
 		};
 	}
 	return scsi->state;
+}
+
+scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize)
+{
+	// Only read events are currently processed here
+	if (scsi->state != SCSIRead)
+		return (scsi_ret_t){0, 0, scsi->state};
+
+	// Calculate packet size
+	uint32_t size = maxsize < scsi->length ? maxsize : scsi->length;
+
+	// Insufficient buffering
+	if (scsi_read_available(scsi) < size)
+		return (scsi_ret_t){0, 0, scsi->state};
+
+	// Read available data
+	uint32_t length = size;
+	void *p = scsi_read_data(scsi, &length);
+	if (!p || length != size) {
+		dbgbkpt();
+		return (scsi_ret_t){0, 0, scsi->state};
+	}
+
+	// Update status
+	scsi->length -= size;
+	if (!scsi->length) {
+		if (!scsi_read_stop(scsi))
+			dbgbkpt();
+		scsi->state = SCSIGood;
+	}
+	return (scsi_ret_t){p, size, scsi->state};
 }
