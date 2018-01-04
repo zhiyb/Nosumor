@@ -58,12 +58,11 @@ void usb_ep0_enum(usb_t *usb, uint32_t speed)
 		// HS: Maximum control packet size: 64 bytes
 		EP_IN(usb->base, 0)->DIEPCTL = 0;
 	}
-	// Initialise descriptors and endpoints
+	// Initialise descriptors
 	usb_desc_init(usb);
-	for (int i = 0; i != USB_EPIN_CNT; i++)
-		FUNC(usb->epin[i].init)(usb, i);
-	for (int i = 0; i != USB_EPIN_CNT; i++)
-		FUNC(usb->epout[i].init)(usb, i);
+	// Initialise endpoint 0
+	FUNC(usb->epin[0].init)(usb, 0);
+	FUNC(usb->epout[0].init)(usb, 0);
 }
 
 uint32_t usb_ep0_max_size(USB_OTG_GlobalTypeDef *usb)
