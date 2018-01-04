@@ -47,7 +47,7 @@ static scsi_ret_t sense_fixed(scsi_t *scsi, uint8_t response, uint8_t status,
 	data->sense = asc;
 	data->qualifier = ascq;
 
-	scsi_ret_t ret = {data, 7 + data->additional, Failure};
+	scsi_ret_t ret = {data, 7 + data->additional, SCSIFailure};
 	return ret;
 }
 
@@ -88,7 +88,7 @@ static scsi_ret_t unimplemented(scsi_t *scsi)
 
 static scsi_ret_t test_unit_ready(scsi_t *scsi, cmd_TEST_UNIT_READY_t *cmd)
 {
-	scsi_ret_t ret = {0, 0, Good};
+	scsi_ret_t ret = {0, 0, SCSIGood};
 	return ret;
 }
 
@@ -114,7 +114,7 @@ static scsi_ret_t inquiry_standard(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 	strcpy((void *)data->product, PRODUCT_NAME);
 	memcpy(data->revision, SW_VERSION_STR, 4);
 
-	scsi_ret_t ret = {data, 4 + data->additional, Good};
+	scsi_ret_t ret = {data, 4 + data->additional, SCSIGood};
 	return ret;
 }
 
@@ -135,7 +135,7 @@ static scsi_ret_t inquiry_vital(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
 	}
 
-	scsi_ret_t ret = {data, data->length, Good};
+	scsi_ret_t ret = {data, data->length, SCSIGood};
 	// Endianness conversion
 	data->length = __REV16(data->length);
 	return ret;
@@ -189,7 +189,7 @@ static scsi_ret_t request_sense(scsi_t *scsi, cmd_REQUEST_SENSE_t *cmd)
 		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
 		ret = sense_fixed(scsi, 0x70, GOOD, NO_SENSE, 0x00, 0x00);
 
-	ret.state = Good;
+	ret.state = SCSIGood;
 	if (ret.length > cmd->length)
 		ret.length = cmd->length;
 	return ret;
@@ -211,7 +211,7 @@ static scsi_ret_t read_capacity_10(scsi_t *scsi, cmd_READ_CAPACITY_10_t *cmd)
 		scsi_capacity(scsi, &data->lbaddr, &data->lbsize);
 		data->lbaddr--;
 
-		scsi_ret_t ret = {data, 8, Good};
+		scsi_ret_t ret = {data, 8, SCSIGood};
 		// Endianness conversion
 		data->lbaddr = __REV(data->lbaddr);
 		data->lbsize = __REV(data->lbsize);
@@ -251,7 +251,7 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 
 	dbgprintf(ESC_GREEN "[SCSI] Read %u blocks from %lu\n", cmd->length, cmd->lbaddr);
 
-	scsi_ret_t ret = {0, 0, Good};
+	scsi_ret_t ret = {0, 0, SCSIGood};
 	if (cmd->length == 0)
 		return ret;
 
@@ -282,7 +282,7 @@ static scsi_ret_t write_10(scsi_t *scsi, cmd_WRITE_10_t *cmd)
 		scsi->sense.sense = ILLEGAL_REQUEST;
 		scsi->sense.asc = 0x21;
 		scsi->sense.ascq = 0x00;
-		return (scsi_ret_t){0, 0, Failure};
+		return (scsi_ret_t){0, 0, SCSIFailure};
 	}
 
 	if (cmd->group != 0)
@@ -296,16 +296,16 @@ static scsi_ret_t write_10(scsi_t *scsi, cmd_WRITE_10_t *cmd)
 		scsi->sense.sense = ILLEGAL_REQUEST;
 		scsi->sense.asc = 0x21;
 		scsi->sense.ascq = 0x00;
-		return (scsi_ret_t){0, 0, Failure};
+		return (scsi_ret_t){0, 0, SCSIFailure};
 	}
 
 	dbgprintf(ESC_RED "[SCSI] Write %u blocks from %lu\n", cmd->length, cmd->lbaddr);
 
 	scsi->length = cmd->length * lbsize;
-	scsi->state = Write;
+	scsi->state = SCSIWrite;
 	// TODO: Error checking
 	scsi_write_start(scsi, cmd->lbaddr * lbsize, scsi->length);
-	return (scsi_ret_t){0, 0, Write};
+	return (scsi_ret_t){0, 0, SCSIWrite};
 }
 
 scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
@@ -347,14 +347,14 @@ scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
 
 scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 {
-	if (scsi->state != Write) {
+	if ((scsi->state & ~SCSIBusy) != SCSIWrite) {
 		dbgbkpt();
-		return Failure;
+		return SCSIFailure;
 	}
 
 	if (scsi->length < size) {
 		dbgbkpt();
-		return Failure;
+		return SCSIFailure;
 	}
 
 	// Retrieve capacity information
@@ -362,14 +362,24 @@ scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 	scsi_capacity(scsi, &lbnum, &lbsize);
 
 	// Transfer data
-	size = scsi_write_data(scsi, size, pdata);
+	if (!(scsi->state & SCSIBusy)) {
+		// TODO: Error checking
+		size = scsi_write_data(scsi, size, pdata);
+	}
 
-	// Update offset
-	scsi->length -= size;
-	if (scsi->length)
-		return Write;
-	// TODO: Error checking
-	scsi_write_stop(scsi);
-	scsi->state = Good;
-	return Good;
+	// Check busy status
+	if (scsi_write_busy(scsi)) {
+		scsi->state = SCSIWrite | SCSIBusy;
+	} else {
+		// Update offset
+		scsi->length -= size;
+		if (scsi->length) {
+			scsi->state = SCSIWrite;
+		} else {
+			// TODO: Error checking
+			scsi_write_stop(scsi);
+			scsi->state = SCSIGood;
+		};
+	}
+	return scsi->state;
 }

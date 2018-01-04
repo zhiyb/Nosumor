@@ -187,9 +187,14 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	cbw_t *cbw = &msc->buf[msc->outbuf].cbw;
 	csw_t *csw = &msc->inbuf.csw;
 
-	if (msc->scsi_state == Write) {
+	if ((msc->scsi_state & ~SCSIBusy) == SCSIWrite) {
 		uint32_t size = msc->buf_size[msc->outbuf];
-		msc->scsi_state = scsi_data(msc->scsi, msc->buf[msc->outbuf].raw, size);
+		msc->scsi_state = scsi_data(msc->scsi,
+					    msc->buf[msc->outbuf].raw, size);
+		// Check with SCSI again if currently busy
+		if (msc->scsi_state & SCSIBusy)
+			return;
+		// Mark buffer as available
 		msc->buf_size[msc->outbuf] = 0;
 		// Check alternative buffer status
 		if (msc->buf_size[!msc->outbuf])
@@ -197,7 +202,7 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 		// Update Command Status Wrapper (CSW)
 		csw->dCSWDataResidue -= size;
 		// Send Command Status Wrapper (CSW) after transfer finished
-		if (msc->scsi_state != Write)
+		if (msc->scsi_state != SCSIWrite)
 			goto s_csw;
 		return;
 	}
@@ -236,8 +241,8 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	// Prepare CSW
 	csw->dCSWDataResidue = cbw->dCBWDataTransferLength - ret.length;
 	csw->dCSWTag = cbw->dCBWTag;
-s_csw:	csw->bCSWStatus = msc->scsi_state == Failure;
+s_csw:	csw->bCSWStatus = msc->scsi_state == SCSIFailure;
 	// Send CSW after transfer finished
-	if (msc->scsi_state == Good || msc->scsi_state == Failure)
+	if (msc->scsi_state == SCSIGood || msc->scsi_state == SCSIFailure)
 		usb_ep_in_transfer(usb->base, msc->ep_in, csw, 13);
 }

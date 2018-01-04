@@ -9,7 +9,8 @@ extern "C" {
 
 typedef struct scsi_t scsi_t;
 
-typedef enum {Good = 0, Failure, Read, Write} scsi_state_t;
+typedef enum {SCSIGood = 0, SCSIFailure, SCSIRead, SCSIWrite,
+	      SCSIBusy = 0x80} scsi_state_t;
 
 typedef struct scsi_ret_t {
 	void *p;
@@ -27,6 +28,7 @@ extern uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize);
 extern void *scsi_read(scsi_t *scsi, uint32_t offset, uint32_t *length);
 extern uint32_t scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size);
 extern uint32_t scsi_write_data(scsi_t *scsi, uint32_t length, const void *p);
+extern uint32_t scsi_write_busy(scsi_t *scsi);
 extern uint32_t scsi_write_stop(scsi_t *scsi);
 
 #ifdef __cplusplus
