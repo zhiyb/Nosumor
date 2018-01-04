@@ -1,3 +1,4 @@
+#include <debug.h>
 #include "usb_ep.h"
 #include "usb_ep0.h"
 #include "usb_macros.h"
@@ -19,16 +20,16 @@ void usb_ep_register(usb_t *usb, const epin_t *epin, int *in, const epout_t *epo
 	}
 }
 
-void usb_ep_in_transfer(USB_OTG_GlobalTypeDef *usb, int n, const void *p, uint32_t size)
+uint32_t usb_ep_in_transfer(USB_OTG_GlobalTypeDef *usb, int n, const void *p, uint32_t size)
 {
 	// Wait for endpoint available
 	if (!usb_ep_in_wait(usb, n))
-		return;
+		return 0;
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb, n);
 	if (size == 0) {
 		ep->DIEPTSIZ = (1ul << USB_OTG_DIEPTSIZ_PKTCNT_Pos) | 0;
 		DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_CNAK_Msk);
-		return;
+		return 0;
 	}
 	uint32_t max = usb_ep_in_max_size(usb, n);
 	uint32_t pcnt = (size + max - 1) / max;
@@ -36,6 +37,7 @@ void usb_ep_in_transfer(USB_OTG_GlobalTypeDef *usb, int n, const void *p, uint32
 	ep->DIEPDMA = (uint32_t)p;
 	// Enable endpoint
 	DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_CNAK_Msk);
+	return size;
 }
 
 void usb_ep_in_descriptor(USB_OTG_GlobalTypeDef *usb, int ep, desc_t desc)
@@ -77,10 +79,14 @@ int usb_ep_in_wait(USB_OTG_GlobalTypeDef *usb, int n)
 	// Wait for endpoint available
 	uint32_t ctl;
 	while ((ctl = ep->DIEPCTL) & USB_OTG_DIEPCTL_EPENA_Msk) {
-		if (!(ctl & USB_OTG_DIEPCTL_USBAEP_Msk))
+		if (!(ctl & USB_OTG_DIEPCTL_USBAEP_Msk)) {
+			dbgbkpt();
 			return 0;
-		if (ep->DIEPINT & USB_OTG_DIEPINT_TOC_Msk)
+		}
+		if (ep->DIEPINT & USB_OTG_DIEPINT_TOC_Msk) {
+			dbgbkpt();
 			return 0;
+		}
 		if (ctl & USB_OTG_DIEPCTL_NAKSTS_Msk)
 			return 1;
 	}
