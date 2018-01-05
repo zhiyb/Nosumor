@@ -87,8 +87,6 @@ int usb_ep_in_wait(USB_OTG_GlobalTypeDef *usb, int n)
 			dbgbkpt();
 			return 0;
 		}
-		if (ctl & USB_OTG_DIEPCTL_NAKSTS_Msk)
-			return 1;
 	}
 	return 1;
 }
