@@ -253,6 +253,10 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 
 	// Process SCSI commands
 	ret = scsi_cmd(msc->scsi, cbw->CBWCB, cbw->bCBWCBLength);
+	// Prepare CSW
+	csw->dCSWDataResidue = cbw->dCBWDataTransferLength;
+	csw->dCSWTag = cbw->dCBWTag;
+	// Mark buffer as available
 	__disable_irq();
 	if (outbuf != msc->outbuf)
 		dbgbkpt();
@@ -264,16 +268,15 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	// SCSI data transfer
 	if (dir == CBW_DIR_IN &&
 			(ret.state == SCSIGood || ret.state == SCSIFailure)) {
-		if (ret.length > cbw->dCBWDataTransferLength)
-			ret.length = cbw->dCBWDataTransferLength;
+		if (ret.length > csw->dCSWDataResidue)
+			ret.length = csw->dCSWDataResidue;
 		if (usb_ep_in_transfer(usb->base, msc->ep_in,
 				       ret.p, ret.length) != ret.length)
 			dbgbkpt();
 	}
 
 	// Prepare CSW
-	csw->dCSWDataResidue = cbw->dCBWDataTransferLength - ret.length;
-	csw->dCSWTag = cbw->dCBWTag;
+	csw->dCSWDataResidue -= ret.length;
 s_csw:	csw->bCSWStatus = ret.state == SCSIFailure;
 	// Send CSW after transfer finished
 	if (ret.state == SCSIGood || ret.state == SCSIFailure) {
