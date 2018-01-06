@@ -59,6 +59,13 @@ int MainWindow::init()
 	return 0;
 }
 
+void MainWindow::changeEvent(QEvent *event)
+{
+	QMainWindow::changeEvent(event);
+	if (event->type() == QEvent::ActivationChange && this->isActiveWindow())
+		devRefresh();
+}
+
 void MainWindow::devRefresh()
 {
 	// Refresh existing devices, check for disconnection

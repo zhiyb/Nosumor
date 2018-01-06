@@ -19,6 +19,9 @@ signals:
 
 public slots:
 
+protected:
+	void changeEvent(QEvent *event);
+
 private slots:
 	void devRefresh();
 	void devRemoved(DeviceWidget *dev);

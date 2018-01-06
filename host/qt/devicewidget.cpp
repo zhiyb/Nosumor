@@ -45,7 +45,6 @@ bool DeviceWidget::devRefresh()
 	wchar_t str[256];
 	if (hid_get_serial_number_string(dev, str, 256) == 0)
 		return true;
-	QMessageBox::information(this, tr("Info"), tr("Device %1 removed").arg(path));
 	deleteLater();
 	return false;
 }
