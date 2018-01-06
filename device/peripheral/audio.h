@@ -32,6 +32,10 @@ uint32_t audio_transfer_cnt();
 uint32_t audio_data_cnt();
 int32_t audio_buffering();
 
+#ifdef DEBUG
+void audio_test();
+#endif
+
 #ifdef __cplusplus
 }
 #endif

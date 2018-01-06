@@ -256,6 +256,11 @@ loop:	;
 	fflush(stdout);
 
 #ifdef DEBUG
+	if (s & keyboard_masks[3]) {
+		audio_test();
+		while (keyboard_status());
+	}
+
 	if ((s & mask) == mask) {
 		usb_connect(&usb, 0);
 		while (keyboard_status());

@@ -224,3 +224,72 @@ void audio_play(void *p, uint32_t size)
 	data.cnt_data += size >> 3u;
 	data.ptr = mptr;
 }
+
+#ifdef DEBUG
+
+#define TEST_FREQ	620
+#define TEST_SIZE	(192000 / TEST_FREQ)
+#define TEST_BUF_SIZE	(TEST_SIZE * AUDIO_FRAME_SIZE)
+
+static void *test = 0;
+
+void audio_test()
+{
+	if (test) {
+		// Redirect DMA
+		// Disable DMA stream
+		STREAM_TX->CR &= ~DMA_SxCR_CIRC_Msk;
+		while (STREAM_TX->CR & DMA_SxCR_EN_Msk);
+		// Clear DMA flags
+		DMA2->HIFCR = DMA_HIFCR_CTCIF5_Msk | DMA_HIFCR_CHTIF5_Msk |
+				DMA_HIFCR_CTEIF5_Msk | DMA_HIFCR_CDMEIF5_Msk |
+				DMA_HIFCR_CFEIF5_Msk;
+		// Memory address
+		STREAM_TX->M0AR = (uint32_t)data.buf;
+		// Number of data items
+		STREAM_TX->NDTR = AUDIO_TRANSFER_SIZE;
+		// Enable DMA stream
+		STREAM_TX->CR |= DMA_SxCR_EN_Msk | DMA_SxCR_CIRC_Msk;
+
+		// Free memory space
+		free(test);
+		test = 0;
+		return;
+	}
+
+	// Generate sin wave
+	if (!test) {
+		test = malloc(TEST_BUF_SIZE);
+		if (!test) {
+			dbgbkpt();
+			return;
+		}
+		uint32_t *p = test;
+		for (uint32_t i = TEST_SIZE; i != 0; i--) {
+			uint32_t v = round(sin((float)i / (float)TEST_SIZE) * 0x3fffffff);
+			v = __REV16(__REV(v));
+			*p++ = v;
+			*p++ = v;
+		}
+	}
+
+	// Redirect DMA
+	// Disable DMA stream
+	STREAM_TX->CR &= ~DMA_SxCR_CIRC_Msk;
+	while (STREAM_TX->CR & DMA_SxCR_EN_Msk);
+	// Clear DMA flags
+	DMA2->HIFCR = DMA_HIFCR_CTCIF5_Msk | DMA_HIFCR_CHTIF5_Msk |
+			DMA_HIFCR_CTEIF5_Msk | DMA_HIFCR_CDMEIF5_Msk |
+			DMA_HIFCR_CFEIF5_Msk;
+	// Memory address
+	STREAM_TX->M0AR = (uint32_t)test;
+	// Number of data items
+	STREAM_TX->NDTR = TEST_BUF_SIZE >> 1u;
+	// Enable DMA stream
+	STREAM_TX->CR |= DMA_SxCR_EN_Msk | DMA_SxCR_CIRC_Msk;
+
+	// Enable codec
+	audio_out_enable(1);
+}
+
+#endif	// DEBUG
