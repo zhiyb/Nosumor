@@ -322,6 +322,9 @@ loop:	;
 		prev.blocks = cur.blocks;
 	}
 #endif
+#ifndef DEBUG
+	__WFI();
+#endif
 	goto loop;
 	return 0;
 }
