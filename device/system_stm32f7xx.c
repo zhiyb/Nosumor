@@ -257,6 +257,25 @@ void SystemCoreClockUpdate(void)
 }
 
 /**
+ * @brief  This is the code that gets called when the processor receives an
+ *         unexpected interrupt.  This simply enters an infinite loop, preserving
+ *         the system state for examination by a debugger.
+ * @param  None
+ * @retval None
+*/
+void debug_handler()
+{
+#ifdef DEBUG
+	uint32_t ipsr = __get_IPSR();
+	SCB_Type scb = *SCB;
+	NVIC_Type nvic = *NVIC;
+	SCB_CleanInvalidateDCache();
+#endif
+	__BKPT(0);
+	for (;;);
+}
+
+/**
   * @}
   */
 
