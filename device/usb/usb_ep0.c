@@ -58,6 +58,10 @@ void usb_ep0_enum(usb_t *usb, uint32_t speed)
 		// HS: Maximum control packet size: 64 bytes
 		EP_IN(usb->base, 0)->DIEPCTL = 0;
 	}
+	// Allocate RX queue
+	uint32_t size = usb_ram_size(usb) / 4 * 3;
+	usb_ram_alloc(usb, &size);
+	usb->base->GRXFSIZ = size / 4;
 	// Initialise descriptors
 	usb_desc_init(usb);
 	// Initialise endpoint 0

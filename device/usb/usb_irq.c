@@ -24,10 +24,6 @@ static void usb_reset(usb_t *usb)
 	dev->DAINTMSK = 0;
 	// Reset USB FIFO RAM allocation
 	usb_ram_reset(usb);
-	// Allocate RX queue
-	uint32_t size = usb_ram_size(usb) / 2;
-	usb_ram_alloc(usb, &size);
-	usb->base->GRXFSIZ = size / 4;
 	usb->speed = USB_Reset;
 }
 
