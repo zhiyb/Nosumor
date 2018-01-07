@@ -76,7 +76,7 @@ static void epin_xfr_cplt(usb_t *usb, uint32_t n)
 	usb_isoc_check(usb, n | EP_DIR_IN, 0);
 	// Enable endpoint
 	data->pending = 0;
-	if (!--data->cnt)
+	if (!data->cnt)
 		epin_update(usb, n);
 }
 

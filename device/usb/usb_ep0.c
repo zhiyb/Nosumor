@@ -9,7 +9,7 @@
 
 #define MAX_SETUP_CNT	3u
 #define MAX_PKT_CNT	1u
-#define MAX_SIZE	32ul
+#define MAX_SIZE	64ul
 
 #define DSTS_ENUMSPD_HS_PHY_30MHZ_OR_60MHZ     (0 << 1)
 #define DSTS_ENUMSPD_FS_PHY_30MHZ_OR_60MHZ     (1 << 1)
@@ -25,7 +25,7 @@ typedef struct setup_buf_t {
 typedef struct {
 	uint32_t siz, dma;
 	setup_buf_t * volatile pkt;
-	uint8_t buf[MAX_SIZE];
+	uint8_t buf[MAX_SIZE] ALIGN(4);
 } epout_data_t;
 
 static void epin_init(usb_t *usb, uint32_t n)

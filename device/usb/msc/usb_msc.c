@@ -11,8 +11,8 @@
 #include "usb_msc_defs.h"
 #include "scsi.h"
 
-#define MSC_IN_MAX_SIZE		1024u
-#define MSC_OUT_MAX_SIZE	1024u
+#define MSC_IN_MAX_SIZE		512u
+#define MSC_OUT_MAX_SIZE	512u
 #define MSC_OUT_MAX_PKT		1u
 
 #define CBW_DIR_Msk	0x80
@@ -79,6 +79,7 @@ static void epout_swap(usb_t *usb, uint32_t n)
 	// Receive packets
 	usb_msc_t *data = (usb_msc_t *)usb->epout[n].data;
 	uint8_t outbuf = data->outbuf;
+	SCB_InvalidateDCache_by_Addr((void *)&buf[outbuf], MSC_OUT_MAX_SIZE);
 	usb_ep_out_transfer(usb->base, n, &buf[outbuf], 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
 	data->outbuf = !outbuf;
 }
@@ -106,10 +107,11 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 	uint32_t pkt_cnt = MSC_OUT_MAX_PKT - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
 	uint32_t size = MSC_OUT_MAX_SIZE - FIELD(siz, USB_OTG_DOEPTSIZ_XFRSIZ);
 	// Enqueue packets
-	if (pkt_cnt != 1u) {
+	if (pkt_cnt != 1u || size == 0) {
 		dbgbkpt();
 		return;
 	}
+	// Update buffer size
 	data->buf_size[!data->outbuf] = size;
 	// Check alternative buffer availability
 	if (data->buf_size[data->outbuf])
@@ -207,7 +209,6 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	uint8_t outbuf = msc->outbuf;
 	if (!msc->buf_size[outbuf])
 		return;
-	SCB_InvalidateDCache_by_Addr((void *)&buf[outbuf], MSC_OUT_MAX_SIZE);
 
 	// Data packet
 	if ((ret.state & ~SCSIBusy) == SCSIWrite) {
@@ -222,9 +223,10 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 		// Mark buffer as available
 		msc->buf_size[outbuf] = 0;
 		// Check alternative buffer status
-		if (msc->buf_size[!outbuf])
-			epout_swap(usb, msc->ep_out);
+		uint32_t buf_size = msc->buf_size[!outbuf];
 		__enable_irq();
+		if (buf_size)
+			epout_swap(usb, msc->ep_out);
 		// Update CSW
 		csw->dCSWDataResidue -= size;
 		// Send CSW after transfer finished
@@ -262,9 +264,10 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 		dbgbkpt();
 	msc->buf_size[outbuf] = 0;
 	// Check alternative buffer status
-	if (msc->buf_size[!outbuf])
-		epout_swap(usb, msc->ep_out);
+	uint32_t buf_size = msc->buf_size[!outbuf];
 	__enable_irq();
+	if (buf_size)
+		epout_swap(usb, msc->ep_out);
 	// SCSI data transfer
 	if (dir == CBW_DIR_IN &&
 			(ret.state == SCSIGood || ret.state == SCSIFailure)) {

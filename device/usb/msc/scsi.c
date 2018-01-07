@@ -381,7 +381,7 @@ scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 			if (!scsi_write_stop(scsi))
 				dbgbkpt();
 			scsi->state = SCSIGood;
-		};
+		}
 	}
 	return scsi->state;
 }

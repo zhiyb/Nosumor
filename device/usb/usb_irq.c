@@ -192,9 +192,8 @@ void OTG_HS_EP1_IN_IRQHandler()
 	usb_t *usb = usb_hs;
 	USB_OTG_GlobalTypeDef *base = usb->base;
 	USB_OTG_DeviceTypeDef *dev = DEV(base);
-	dev->DEACHINT = USB_OTG_DEACHINT_IEP1INT_Msk;
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(base, 1);
-	uint32_t intr = ep->DIEPINT;
+	uint32_t intr = ep->DIEPINT & dev->DINEP1MSK;
 	if (intr & USB_OTG_DIEPINT_XFRC_Msk) {
 		ep->DIEPINT = USB_OTG_DIEPINT_XFRC_Msk;
 		FUNC(usb->epin[1].xfr_cplt)(usb, 1);
@@ -210,9 +209,8 @@ void OTG_HS_EP1_OUT_IRQHandler()
 	usb_t *usb = usb_hs;
 	USB_OTG_GlobalTypeDef *base = usb->base;
 	USB_OTG_DeviceTypeDef *dev = DEV(base);
-	dev->DEACHINT = USB_OTG_DEACHINT_OEP1INT_Msk;
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(base, 1);
-	uint32_t intr = ep->DOEPINT;
+	uint32_t intr = ep->DOEPINT & dev->DOUTEP1MSK;
 	if (intr & USB_OTG_DOEPINT_XFRC_Msk) {
 		ep->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk;
 		FUNC(usb->epout[1].xfr_cplt)(usb, 1);

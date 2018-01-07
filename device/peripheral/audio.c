@@ -210,8 +210,7 @@ void audio_play(void *p, uint32_t size)
 		dbgbkpt();
 	uint32_t *mptr = mem;
 	while (slots--) {
-		*mptr++ = ((*ptr) << 16ul) | ((*ptr) >> 16ul);
-		ptr++;
+		*mptr++ = __REV16(__REV(*ptr++));
 		// Circular buffer wrap around
 		if ((void *)mptr == (void *)data.buf + AUDIO_BUFFER_SIZE)
 			mptr = (void *)data.buf;

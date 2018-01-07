@@ -76,7 +76,7 @@ uint32_t usb_ep_in_active(USB_OTG_GlobalTypeDef *usb, int ep)
 int usb_ep_in_wait(USB_OTG_GlobalTypeDef *usb, int n)
 {
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb, n);
-	// Wait for endpoint available
+	// Wait for endpoint become available
 	uint32_t ctl;
 	while ((ctl = ep->DIEPCTL) & USB_OTG_DIEPCTL_EPENA_Msk) {
 		if (!(ctl & USB_OTG_DIEPCTL_USBAEP_Msk)) {
@@ -102,6 +102,8 @@ void usb_ep_out_transfer(USB_OTG_GlobalTypeDef *usb, int n, void *p,
 			 uint8_t scnt, uint8_t pcnt, uint32_t size)
 {
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb, n);
+	// Wait until endpoint become available
+	while (ep->DOEPCTL & USB_OTG_DOEPCTL_EPENA_Msk);
 	// Configure endpoint DMA
 	ep->DOEPDMA = (uint32_t)p;
 	// Reset packet counter
