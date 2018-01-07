@@ -19,6 +19,7 @@
 #include "peripheral/keyboard.h"
 #include "peripheral/audio.h"
 #include "peripheral/mmc.h"
+#include "peripheral/rgb.h"
 // USB interfaces
 #include "usb/usb.h"
 #include "usb/usb_ram.h"
@@ -98,6 +99,9 @@ static inline void init()
 	puts(ESC_CLEAR ESC_MAGENTA VARIANT " build @ " __DATE__ " " __TIME__);
 	printf(ESC_YELLOW "Core clock: " ESC_WHITE "%lu\n", clkAHB());
 
+	puts(ESC_CYAN "Initialising LEDs...");
+	rgb_init();
+
 	puts(ESC_CYAN "Initialising USB HS...");
 	usb_init(&usb, USB_OTG_HS);
 	printf(ESC_YELLOW "USB in " ESC_WHITE "%s" ESC_YELLOW " mode\n",
@@ -126,25 +130,6 @@ static inline void init()
 	puts(ESC_CYAN "Initialising USB mass storage...");
 	if (mmc_capacity() != 0)
 		usb_msc = usb_msc_init(&usb);
-
-	puts(ESC_CYAN "Initialising LEDs...");
-	// RGB:	PA0(R), PA1(G), PA2(B)			| TIM5_CH123
-	// LED:	PB14(1), PB15(2), PA11(3), PA10(4)	| TIM12_CH12, TIM1_CH43
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN;
-	// 01: General purpose output mode
-	GPIO_MODER(GPIOA, 0, 0b01);
-	GPIO_MODER(GPIOA, 1, 0b01);
-	GPIO_MODER(GPIOA, 2, 0b01);
-	GPIO_OTYPER_OD(GPIOA, 0);
-	GPIO_OTYPER_OD(GPIOA, 1);
-	GPIO_OTYPER_OD(GPIOA, 2);
-	GPIOA->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1 | GPIO_ODR_ODR_2);
-	GPIO_MODER(GPIOB, 14, 0b01);
-	GPIO_MODER(GPIOB, 15, 0b01);
-	GPIOB->ODR &= ~(GPIO_ODR_ODR_14 | GPIO_ODR_ODR_15);
-	GPIO_MODER(GPIOA, 10, 0b01);
-	GPIO_MODER(GPIOA, 11, 0b01);
-	GPIOA->ODR &= ~(GPIO_ODR_ODR_10 | GPIO_ODR_ODR_11);
 
 	puts(ESC_GREEN "Initialisation done");
 	usb_connect(&usb, 1);
@@ -218,6 +203,7 @@ int main()
 #endif
 loop:	;
 	uint32_t s = keyboard_status();
+#if 0
 	int up = s & (keyboard_masks[0] | keyboard_masks[1]);
 	if (up)
 		GPIOA->ODR |= GPIO_ODR_ODR_10 | GPIO_ODR_ODR_11;
@@ -248,6 +234,7 @@ loop:	;
 		else
 			GPIOA->ODR |= GPIO_ODR_ODR_1;
 	}
+#endif
 
 	// Process time consuming tasks
 	usb_process(&usb);

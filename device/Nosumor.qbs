@@ -14,7 +14,7 @@ Project {
         property bool itcm: false
         property bool bootloader: false
 
-        cpp.defines: ["HWVER=0x0002"]
+        cpp.defines: ["HWVER=0x0003"]
 
         cpp.commonCompilerFlags: [
             "-Wno-unused-parameter",
@@ -63,6 +63,8 @@ Project {
                 "peripheral/mmc_defs.h",
                 "peripheral/mmc.c",
                 "peripheral/mmc.h",
+                "peripheral/rgb.c",
+                "peripheral/rgb.h",
                 "peripheral/uart.c",
                 "peripheral/uart.h",
                 "peripheral/keyboard.c",
