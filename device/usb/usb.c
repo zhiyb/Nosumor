@@ -47,13 +47,13 @@ void usb_init(usb_t *usb, USB_OTG_GlobalTypeDef *base)
 
 	uint32_t pg = NVIC_GetPriorityGrouping();
 	NVIC_SetPriority(OTG_HS_IRQn,
-			 NVIC_EncodePriority(pg, NVIC_PRIORITY_USB, 2));
+			 NVIC_EncodePriority(pg, NVIC_PRIORITY_USB, 1));
 	NVIC_SetPriority(OTG_HS_WKUP_IRQn,
 			 NVIC_EncodePriority(pg, NVIC_PRIORITY_USB, 0));
 	NVIC_SetPriority(OTG_HS_EP1_IN_IRQn,
-			 NVIC_EncodePriority(pg, NVIC_PRIORITY_USB, 1));
+			 NVIC_EncodePriority(pg, NVIC_PRIORITY_USB_H, 1));
 	NVIC_SetPriority(OTG_HS_EP1_OUT_IRQn,
-			 NVIC_EncodePriority(pg, NVIC_PRIORITY_USB, 1));
+			 NVIC_EncodePriority(pg, NVIC_PRIORITY_USB_H, 0));
 	NVIC_EnableIRQ(OTG_HS_IRQn);
 	NVIC_EnableIRQ(OTG_HS_WKUP_IRQn);
 	NVIC_EnableIRQ(OTG_HS_EP1_IN_IRQn);
