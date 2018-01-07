@@ -12,7 +12,7 @@ uint32_t usb_ram_alloc(usb_t *usb, uint32_t *size)
 	}
 	uint32_t addr = usb->top;
 	usb->top += *size;
-	return addr;
+	return addr >> 2u;
 }
 
 void usb_ram_reset(usb_t *usb)
