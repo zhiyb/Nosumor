@@ -7,6 +7,9 @@
 #include "usb_audio2_structs.h"
 #include "usb_audio2_ep_data.h"
 
+#define DATA_MAX_PKT	1u
+#define DATA_MAX_SIZE	(EP_MAX_SIZE * DATA_MAX_PKT)
+
 typedef struct {
 	void *data[2];
 	int swap, enabled;
@@ -14,16 +17,22 @@ typedef struct {
 
 static void epout_recv(usb_t *usb, uint32_t n)
 {
+#if DATA_MAX_PKT == 1u
 	// Check frame parity
 	USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
 	uint32_t fn = FIELD(dev->DSTS, USB_OTG_DSTS_FNSOF) & 1u;
 	fn = fn ? USB_OTG_DOEPCTL_SD0PID_SEVNFRM_Msk : USB_OTG_DOEPCTL_SODDFRM_Msk;
+#else
+	uint32_t fn = 0;
+#endif
 	// Configure endpoint DMA
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 	epdata_t *epdata = usb->epout[n].data;
 	ep->DOEPDMA = (uint32_t)epdata->data[epdata->swap];
 	// Reset packet counter
-	ep->DOEPTSIZ = (1u << USB_OTG_DOEPTSIZ_PKTCNT_Pos) | DATA_MAX_SIZE;
+	ep->DOEPTSIZ = (DATA_MAX_PKT << USB_OTG_DOEPTSIZ_PKTCNT_Pos) | DATA_MAX_SIZE;
+	// Clear interrupts
+	ep->DOEPINT = USB_OTG_DOEPINT_OTEPDIS_Msk | USB_OTG_DOEPINT_XFRC_Msk;
 	// Enable endpoint
 	ep->DOEPCTL |= fn | USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA;
 	epdata->swap = !epdata->swap;
@@ -71,7 +80,7 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 	uint32_t siz = ep->DOEPTSIZ;
 	if (epdata->enabled)
 		epout_recv(usb, n);
-	uint32_t pktcnt = 1u - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
+	uint32_t pktcnt = DATA_MAX_PKT - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
 	uint32_t size = DATA_MAX_SIZE - FIELD(siz, USB_OTG_DOEPTSIZ_XFRSIZ);
 	if (pktcnt)
 		audio_play(epdata->data[epdata->swap], size);

@@ -9,7 +9,7 @@
 #include "../usb_desc.h"
 #include "usb_audio2_entities.h"
 
-#define DATA_MAX_SIZE	256u
+#define EP_MAX_SIZE	(192u + 32u)
 #define CHANNELS	(1u + AUDIO_CHANNELS)
 
 #ifdef __cplusplus

@@ -88,7 +88,7 @@ static void usbif_as_config(usb_t *usb, void *pdata)
 	// Data stream endpoint descriptor
 	usb_desc_add_endpoint(usb, EP_DIR_OUT | data->ep_data,
 			      EP_ISOCHRONOUS | EP_ISO_ASYNC | EP_ISO_DATA,
-			      DATA_MAX_SIZE, 1u);
+			      EP_MAX_SIZE, 1u);
 	usb_desc_add(usb, &desc_ep[0], desc_ep[0].bLength);
 	// Feedback endpoint descriptor
 	usb_desc_add_endpoint_sync(usb, EP_DIR_IN | data->ep_feedback,
