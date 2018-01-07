@@ -21,6 +21,11 @@ void usb_ram_reset(usb_t *usb)
 	usb->fifo = 0;
 }
 
+uint32_t usb_ram_usage(usb_t *usb)
+{
+	return usb->top;
+}
+
 uint32_t usb_ram_size(usb_t *usb)
 {
 	if (usb->max == 0)

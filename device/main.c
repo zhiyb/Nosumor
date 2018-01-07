@@ -21,6 +21,7 @@
 #include "peripheral/mmc.h"
 // USB interfaces
 #include "usb/usb.h"
+#include "usb/usb_ram.h"
 #include "usb/audio2/usb_audio2.h"
 #include "usb/msc/usb_msc.h"
 #include "usb/hid/usb_hid.h"
@@ -208,12 +209,12 @@ int main()
 #ifdef DEBUG
 	uint32_t mask = keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4];
 	struct {
-		uint32_t tick, audio, data, feedback, blocks;
+		uint32_t tick, audio, data, feedback, blocks, heap, usbram;
 	} cur, diff, prev = {
 		systick_cnt(), audio_transfer_cnt(),
-		audio_data_cnt(), usb_audio2_feedback_cnt(), mmc_statistics(),
+		audio_data_cnt(), usb_audio2_feedback_cnt(),
+		mmc_statistics(), 0, 0,
 	};
-	size_t heap = 0;
 #endif
 loop:	;
 	uint32_t s = keyboard_status();
@@ -267,15 +268,6 @@ loop:	;
 		usb_connect(&usb, 1);
 	}
 
-	if (heap != heap_usage()) {
-		dbgprintf(ESC_YELLOW "[HEAP]: "
-			  ESC_WHITE "%.2f%%" ESC_YELLOW ", "
-			  ESC_WHITE "%u/%u" ESC_YELLOW " bytes\n",
-			  (float)heap_usage() * 100.f / (float)heap_size(),
-			  heap_usage(), heap_size());
-		heap = heap_usage();
-	}
-
 	// Every 1024 systick ticks
 	cur.tick = systick_cnt();
 	if ((cur.tick - prev.tick) & ~(1023ul)) {
@@ -284,17 +276,37 @@ loop:	;
 		cur.data = audio_data_cnt();
 		cur.feedback = usb_audio2_feedback_cnt();
 		cur.blocks = mmc_statistics();
+		cur.heap = heap_usage();
+		cur.usbram = usb_ram_usage(&usb);
 
 		// Calculate difference
 		diff.audio = (cur.audio - prev.audio) * 1000ul;
 		diff.data = (cur.data - prev.data) * 1000ul;
 		diff.feedback = (cur.feedback - prev.feedback) * 1000ul;
 		diff.blocks = cur.blocks - prev.blocks;
+		diff.heap = cur.heap - prev.heap;
+		diff.usbram = cur.usbram - prev.usbram;
 
-		if (diff.audio && diff.data && diff.feedback) {
+		if (diff.heap)
+			dbgprintf(ESC_YELLOW "[HEAP]: "
+				  ESC_WHITE "%.2f%%" ESC_YELLOW ", "
+				  ESC_WHITE "%lu" ESC_YELLOW "/"
+				  ESC_WHITE "%u" ESC_YELLOW " bytes\n",
+				  (float)cur.heap * 100.f / (float)heap_size(),
+				  cur.heap, heap_size());
+
+		if (diff.usbram)
+			dbgprintf(ESC_YELLOW "[USBRAM]: "
+				  ESC_WHITE "%.2f%%" ESC_YELLOW ", "
+				  ESC_WHITE "%lu" ESC_YELLOW "/"
+				  ESC_WHITE "%lu" ESC_YELLOW " bytes\n",
+				  (float)cur.usbram * 100.f / (float)usb_ram_size(&usb),
+				  cur.usbram, usb_ram_size(&usb));
+
+		if (diff.audio || diff.data || diff.feedback) {
 			// Audio update frequency
 			uint32_t div = 1024ul * AUDIO_FRAME_TRANSFER;
-			printf(ESC_YELLOW "Audio freq: " ESC_WHITE "%lu+%lu",
+			printf(ESC_YELLOW "[AUDIO]: " ESC_WHITE "%lu+%lu",
 			       diff.audio / div, diff.audio & (div - 1u));
 			// Audio data frequency
 			div = 1024ul;
@@ -311,15 +323,13 @@ loop:	;
 
 		// SDMMC statistics
 		if (diff.blocks)
-			printf(ESC_YELLOW "SDMMC: " ESC_WHITE "%lu + %lu"
+			printf(ESC_YELLOW "[SDMMC]: " ESC_WHITE "%lu + %lu"
 			       ESC_YELLOW " blocks\n", prev.blocks, diff.blocks);
 
 		// Update previous values
-		prev.tick += 1024ul;
-		prev.audio = cur.audio;
-		prev.data = cur.data;
-		prev.feedback = cur.feedback;
-		prev.blocks = cur.blocks;
+		uint32_t tick = prev.tick + 1024ul;
+		memcpy(&prev, &cur, sizeof(cur));
+		prev.tick = tick;
 	}
 #endif
 #ifndef DEBUG
