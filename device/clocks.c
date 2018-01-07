@@ -40,6 +40,33 @@ uint32_t clkSDMMC2()
 	return 54ul * 1000 * 1000;
 }
 
+uint32_t clkTimer(uint32_t i)
+{
+	uint32_t div;
+	switch (i) {
+	case 2:
+	case 3:
+	case 4:
+	case 5:
+	case 6:
+	case 7:
+	case 12:
+	case 13:
+	case 14:
+		div = (RCC->CFGR & RCC_CFGR_PPRE1_Msk) >> RCC_CFGR_PPRE1_Pos;
+		return (div & 0b100) ? clkAPB1() << 1u : clkAPB1();
+	case 1:
+	case 8:
+	case 9:
+	case 10:
+	case 11:
+		div = (RCC->CFGR & RCC_CFGR_PPRE2_Msk) >> RCC_CFGR_PPRE2_Pos;
+		return (div & 0b100) ? clkAPB2() << 1u : clkAPB2();
+	default:
+		return 0;
+	}
+}
+
 static inline void mco1_init()
 {
 	// MCO1: HSE / 1

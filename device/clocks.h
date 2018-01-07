@@ -12,6 +12,7 @@ uint32_t clkAPB1();
 uint32_t clkAPB2();
 uint32_t clkSDMMC1();
 uint32_t clkSDMMC2();
+uint32_t clkTimer(uint32_t i);
 
 void rcc_init();
 
