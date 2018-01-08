@@ -194,3 +194,8 @@ void rgb_init()
 	base_scan_init();
 	base_rgb_init();
 }
+
+void rgb_set(uint32_t i, uint32_t c)
+{
+	colours[(i >> 4) & 0x0f][i & 0x0f] = c;
+}

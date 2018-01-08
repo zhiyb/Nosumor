@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <escape.h>
 #include <peripheral/keyboard.h>
+#include <peripheral/rgb.h>
 #include <usb/hid/usb_hid.h>
 #include "vendor.h"
 #include "vendor_defs.h"
@@ -56,6 +57,15 @@ static void flash_check(usb_hid_if_t *hid)
 		puts(ESC_RED "Invalid HEX content received");
 }
 
+static void rgb_update(void *payload)
+{
+	uint8_t id;
+	uint32_t clr;
+	memcpy(&id, payload++, 1);
+	memcpy(&clr, payload, 4);
+	rgb_set(id, clr);
+}
+
 void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp)
 {
 	if (!rp->size)
@@ -89,6 +99,9 @@ void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp)
 		if (size != 2)
 			break;
 		keyboard_keycode_set(rp->payload[0], rp->payload[1]);
+		break;
+	case RGBUpdate:
+		rgb_update(rp->payload);
 		break;
 	}
 }
