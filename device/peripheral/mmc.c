@@ -92,6 +92,9 @@ static inline void mmc_base_init()
 	// Wait for IO compensation cell
 	while (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY));
 
+	// Initialise SDMMC module
+	RCC->APB2ENR |= RCC_APB2ENR_SDMMC1EN_Msk;
+
 	// DMA initialisation
 	RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN_Msk;
 	// Disable stream
@@ -308,8 +311,10 @@ static uint32_t mmc_data(const void *p, uint32_t count)
 static uint32_t mmc_busy()
 {
 	if (MMC->STA & (SDMMC_STA_TXACT_Msk | SDMMC_STA_RXACT_Msk))
+		// Return as soon as FIFO become empty for performance
 		return MMC->FIFOCNT;
 	else if (status & (MMCWrite | MMCRead))
+		// TX/RX not active yet, or already finished
 		return !(MMC->STA & SDMMC_STA_DATAEND_Msk);
 	else
 		return 0;
@@ -394,6 +399,40 @@ static uint32_t mmc_read_block(void *p, uint32_t start, uint32_t count)
 	return count;
 }
 
+static DSTATUS mmc_cd()
+{
+	// Switch opens when card inserted
+#if HWVER == 0x0002
+	uint32_t cd_mask = 1ul << 12;
+#else
+	uint32_t cd_mask = 1ul << 15;
+#endif
+	if (!(GPIOA->IDR & cd_mask)) {
+		// Stop card clock
+		MMC->POWER = 0b00ul << SDMMC_POWER_PWRCTRL_Pos;
+		stat = STA_NODISK;
+		capacity = 0;
+		return stat;
+	}
+
+	if (!(stat & STA_NODISK))
+		return 0;
+
+	do {	// Debouncing
+		systick_delay(10);
+	} while (!(GPIOA->IDR & cd_mask));
+	return 0;
+}
+
+static uint32_t mmc_ping()
+{
+	uint32_t stat, resp;
+	resp = mmc_command(SEND_STATUS, rca, &stat);
+	if (!(stat & SDMMC_STA_CMDREND_Msk))
+		return STA_ERROR;
+	return 0;
+}
+
 /* FatFs interface functions */
 
 DSTATUS mmc_disk_init()
@@ -403,26 +442,12 @@ DSTATUS mmc_disk_init()
 
 	if (stat & STA_NOINIT) {
 		mmc_base_init();
-		// Initialise SDMMC module
-		RCC->APB2ENR |= RCC_APB2ENR_SDMMC1EN_Msk;
+		stat = STA_ERROR;
 	}
 
-	// Switch opens when card inserted
-#if HWVER == 0x0002
-	if (GPIOA->IDR & (1ul << 12))
-		stat = STA_ERROR;
-#else
-	if (GPIOA->IDR & (1ul << 15))
-		stat = STA_ERROR;
-#endif
-	else {
-		// Stop card clock
-		MMC->POWER = 0b00ul << SDMMC_POWER_PWRCTRL_Pos;
-		stat = STA_NODISK;
+	if (mmc_cd())
 		return stat;
-	}
 
-	// Card entering identification mode
 	// Disable interrupts
 	MMC->MASK = 0ul;
 	// 1-bit bus, clock enable, 400kHz
@@ -431,7 +456,8 @@ DSTATUS mmc_disk_init()
 	MMC->POWER = 0b11ul << SDMMC_POWER_PWRCTRL_Pos;
 	// The last busy in any write operation up to 500ms
 	MMC->DTIMER = clkSDMMC1() / 2ul;
-	systick_delay(2);
+	// Card entering identification mode
+	systick_delay(5);
 
 	// Reset card
 	mmc_command(GO_IDLE_STATE, 0, 0);
@@ -442,14 +468,14 @@ DSTATUS mmc_disk_init()
 	if (!(sta & SDMMC_STA_CMDREND_Msk)) {
 		// Voltage mismatch or Ver.1 or not SD
 		dbgbkpt();
-		return sta;
+		return stat;
 	}
 
 	// SD version 2.0 or later
 	if (resp != arg) {
 		// Unusable card
 		dbgbkpt();
-		return sta;
+		return stat;
 	}
 
 	// Inquiry OCR
@@ -457,7 +483,7 @@ DSTATUS mmc_disk_init()
 	if (~ocr & (0b11 << 20u)) {
 		// 3.2~3.4V unsupported
 		dbgbkpt();
-		return sta;
+		return stat;
 	}
 
 	// OCR initialisation, HCS, XPC
@@ -475,7 +501,7 @@ DSTATUS mmc_disk_init()
 	rca = mmc_command(SEND_RELATIVE_ADDR, 0, &sta);
 	if (!(sta & SDMMC_STA_CMDREND_Msk) || (rca & STAT_ERROR)) {
 		dbgbkpt();
-		return sta;
+		return stat;
 	}
 
 	// Read CID register
@@ -499,7 +525,7 @@ DSTATUS mmc_disk_init()
 	mmc_command(SEND_CSD, rca, &sta);
 	if (!(sta & SDMMC_STA_CMDREND_Msk)) {
 		dbgbkpt();
-		return sta;
+		return stat;
 	}
 
 	if ((MMC->RESP1 >> 30u) == 0u) {	// CSD V1
@@ -523,14 +549,14 @@ DSTATUS mmc_disk_init()
 	resp = mmc_command(SELECT_CARD, rca, &sta);
 	if (!(sta & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
 		dbgbkpt();
-		return sta;
+		return stat;
 	}
 
 	// Set bus width (4 bits bus)
 	resp = mmc_app_command(SET_BUS_WIDTH, rca, 0b10, &sta);
 	if (!(sta & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
 		dbgbkpt();
-		return sta;
+		return stat;
 	}
 
 	// Unlock card
@@ -543,7 +569,7 @@ DSTATUS mmc_disk_init()
 	resp = mmc_command(SET_BLOCKLEN, 512u, &sta);
 	if (!(sta & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
 		dbgbkpt();
-		return sta;
+		return stat;
 	}
 
 	stat = 0;
@@ -552,6 +578,12 @@ DSTATUS mmc_disk_init()
 
 DSTATUS mmc_disk_status()
 {
+	if ((stat & STA_NOINIT) || !mmc_cd())
+		mmc_disk_init();
+	if (!(stat & STA_NODISK) && mmc_ping()) {
+		stat = STA_ERROR;
+		capacity = 0;
+	}
 	return stat;
 }
 
@@ -570,8 +602,9 @@ uint8_t scsi_buf[64 * 1024] ALIGN(32), *scsi_ptr;
 
 uint8_t scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
 {
-	if (stat)
-		mmc_disk_init();
+	// Update status
+	mmc_disk_status();
+	// Construct SCSI sense code
 	if (stat & STA_NODISK) {
 		*sense = NOT_READY;
 		// 3A/00  DZT ROM  BK    MEDIUM NOT PRESENT
@@ -591,6 +624,10 @@ uint8_t scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
 		*ascq = 0x00;
 		return CHECK_CONDITION;
 	}
+	*sense = NO_SENSE;
+	// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
+	*asc = 0x00;
+	*ascq = 0x00;
 	return GOOD;
 }
 
