@@ -4,7 +4,7 @@
 #include <debug.h>
 #include <escape.h>
 #include <peripheral/keyboard.h>
-#include <peripheral/rgb.h>
+#include <peripheral/led.h>
 #include <usb/hid/usb_hid.h>
 #include "vendor.h"
 #include "vendor_defs.h"
@@ -58,17 +58,17 @@ static void flash_check(usb_hid_if_t *hid)
 }
 
 // OUT; Format: Num(8), Info[N](16)
-static void vendor_rgb_info(usb_hid_if_t *hid)
+static void vendor_led_info(usb_hid_if_t *hid)
 {
-	report.type = RGBInfo | Reply;
+	report.type = LEDInfo | Reply;
 	report.size = VENDOR_REPORT_BASE_SIZE + 1u;
-	const void *p = rgb_info(&report.payload[0]);
+	const void *p = led_info(&report.payload[0]);
 	memcpy(&report.payload[1], p, report.payload[0] * 2u);
 	usb_hid_vendor_send(hid, &report);
 }
 
 // IN; Format: ID(8), R(16), G(16), B(16)
-static void vendor_rgb_config(usb_hid_if_t *hid, uint8_t size, void *payload)
+static void vendor_led_config(usb_hid_if_t *hid, uint8_t size, void *payload)
 {
 	if (size != 7)
 		return;
@@ -76,15 +76,15 @@ static void vendor_rgb_config(usb_hid_if_t *hid, uint8_t size, void *payload)
 	uint16_t clr[3];
 	memcpy(&id, payload++, 1);
 	if (!(id & 0x80)) {
-		report.type = RGBConfig | Reply;
+		report.type = LEDConfig | Reply;
 		report.size = VENDOR_REPORT_BASE_SIZE + 7u;
 		report.payload[0] = id;
-		rgb_get(id, 3u, clr);
+		led_get(id, 3u, clr);
 		memcpy(&report.payload[1], clr, sizeof(clr));
 		usb_hid_vendor_send(hid, &report);
 	} else {
 		memcpy(&clr, payload, sizeof(clr));
-		rgb_set(id & 0x7f, 3u, clr);
+		led_set(id & 0x7f, 3u, clr);
 	}
 }
 
@@ -122,11 +122,11 @@ void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp)
 			break;
 		keyboard_keycode_set(rp->payload[0], rp->payload[1]);
 		break;
-	case RGBInfo:
-		vendor_rgb_info(hid);
+	case LEDInfo:
+		vendor_led_info(hid);
 		break;
-	case RGBConfig:
-		vendor_rgb_config(hid, size, rp->payload);
+	case LEDConfig:
+		vendor_led_config(hid, size, rp->payload);
 		break;
 	}
 }

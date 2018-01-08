@@ -3,9 +3,9 @@
 #include <clocks.h>
 #include <debug.h>
 #include <vendor_defs.h>
-#include "rgb.h"
+#include "led.h"
 
-static uint16_t colours[RGB_NUM][3] ALIGN(4) SECTION(.dtcm);
+static uint16_t colours[LED_NUM][3] ALIGN(4) SECTION(.dtcm);
 
 static void base_scan_init()
 {
@@ -183,9 +183,9 @@ static void base_rgb_init()
 	DMA1_Stream1->CR |= DMA_SxCR_EN_Msk;
 }
 
-void rgb_init()
+void led_init()
 {
-	static const uint16_t clr[RGB_NUM][3] = {
+	static const uint16_t clr[LED_NUM][3] = {
 		// Bottom-left, RGB
 		{0x3ff, 0, 0},
 		// Top-right, BRG
@@ -201,22 +201,22 @@ void rgb_init()
 	base_rgb_init();
 }
 
-const void *rgb_info(uint8_t *num)
+const void *led_info(uint8_t *num)
 {
-	static const uint8_t info[RGB_NUM][2] = {
+	static const uint8_t info[LED_NUM][2] = {
 		{Bottom | Left, (3 << 4) | 12},
 		{Top | Right, (3 << 4) | 12},
 		{Top | Left, (3 << 4) | 12},
 		{Bottom | Right, (3 << 4) | 12},
 	};
 	if (num)
-		*num = RGB_NUM;
+		*num = LED_NUM;
 	return info;
 }
 
-void rgb_set(uint32_t i, uint32_t size, const uint16_t *c)
+void led_set(uint32_t i, uint32_t size, const uint16_t *c)
 {
-	if (i >= RGB_NUM || size != 3u)
+	if (i >= LED_NUM || size != 3u)
 		return;
 	uint16_t *p = &colours[i][0];
 	// Fix for out-of-order hardware connections
@@ -237,9 +237,9 @@ void rgb_set(uint32_t i, uint32_t size, const uint16_t *c)
 	}
 }
 
-void rgb_get(uint32_t i, uint32_t size, uint16_t *c)
+void led_get(uint32_t i, uint32_t size, uint16_t *c)
 {
-	if (i >= RGB_NUM || size != 3u)
+	if (i >= LED_NUM || size != 3u)
 		return;
 	uint16_t *p = &colours[i][0];
 	// Fix for out-of-order hardware connections
