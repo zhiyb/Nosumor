@@ -10,7 +10,7 @@ desc_t usb_audio2_cs_get(usb_audio_t *audio, usb_audio_entity_t *entity, setup_t
 	const audio_cs_t *data = entity->data;
 	desc_t desc = {0, audio->buf.raw};
 	uint8_t cs = pkt.bType, cn = pkt.bIndex;
-	dbgprintf(ESC_GREEN "(CS_");
+	dbgprintf(ESC_READ "(CS_");
 	switch (cs) {
 	case CS_SAM_FREQ_CONTROL:
 		// Layout 3 parameter block
@@ -60,7 +60,7 @@ int usb_audio2_cs_set(usb_audio_t *audio, usb_audio_entity_t *entity, setup_t pk
 {
 	const audio_cs_t *data = entity->data;
 	uint8_t cs = pkt.bType, cn = pkt.bIndex;
-	dbgprintf(ESC_RED "(CS_");
+	dbgprintf(ESC_WRITE "(CS_");
 	switch (cs) {
 	case CS_SAM_FREQ_CONTROL:
 		// Layout 3 parameter block

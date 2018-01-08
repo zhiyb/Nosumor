@@ -52,9 +52,9 @@ static void flash_check(usb_hid_if_t *hid)
 	report.payload[0] = valid;
 	usb_hid_vendor_send(hid, &report);
 	if (valid)
-		puts(ESC_GREEN "Valid HEX content received");
+		puts(ESC_GOOD "Valid HEX content received");
 	else
-		puts(ESC_RED "Invalid HEX content received");
+		puts(ESC_ERROR "Invalid HEX content received");
 }
 
 // OUT; Format: Num(8), Info[N](16)

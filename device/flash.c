@@ -158,7 +158,7 @@ reset:
 
 void flash_hex_free()
 {
-	dbgprintf(ESC_CYAN "Resetting flash buffer...\n");
+	dbgprintf(ESC_DEBUG "Resetting flash buffer...\n");
 	hex_t *next;
 	for (hex_t *hp = hex; hp; hp = next) {
 		next = hp->next;
@@ -172,7 +172,7 @@ void flash_hex_free()
 static int hex_verify(uint8_t size, ihex_t *ip)
 {
 	if (size < 5u) {
-		dbgprintf(ESC_RED "Data too short\n");
+		dbgprintf(ESC_ERROR "Data too short\n");
 		return 0;
 	}
 	if (ip->cnt != size - 5u)
@@ -203,25 +203,25 @@ static int hex_verify(uint8_t size, ihex_t *ip)
 			goto bcerr;
 		break;
 	default:
-		dbgprintf(ESC_RED "Invalid record type\n");
+		dbgprintf(ESC_ERROR "Invalid record type\n");
 		return 0;
 	}
 	uint8_t cksum = 0;
 	for (uint8_t *p = (uint8_t *)ip; size--; cksum += *p++);
 	if (cksum != 0u) {
-		dbgprintf(ESC_RED "Checksum failed\n");
+		dbgprintf(ESC_ERROR "Checksum failed\n");
 		return 0;
 	}
 	return 1;
 bcerr:
-	dbgprintf(ESC_RED "Invalid byte count\n");
+	dbgprintf(ESC_ERROR "Invalid byte count\n");
 	return 0;
 }
 
 void flash_hex_data(uint8_t size, void *payload)
 {
 	if (!hex)
-		dbgprintf(ESC_CYAN "Receiving HEX content...\n");
+		dbgprintf(ESC_DEBUG "Receiving HEX content...\n");
 	ihex_t *ip = payload;
 	hex_invalid = hex_invalid ?: !hex_verify(size, ip);
 	if (hex_invalid)
@@ -250,7 +250,7 @@ void flash_hex_program()
 	uint32_t size = 0;
 	for (hex_t **hp = &hex; *hp; hp = &(*hp)->next)
 		size += (*hp)->ihex.cnt;
-	printf(ESC_CYAN "Flashing %lu bytes...\n", size);
+	printf(ESC_WRITE "Flashing %lu bytes...\n", size);
 	pvd_disable_all();
 	flash_hex();
 }

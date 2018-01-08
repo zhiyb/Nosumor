@@ -99,7 +99,7 @@ static void feedback_update(uint32_t tick)
 	if (diff) {
 		data->cnt = EP_UPDATES;
 		epin_update(data->usb, data->ep);
-		dbgprintf(ESC_BLUE "[UAC2] Feedback: %ld\n", data->acc);
+		dbgprintf(ESC_MSG "[UAC2] Feedback: " ESC_DATA "%ld\n", data->acc);
 	}
 }
 

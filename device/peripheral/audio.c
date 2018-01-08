@@ -185,9 +185,9 @@ void audio_out_enable(int enable)
 	data.offset = 0;
 	data.ptr = 0;
 	if (enable)
-		dbgprintf(ESC_BLUE "Audio unmuted\n");
+		dbgprintf(ESC_MSG "[AUDIO] " ESC_ENABLE "Unmuted\n");
 	else {
-		dbgprintf(ESC_BLUE "Audio muted\n");
+		dbgprintf(ESC_MSG "[AUDIO] " ESC_DISABLE "Muted\n");
 		memset(data.buf, 0, sizeof(data.buf));
 	}
 }

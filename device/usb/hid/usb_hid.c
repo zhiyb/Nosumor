@@ -76,7 +76,7 @@ static void epin_halt(struct usb_t *usb, uint32_t n, int halt)
 	if (!(ctl & USB_OTG_DIEPCTL_USBAEP_Msk) != !halt)
 		return;
 	if (halt) {
-		dbgprintf(ESC_BLUE "HID Keyboard disabled\n");
+		dbgprintf(ESC_MSG "[HID] " ESC_DISABLE "Disabled\n");
 		if (ctl & USB_OTG_DIEPCTL_EPENA_Msk) {
 			DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_EPDIS_Msk);
 			while (ep->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk);
@@ -85,7 +85,7 @@ static void epin_halt(struct usb_t *usb, uint32_t n, int halt)
 		ep->DIEPCTL &= ~USB_OTG_DIEPCTL_USBAEP_Msk;
 		return;
 	}
-	dbgprintf(ESC_BLUE "HID Keyboard enabled\n");
+	dbgprintf(ESC_MSG "[HID] " ESC_ENABLE "Enabled\n");
 	DIEPCTL_SET(ep->DIEPCTL, USB_OTG_DIEPCTL_USBAEP_Msk);
 	//usb_keyboard_update(keyboard_status());
 }

@@ -162,7 +162,7 @@ static inline void fatfs_test()
 		}
 		if (info.fname[0] == 0)
 			break;
-		printf(ESC_DATA "%s" ESC_INFO " type " ESC_DATA "0x%x"
+		printf(ESC_INFO ESC_DATA "%s" ESC_INFO " type " ESC_DATA "0x%x"
 		       ESC_INFO " size " ESC_DATA "%"PRIu64
 		       "\n", info.fname, info.fattrib, info.fsize);
 	}

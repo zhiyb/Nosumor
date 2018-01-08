@@ -10,7 +10,7 @@ desc_t usb_audio2_fu_get(usb_audio_t *audio, usb_audio_entity_t *entity, setup_t
 	const audio_fu_t *data = entity->data;
 	desc_t desc = {0, audio->buf.raw};
 	uint8_t cs = pkt.bType, cn = pkt.bIndex;
-	dbgprintf(ESC_GREEN "(FU_");
+	dbgprintf(ESC_READ "(FU_");
 	switch (cs) {
 	case FU_MUTE_CONTROL:
 		// Layout 1 parameter block
@@ -60,7 +60,7 @@ int usb_audio2_fu_set(usb_audio_t *audio, usb_audio_entity_t *entity, setup_t pk
 {
 	const audio_fu_t *data = entity->data;
 	uint8_t cs = pkt.bType, cn = pkt.bIndex;
-	dbgprintf(ESC_RED "(FU_");
+	dbgprintf(ESC_WRITE "(FU_");
 	switch (cs) {
 	case FU_MUTE_CONTROL:
 		// Layout 1 parameter block

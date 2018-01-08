@@ -101,7 +101,7 @@ static void usbif_as_enable(usb_t *usb, void *pdata)
 	usb_audio_t *data = pdata;
 	usb_audio2_ep_data_halt(usb, data->ep_data, 0);
 	usb_audio2_ep_feedback_halt(usb, data->ep_feedback, 0);
-	dbgprintf(ESC_BLUE "USB Audio enabled\n");
+	dbgprintf(ESC_MSG "[UAC2] Audio streaming " ESC_ENABLE "enabled\n");
 }
 
 static void usbif_as_disable(usb_t *usb, void *pdata)
@@ -109,7 +109,7 @@ static void usbif_as_disable(usb_t *usb, void *pdata)
 	usb_audio_t *data = pdata;
 	usb_audio2_ep_data_halt(usb, data->ep_data, 1);
 	usb_audio2_ep_feedback_halt(usb, data->ep_feedback, 1);
-	dbgprintf(ESC_BLUE "USB Audio disabled\n");
+	dbgprintf(ESC_MSG "[UAC2] Audio streaming " ESC_DISABLE "disabled\n");
 }
 
 static void usbif_as_setup_std(usb_t *usb, void *pdata, uint32_t ep, setup_t pkt)

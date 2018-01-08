@@ -10,7 +10,7 @@ desc_t usb_audio2_cx_get(usb_audio_t *audio, usb_audio_entity_t *entity, setup_t
 	const audio_cx_t *data = entity->data;
 	desc_t desc = {0, audio->buf.raw};
 	uint8_t cs = pkt.bType, cn = pkt.bIndex;
-	dbgprintf(ESC_GREEN "(CX_");
+	dbgprintf(ESC_READ "(CX_");
 	switch (cs) {
 	case CX_CLOCK_SELECTOR_CONTROL:
 		// Layout 1 parameter block
