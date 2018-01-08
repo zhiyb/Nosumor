@@ -96,42 +96,41 @@ static inline void init()
 	pvd_init();
 #endif
 
-	puts(ESC_CLEAR ESC_MAGENTA VARIANT " build @ " __DATE__ " " __TIME__);
-	printf(ESC_YELLOW "Core clock: " ESC_WHITE "%lu\n", clkAHB());
+	puts(ESC_BOOT VARIANT " build @ " __DATE__ " " __TIME__);
+	printf(ESC_INFO "Core clock: " ESC_DATA "%lu\n", clkAHB());
 
-	puts(ESC_CYAN "Initialising LEDs...");
+	puts(ESC_INIT "Initialising LEDs...");
 	led_init();
 
-	puts(ESC_CYAN "Initialising USB HS...");
+	puts(ESC_INIT "Initialising USB HS...");
 	usb_init(&usb, USB_OTG_HS);
-	printf(ESC_YELLOW "USB in " ESC_WHITE "%s" ESC_YELLOW " mode\n",
+	printf(ESC_INFO "USB in " ESC_DATA "%s" ESC_INFO " mode\n",
 	       usb_mode(&usb) ? "host" : "device");
 	while (usb_mode(&usb) != 0);
 	usb_init_device(&usb);
 
 #ifndef BOOTLOADER
-	puts(ESC_CYAN "Initialising audio...");
+	puts(ESC_INIT "Initialising audio...");
 	usb_audio_t *audio = usb_audio2_init(&usb);
 	audio_init(&usb, audio);
 #endif
 
-	puts(ESC_CYAN "Initialising USB HID interface...");
+	puts(ESC_INIT "Initialising USB HID interface...");
 	usb_hid_t *hid = usb_hid_init(&usb);
 	usb_hid_if_t *hid_keyboard = usb_hid_keyboard_init(hid);
 	usb_hid_vendor = usb_hid_vendor_init(hid);
 
-	puts(ESC_CYAN "Initialising keyboard...");
+	puts(ESC_INIT "Initialising keyboard...");
 	keyboard_init(hid_keyboard);
 
-	puts(ESC_CYAN "Initialising SD/MMC card...");
+	puts(ESC_INIT "Initialising SD/MMC card...");
 	mmc_disk_init();
-	printf(ESC_YELLOW "Card capacity: " ESC_WHITE "%llu"
-	       ESC_YELLOW " bytes\n", (uint64_t)mmc_capacity() * 512ull);
-	puts(ESC_CYAN "Initialising USB mass storage...");
-	if (mmc_capacity() != 0)
-		usb_msc = usb_msc_init(&usb);
+	printf(ESC_INFO "Card capacity: " ESC_DATA "%llu"
+	       ESC_INFO " bytes\n", (uint64_t)mmc_capacity() * 512ull);
+	puts(ESC_INIT "Initialising USB mass storage...");
+	usb_msc = usb_msc_init(&usb);
 
-	puts(ESC_GREEN "Initialisation done");
+	puts(ESC_GOOD "Initialisation done");
 	usb_connect(&usb, 1);
 }
 
@@ -139,47 +138,47 @@ static inline void fatfs_test()
 {
 	static FATFS fs SECTION(.dtcm);
 	memset(&fs, 0, sizeof(fs));
-	puts(ESC_CYAN "Testing FatFS...");
+	puts(ESC_INIT "Testing FatFS...");
 
 	// Mount volume
 	FRESULT res;
 	if ((res = f_mount(&fs, "SD:", 1)) != FR_OK) {
-		printf(ESC_RED "f_mount: %d\n", res);
+		printf(ESC_ERROR "f_mount: %d\n", res);
 		return;
 	}
 
 	// Open root directory for listing
 	DIR dir;
 	if ((res = f_opendir(&dir, "SD:/")) != FR_OK) {
-		printf(ESC_RED "f_opendir: %d\n", res);
+		printf(ESC_ERROR "f_opendir: %d\n", res);
 		return;
 	}
 	// Iterate through directory
 	FILINFO info;
 	for (;;) {
 		if ((res = f_readdir(&dir, &info)) != FR_OK) {
-			printf(ESC_RED "f_readdir: %d\n", res);
+			printf(ESC_ERROR "f_readdir: %d\n", res);
 			return;
 		}
 		if (info.fname[0] == 0)
 			break;
-		printf(ESC_WHITE "%s" ESC_YELLOW " type " ESC_WHITE "0x%x"
-		       ESC_YELLOW " size " ESC_WHITE "%"PRIu64
+		printf(ESC_DATA "%s" ESC_INFO " type " ESC_DATA "0x%x"
+		       ESC_INFO " size " ESC_DATA "%"PRIu64
 		       "\n", info.fname, info.fattrib, info.fsize);
 	}
 	// Close directory
 	if ((res = f_closedir(&dir)) != FR_OK) {
-		printf(ESC_RED "f_closedir: %d\n", res);
+		printf(ESC_ERROR "f_closedir: %d\n", res);
 		return;
 	}
 
 	// Unmount volume
 	if ((res = f_mount(NULL, "SD:", 0)) != FR_OK) {
-		printf(ESC_RED "f_unmount: %d\n", res);
+		printf(ESC_ERROR "f_unmount: %d\n", res);
 		return;
 	}
 
-	puts(ESC_GREEN "FatFS tests completed");
+	puts(ESC_GOOD "FatFS tests completed");
 }
 
 int main()
@@ -270,43 +269,43 @@ loop:	;
 		diff.usbram = cur.usbram - prev.usbram;
 
 		if (diff.heap)
-			dbgprintf(ESC_YELLOW "[HEAP] "
-				  ESC_WHITE "%.2f%%" ESC_YELLOW ", "
-				  ESC_WHITE "%lu" ESC_YELLOW "/"
-				  ESC_WHITE "%u" ESC_YELLOW " bytes\n",
+			dbgprintf(ESC_INFO "[HEAP] "
+				  ESC_DATA "%.2f%%" ESC_INFO ", "
+				  ESC_DATA "%lu" ESC_INFO "/"
+				  ESC_DATA "%u" ESC_INFO " bytes\n",
 				  (float)cur.heap * 100.f / (float)heap_size(),
 				  cur.heap, heap_size());
 
 		if (diff.usbram)
-			dbgprintf(ESC_YELLOW "[USBRAM] "
-				  ESC_WHITE "%.2f%%" ESC_YELLOW ", "
-				  ESC_WHITE "%lu" ESC_YELLOW "/"
-				  ESC_WHITE "%lu" ESC_YELLOW " bytes\n",
+			dbgprintf(ESC_INFO "[USBRAM] "
+				  ESC_DATA "%.2f%%" ESC_INFO ", "
+				  ESC_DATA "%lu" ESC_INFO "/"
+				  ESC_DATA "%lu" ESC_INFO " bytes\n",
 				  (float)cur.usbram * 100.f / (float)usb_ram_size(&usb),
 				  cur.usbram, usb_ram_size(&usb));
 
 		if (diff.audio || diff.data || diff.feedback) {
 			// Audio update frequency
 			uint32_t div = 1024ul * AUDIO_FRAME_TRANSFER;
-			printf(ESC_YELLOW "[AUDIO] " ESC_WHITE "%lu+%lu",
+			printf(ESC_INFO "[AUDIO] " ESC_DATA "%lu+%lu",
 			       diff.audio / div, diff.audio & (div - 1u));
 			// Audio data frequency
 			div = 1024ul;
-			printf(ESC_YELLOW " / " ESC_WHITE "%lu+%lu",
+			printf(ESC_INFO " / " ESC_DATA "%lu+%lu",
 			       diff.data / div, diff.data & (div - 1u));
 			// Audio feedback frequency
 			div = 1024ul;
-			printf(ESC_YELLOW " / " ESC_WHITE "%lu+%lu",
+			printf(ESC_INFO " / " ESC_DATA "%lu+%lu",
 			       diff.feedback / div, diff.feedback & (div - 1u));
 			// Audio data offset
-			printf(ESC_YELLOW " => " ESC_WHITE "%ld\n",
+			printf(ESC_INFO " => " ESC_DATA "%ld\n",
 			       audio_buffering());
 		}
 
 		// SDMMC statistics
 		if (diff.blocks)
-			printf(ESC_YELLOW "[SDMMC] " ESC_WHITE "%lu + %lu"
-			       ESC_YELLOW " blocks\n", prev.blocks, diff.blocks);
+			printf(ESC_INFO "[SDMMC] " ESC_DATA "%lu + %lu"
+			       ESC_INFO " blocks\n", prev.blocks, diff.blocks);
 
 		// Update previous values
 		uint32_t tick = prev.tick + 1024ul;
