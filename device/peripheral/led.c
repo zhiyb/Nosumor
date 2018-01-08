@@ -5,7 +5,9 @@
 #include <vendor_defs.h>
 #include "led.h"
 
-static uint16_t colours[LED_NUM][3] ALIGN(4) SECTION(.dtcm);
+typedef uint32_t colour_t;
+
+static colour_t colours[LED_NUM][3] ALIGN(4) SECTION(.dtcm);
 
 static void base_scan_init()
 {
@@ -125,7 +127,7 @@ static void base_rgb_init()
 			DMA_LIFCR_CFEIF1_Msk;
 	// Memory to peripheral, circular, 16bit -> 16bit, low priority
 	DMA1_Stream1->CR = (6ul << DMA_SxCR_CHSEL_Pos) | (0b00ul << DMA_SxCR_PL_Pos) |
-			(0b01ul << DMA_SxCR_MSIZE_Pos) | (0b01ul << DMA_SxCR_PSIZE_Pos) |
+			(0b10ul << DMA_SxCR_MSIZE_Pos) | (0b10ul << DMA_SxCR_PSIZE_Pos) |
 			(0b01ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk | DMA_SxCR_CIRC_Msk;
 	// Peripheral address
 	DMA1_Stream1->PAR = (uint32_t)&TIM5->DMAR;
@@ -134,7 +136,7 @@ static void base_rgb_init()
 	// Memory address
 	DMA1_Stream1->M0AR = (uint32_t)&colours[0][0];
 	// Number of data items
-	DMA1_Stream1->NDTR = sizeof(colours) / 2u;
+	DMA1_Stream1->NDTR = sizeof(colours) / sizeof(colours[0][0]);
 
 	// Initialise RGB timer
 	RCC->APB1ENR |= RCC_APB1ENR_TIM5EN_Msk;
@@ -185,7 +187,7 @@ static void base_rgb_init()
 
 void led_init()
 {
-	static const uint16_t clr[LED_NUM][3] = {
+	static const colour_t clr[LED_NUM][3] = {
 		// Bottom-left, RGB
 		{0x3ff, 0, 0},
 		// Top-right, BRG
@@ -220,7 +222,7 @@ void led_set(uint32_t i, uint32_t size, const uint16_t *c)
 		dbgbkpt();
 		return;
 	}
-	uint16_t *p = &colours[i][0];
+	colour_t *p = &colours[i][0];
 	// Fix for out-of-order hardware connections
 	switch (i) {
 	case 1:
@@ -245,7 +247,7 @@ void led_get(uint32_t i, uint32_t size, uint16_t *c)
 		dbgbkpt();
 		return;
 	}
-	uint16_t *p = &colours[i][0];
+	colour_t *p = &colours[i][0];
 	// Fix for out-of-order hardware connections
 	switch (i) {
 	case 1:
