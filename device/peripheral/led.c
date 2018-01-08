@@ -227,7 +227,7 @@ void led_set(uint32_t i, uint32_t size, const uint16_t *c)
 	switch (i) {
 	case 1:
 	case 2: {
-		uint16_t *b = p++;
+		colour_t *b = p++;
 		*p++ = *c++;
 		*p++ = *c++;
 		*b = *c++;

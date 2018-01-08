@@ -220,10 +220,10 @@ void audio_play(void *p, uint32_t size)
 	data.offset += size;
 	if (!data.ptr)
 		data.offset = 0;
-	while (data.offset > (int)AUDIO_BUFFER_SIZE)
-		data.offset -= AUDIO_BUFFER_SIZE;
-	while (data.offset < -(int)AUDIO_BUFFER_SIZE)
-		data.offset += AUDIO_BUFFER_SIZE;
+	while (data.offset > (int)(AUDIO_BUFFER_SIZE >> 2u))
+		data.offset -= AUDIO_BUFFER_SIZE >> 2u;
+	while (data.offset < -(int)(AUDIO_BUFFER_SIZE >> 2u))
+		data.offset += AUDIO_BUFFER_SIZE >> 2u;
 	data.cnt_data += size >> 3u;
 	data.ptr = mptr;
 }
