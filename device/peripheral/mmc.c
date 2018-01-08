@@ -576,28 +576,18 @@ uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize)
 
 uint32_t scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 {
-	// Check block alignment
-	if (size & (512ul - 1ul)) {
-		dbgbkpt();
-		return 0;
-	} else if (offset & (512ul - 1ul)) {
-		dbgbkpt();
-		return 0;
-	}
-
 	// Invalidate data cache for DMA operation
-	SCB_InvalidateDCache_by_Addr((void *)scsi_buf, size);
+	SCB_InvalidateDCache_by_Addr((void *)scsi_buf, size * 512ul);
 
-	uint32_t start = offset / 512ul, count = size / 512ul;
 	if (mmc_read_prepare() == 0) {
 		dbgbkpt();
 		return 0;
 	}
-	if (mmc_data(scsi_buf, count) != count) {
+	if (mmc_data(scsi_buf, size) != size) {
 		dbgbkpt();
 		return 0;
 	}
-	if (mmc_read_start(start, count) != count) {
+	if (mmc_read_start(offset, size) != size) {
 		dbgbkpt();
 		return 0;
 	}
@@ -607,19 +597,19 @@ uint32_t scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 
 uint32_t scsi_read_available(scsi_t *scsi)
 {
-	return mmc_transferred() * 4ul - (scsi_ptr - scsi_buf);
+	return (mmc_transferred() * 4ul - (scsi_ptr - scsi_buf)) / 512ul;
 }
 
 void *scsi_read_data(scsi_t *scsi, uint32_t *length)
 {
-	if (*length + (scsi_ptr - scsi_buf) > sizeof(scsi_buf)) {
+	if (*length * 512ul + (scsi_ptr - scsi_buf) > sizeof(scsi_buf)) {
 		dbgbkpt();
 		*length = 0;
 		return 0;
 	}
 
 	void *p = scsi_ptr;
-	scsi_ptr += *length / sizeof(*scsi_ptr);
+	scsi_ptr += *length * 512ul / sizeof(*scsi_ptr);
 	return p;
 }
 
@@ -630,25 +620,12 @@ uint32_t scsi_read_stop(scsi_t *scsi)
 
 uint32_t scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 {
-	// Check block alignment
-	if (size & (512ul - 1ul)) {
-		dbgbkpt();
-		return 0;
-	} else if (offset & (512ul - 1ul)) {
-		dbgbkpt();
-		return 0;
-	}
-	return mmc_write_start(offset / 512ul, size / 512ul) * 512ul;
+	return mmc_write_start(offset, size);
 }
 
 uint32_t scsi_write_data(scsi_t *scsi, uint32_t length, const void *p)
 {
-	// Check block alignment
-	if (length & (512ul - 1ul)) {
-		dbgbkpt();
-		return 0;
-	}
-	return mmc_data(p, length / 512ul) * 512ul;
+	return mmc_data(p, length);
 }
 
 uint32_t scsi_write_busy(scsi_t *scsi)
@@ -659,19 +636,4 @@ uint32_t scsi_write_busy(scsi_t *scsi)
 uint32_t scsi_write_stop(scsi_t *scsi)
 {
 	return mmc_stop();
-}
-
-uint32_t scsi_write(scsi_t *scsi, uint32_t offset, uint32_t length, const void *p)
-{
-	// Check sector alignment
-	if (length & (512ul - 1ul)) {
-		dbgbkpt();
-		return 0;
-	} else if (offset & (512ul - 1ul)) {
-		dbgbkpt();
-		return 0;
-	}
-
-	length = mmc_write_block(p, offset / 512ul, length / 512ul) * 512ul;
-	return length;
 }
