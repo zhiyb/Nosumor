@@ -61,7 +61,7 @@ static void base_scan_init()
 	// Initialise registers
 	TIM1->EGR = TIM_EGR_UG_Msk;
 	// Reset counter
-	TIM1->CNT = 5;
+	TIM1->CNT = 4;
 	// OC3/OC4 enable, active low
 	TIM1->CCER = TIM_CCER_CC3E_Msk | TIM_CCER_CC4E_Msk |
 			TIM_CCER_CC3P_Msk | TIM_CCER_CC4P_Msk;
@@ -89,7 +89,7 @@ static void base_scan_init()
 	// Initialise registers
 	TIM12->EGR = TIM_EGR_UG_Msk;
 	// Reset counter
-	TIM12->CNT = 1;
+	TIM12->CNT = 0;
 	// OC1/OC2 enable, active low
 	TIM12->CCER = TIM_CCER_CC1E_Msk | TIM_CCER_CC2E_Msk |
 			TIM_CCER_CC1P_Msk | TIM_CCER_CC2P_Msk;
@@ -140,8 +140,8 @@ static void base_rgb_init()
 
 	// Initialise RGB timer
 	RCC->APB1ENR |= RCC_APB1ENR_TIM5EN_Msk;
-	// Auto reload buffered, centre-align mode 1, continuous
-	TIM5->CR1 = TIM_CR1_ARPE_Msk | TIM_CR1_URS_Msk | (1 << TIM_CR1_CMS_Pos);
+	// Auto reload buffered, centre-align mode 2, continuous
+	TIM5->CR1 = TIM_CR1_ARPE_Msk | TIM_CR1_URS_Msk | (2 << TIM_CR1_CMS_Pos);
 	// Update event as TRGO, DMA request with CCx event
 	TIM5->CR2 = (0b010 << TIM_CR2_MMS_Pos);
 	// Slave mode disabled
@@ -168,7 +168,7 @@ static void base_rgb_init()
 	TIM5->CCR2 = 0x02ff;
 	TIM5->CCR3 = 0x03ff;
 	// Update values at next update event, when counter reaches 0
-	TIM5->CCR4 = 0x03ff;
+	TIM5->CCR4 = 0x0000;
 	// Reset counter
 	TIM5->CNT = 0;
 	// Initialise registers
