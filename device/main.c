@@ -19,7 +19,7 @@
 #include "peripheral/keyboard.h"
 #include "peripheral/audio.h"
 #include "peripheral/mmc.h"
-#include "peripheral/rgb.h"
+#include "peripheral/led.h"
 // USB interfaces
 #include "usb/usb.h"
 #include "usb/usb_ram.h"
@@ -100,7 +100,7 @@ static inline void init()
 	printf(ESC_YELLOW "Core clock: " ESC_WHITE "%lu\n", clkAHB());
 
 	puts(ESC_CYAN "Initialising LEDs...");
-	rgb_init();
+	led_init();
 
 	puts(ESC_CYAN "Initialising USB HS...");
 	usb_init(&usb, USB_OTG_HS);
@@ -270,7 +270,7 @@ loop:	;
 		diff.usbram = cur.usbram - prev.usbram;
 
 		if (diff.heap)
-			dbgprintf(ESC_YELLOW "[HEAP]: "
+			dbgprintf(ESC_YELLOW "[HEAP] "
 				  ESC_WHITE "%.2f%%" ESC_YELLOW ", "
 				  ESC_WHITE "%lu" ESC_YELLOW "/"
 				  ESC_WHITE "%u" ESC_YELLOW " bytes\n",
@@ -278,7 +278,7 @@ loop:	;
 				  cur.heap, heap_size());
 
 		if (diff.usbram)
-			dbgprintf(ESC_YELLOW "[USBRAM]: "
+			dbgprintf(ESC_YELLOW "[USBRAM] "
 				  ESC_WHITE "%.2f%%" ESC_YELLOW ", "
 				  ESC_WHITE "%lu" ESC_YELLOW "/"
 				  ESC_WHITE "%lu" ESC_YELLOW " bytes\n",
@@ -288,7 +288,7 @@ loop:	;
 		if (diff.audio || diff.data || diff.feedback) {
 			// Audio update frequency
 			uint32_t div = 1024ul * AUDIO_FRAME_TRANSFER;
-			printf(ESC_YELLOW "[AUDIO]: " ESC_WHITE "%lu+%lu",
+			printf(ESC_YELLOW "[AUDIO] " ESC_WHITE "%lu+%lu",
 			       diff.audio / div, diff.audio & (div - 1u));
 			// Audio data frequency
 			div = 1024ul;
@@ -305,7 +305,7 @@ loop:	;
 
 		// SDMMC statistics
 		if (diff.blocks)
-			printf(ESC_YELLOW "[SDMMC]: " ESC_WHITE "%lu + %lu"
+			printf(ESC_YELLOW "[SDMMC] " ESC_WHITE "%lu + %lu"
 			       ESC_YELLOW " blocks\n", prev.blocks, diff.blocks);
 
 		// Update previous values
