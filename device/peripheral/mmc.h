@@ -18,6 +18,7 @@ DRESULT mmc_disk_read(BYTE *buff, DWORD sector, UINT count);
 
 /* SCSI interface functions */
 
+uint8_t scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *ascq);
 uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize);
 
 uint32_t scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size);

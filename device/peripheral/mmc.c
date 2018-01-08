@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stm32f7xx.h>
+#include <usb/msc/scsi_defs_sense.h>
 #include "mmc.h"
 #include "mmc_defs.h"
 #include "../systick.h"
@@ -566,6 +567,32 @@ DRESULT mmc_disk_read(BYTE *buff, DWORD sector, UINT count)
 /* SCSI interface functions */
 
 uint8_t scsi_buf[64 * 1024] ALIGN(32), *scsi_ptr;
+
+uint8_t scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
+{
+	if (stat)
+		mmc_disk_init();
+	if (stat & STA_NODISK) {
+		*sense = NOT_READY;
+		// 3A/00  DZT ROM  BK    MEDIUM NOT PRESENT
+		*asc = 0x3a;
+		*ascq = 0x00;
+		return CHECK_CONDITION;
+	} else if (stat & STA_ERROR) {
+		*sense = NOT_READY;
+		// 30/00  DZT ROM  BK    INCOMPATIBLE MEDIUM INSTALLED
+		*asc = 0x30;
+		*ascq = 0x00;
+		return CHECK_CONDITION;
+	} else if (stat) {
+		*sense = NOT_READY;
+		// 04/00  DZTPROMAEBKVF  LOGICAL UNIT NOT READY, CAUSE NOT REPORTABLE
+		*asc = 0x04;
+		*ascq = 0x00;
+		return CHECK_CONDITION;
+	}
+	return GOOD;
+}
 
 uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize)
 {
