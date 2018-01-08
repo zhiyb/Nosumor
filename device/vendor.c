@@ -70,8 +70,6 @@ static void vendor_led_info(usb_hid_if_t *hid)
 // IN; Format: ID(8), R(16), G(16), B(16)
 static void vendor_led_config(usb_hid_if_t *hid, uint8_t size, void *payload)
 {
-	if (size != 7)
-		return;
 	uint8_t id;
 	uint16_t clr[3];
 	memcpy(&id, payload++, 1);
@@ -83,6 +81,8 @@ static void vendor_led_config(usb_hid_if_t *hid, uint8_t size, void *payload)
 		memcpy(&report.payload[1], clr, sizeof(clr));
 		usb_hid_vendor_send(hid, &report);
 	} else {
+		if (size != 7)
+			return;
 		memcpy(&clr, payload, sizeof(clr));
 		led_set(id & 0x7f, 3u, clr);
 	}

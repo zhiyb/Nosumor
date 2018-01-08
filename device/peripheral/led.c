@@ -246,10 +246,10 @@ void led_get(uint32_t i, uint32_t size, uint16_t *c)
 	switch (i) {
 	case 1:
 	case 2: {
-		uint16_t *b = c++;
+		uint16_t b = *p++;
 		*c++ = *p++;
 		*c++ = *p++;
-		*b = *p++;
+		*c++ = b;
 		break;
 	}
 	default:
