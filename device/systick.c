@@ -34,7 +34,8 @@ void systick_delay(uint32_t cycles)
 	uint32_t c = cnt;
 	if (cycles == 0)
 		return;
-	while (cnt - c < cycles);
+	while (cnt - c < cycles)
+		__WFI();
 }
 
 void SysTick_Handler()
