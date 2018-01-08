@@ -28,7 +28,7 @@ static vendor_report_t report SECTION(.dtcm);
 
 static void ping(usb_hid_if_t *hid)
 {
-	report.type = Pong;
+	report.type = Ping | Reply;
 	pong_t *p = (pong_t *)report.payload;
 	p->sw_ver = SW_VERSION;
 #ifdef DEBUG
@@ -46,7 +46,7 @@ static void ping(usb_hid_if_t *hid)
 
 static void flash_check(usb_hid_if_t *hid)
 {
-	report.type = FlashStatus;
+	report.type = FlashCheck | Reply;
 	report.size = VENDOR_REPORT_BASE_SIZE + 1u;
 	int valid = flash_hex_check();
 	report.payload[0] = valid;
@@ -57,13 +57,35 @@ static void flash_check(usb_hid_if_t *hid)
 		puts(ESC_RED "Invalid HEX content received");
 }
 
-static void rgb_update(void *payload)
+// OUT; Format: Num(8), Info[N](16)
+static void vendor_rgb_info(usb_hid_if_t *hid)
 {
+	report.type = RGBInfo | Reply;
+	report.size = VENDOR_REPORT_BASE_SIZE + 1u;
+	const void *p = rgb_info(&report.payload[0]);
+	memcpy(&report.payload[1], p, report.payload[0] * 2u);
+	usb_hid_vendor_send(hid, &report);
+}
+
+// IN; Format: ID(8), R(16), G(16), B(16)
+static void vendor_rgb_config(usb_hid_if_t *hid, uint8_t size, void *payload)
+{
+	if (size != 7)
+		return;
 	uint8_t id;
-	uint32_t clr;
+	uint16_t clr[3];
 	memcpy(&id, payload++, 1);
-	memcpy(&clr, payload, 4);
-	rgb_set(id, clr);
+	if (!(id & 0x80)) {
+		report.type = RGBConfig | Reply;
+		report.size = VENDOR_REPORT_BASE_SIZE + 7u;
+		report.payload[0] = id;
+		rgb_get(id, 3u, clr);
+		memcpy(&report.payload[1], clr, sizeof(clr));
+		usb_hid_vendor_send(hid, &report);
+	} else {
+		memcpy(&clr, payload, sizeof(clr));
+		rgb_set(id & 0x7f, 3u, clr);
+	}
 }
 
 void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp)
@@ -100,8 +122,11 @@ void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp)
 			break;
 		keyboard_keycode_set(rp->payload[0], rp->payload[1]);
 		break;
-	case RGBUpdate:
-		rgb_update(rp->payload);
+	case RGBInfo:
+		vendor_rgb_info(hid);
+		break;
+	case RGBConfig:
+		vendor_rgb_config(hid, size, rp->payload);
 		break;
 	}
 }

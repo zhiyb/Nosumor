@@ -2,9 +2,10 @@
 #include <macros.h>
 #include <clocks.h>
 #include <debug.h>
+#include <vendor_defs.h>
 #include "rgb.h"
 
-static uint16_t colours[4][3] ALIGN(4) SECTION(.dtcm);
+static uint16_t colours[RGB_NUM][3] ALIGN(4) SECTION(.dtcm);
 
 static void base_scan_init()
 {
@@ -184,10 +185,14 @@ static void base_rgb_init()
 
 void rgb_init()
 {
-	static const uint16_t clr[4][3] = {
+	static const uint16_t clr[RGB_NUM][3] = {
+		// Bottom-left, RGB
 		{0x3ff, 0, 0},
+		// Top-right, BRG
 		{0x3ff, 0, 0},
+		// Top-left, BRG
 		{0, 0, 0x3ff},
+		// Bottom-right, RGB
 		{0x3ff, 0x3ff, 0},
 	};
 	memcpy(&colours, &clr, sizeof(clr));
@@ -196,7 +201,61 @@ void rgb_init()
 	base_rgb_init();
 }
 
-void rgb_set(uint32_t i, uint32_t c)
+const void *rgb_info(uint8_t *num)
 {
-	colours[(i >> 4) & 0x0f][i & 0x0f] = c;
+	static const uint8_t info[RGB_NUM][2] = {
+		{Bottom | Left, (3 << 4) | 12},
+		{Top | Right, (3 << 4) | 12},
+		{Top | Left, (3 << 4) | 12},
+		{Bottom | Right, (3 << 4) | 12},
+	};
+	if (num)
+		*num = RGB_NUM;
+	return info;
+}
+
+void rgb_set(uint32_t i, uint32_t size, const uint16_t *c)
+{
+	if (i >= RGB_NUM || size != 3u)
+		return;
+	uint16_t *p = &colours[i][0];
+	// Fix for out-of-order hardware connections
+	switch (i) {
+	case 1:
+	case 2: {
+		uint16_t b = *c++;
+		*p++ = *c++;
+		*p++ = *c++;
+		*p++ = b;
+		break;
+	}
+	default:
+		*p++ = *c++;
+		*p++ = *c++;
+		*p++ = *c++;
+		break;
+	}
+}
+
+void rgb_get(uint32_t i, uint32_t size, uint16_t *c)
+{
+	if (i >= RGB_NUM || size != 3u)
+		return;
+	uint16_t *p = &colours[i][0];
+	// Fix for out-of-order hardware connections
+	switch (i) {
+	case 1:
+	case 2: {
+		uint16_t *b = c++;
+		*c++ = *p++;
+		*c++ = *p++;
+		*b = *p++;
+		break;
+	}
+	default:
+		*c++ = *p++;
+		*c++ = *p++;
+		*c++ = *p++;
+		break;
+	}
 }
