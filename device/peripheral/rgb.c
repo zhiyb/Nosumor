@@ -4,7 +4,7 @@
 #include <debug.h>
 #include "rgb.h"
 
-static uint16_t colours[8][3] ALIGN(4) SECTION(dtcm);
+static uint16_t colours[4][3] ALIGN(4) SECTION(.dtcm);
 
 static void base_scan_init()
 {
@@ -116,6 +116,25 @@ static void base_rgb_init()
 	GPIO_AFRL(GPIOA, 1, 2);
 	GPIO_AFRL(GPIOA, 2, 2);
 
+	// Initialise RGB DMA (DMA1, Stream 1, Channel 6)
+	RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN_Msk;
+	// Clear DMA flags
+	DMA1->LIFCR = DMA_LIFCR_CTCIF1_Msk | DMA_LIFCR_CHTIF1_Msk |
+			DMA_LIFCR_CTEIF1_Msk | DMA_LIFCR_CDMEIF1_Msk |
+			DMA_LIFCR_CFEIF1_Msk;
+	// Memory to peripheral, circular, 16bit -> 16bit, low priority
+	DMA1_Stream1->CR = (6ul << DMA_SxCR_CHSEL_Pos) | (0b00ul << DMA_SxCR_PL_Pos) |
+			(0b01ul << DMA_SxCR_MSIZE_Pos) | (0b01ul << DMA_SxCR_PSIZE_Pos) |
+			(0b01ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk | DMA_SxCR_CIRC_Msk;
+	// Peripheral address
+	DMA1_Stream1->PAR = (uint32_t)&TIM5->DMAR;
+	// FIFO control
+	DMA1_Stream1->FCR = DMA_SxFCR_DMDIS_Msk | (0b11ul << DMA_SxFCR_FTH_Pos);
+	// Memory address
+	DMA1_Stream1->M0AR = (uint32_t)&colours[0][0];
+	// Number of data items
+	DMA1_Stream1->NDTR = sizeof(colours) / 2u;
+
 	// Initialise RGB timer
 	RCC->APB1ENR |= RCC_APB1ENR_TIM5EN_Msk;
 	// Auto reload buffered, centre-align mode 1, continuous
@@ -124,8 +143,8 @@ static void base_rgb_init()
 	TIM5->CR2 = (0b010 << TIM_CR2_MMS_Pos);
 	// Slave mode disabled
 	TIM5->SMCR = 0;
-	// Enable update DMA request, disable interrupts
-	IM5->DIER = TIM_DIER_CC4IE_Msk; //TIM_DIER_UIE_Msk;// | TIM_DIER_UDE_Msk;
+	// Enable DMA request from OC4, disable interrupts
+	TIM5->DIER = TIM_DIER_CC4DE_Msk;
 	// OC1 mode PWM1, OC2 mode PWM1, preload enable
 	TIM5->CCMR1 = (0b110 << TIM_CCMR1_OC1M_Pos) | TIM_CCMR1_OC1PE_Msk |
 			(0b110 << TIM_CCMR1_OC2M_Pos) | TIM_CCMR1_OC2PE_Msk;
@@ -137,14 +156,15 @@ static void base_rgb_init()
 			((&TIM5->CCR1 - &TIM5->CR1) << TIM_DCR_DBA_Pos);
 	// Input remap options
 	TIM5->OR = 0;
-	// Prescaler 120fps * 4 * (2^10) ~ 500kHz
-	TIM5->PSC = clkTimer(5) / 500000ul - 1;
+	// Prescaler 120fps * 4 * 2 * (2^10) ~ 1MHz
+	TIM5->PSC = clkTimer(5) / 1000000ul - 1;
 	// Auto reload value 0x03ff (10bit)
 	TIM5->ARR = 0x03ff;
 	// Output compare values
 	TIM5->CCR1 = 0x01ff;
 	TIM5->CCR2 = 0x02ff;
 	TIM5->CCR3 = 0x03ff;
+	// Update values at next update event, when counter reaches 0
 	TIM5->CCR4 = 0x03ff;
 	// Reset counter
 	TIM5->CNT = 0;
@@ -158,36 +178,17 @@ static void base_rgb_init()
 	// Enable timer
 	TIM5->CR1 |= TIM_CR1_CEN_Msk;
 
-	// Configure NVIC interrupt
-	uint32_t pg = NVIC_GetPriorityGrouping();
-	NVIC_SetPriority(TIM5_IRQn, NVIC_EncodePriority(pg, 5, 0));
-	NVIC_EnableIRQ(TIM5_IRQn);
-}
-
-void TIM5_IRQHandler()
-{
-	static uint32_t i = 0;
-	// Clear interrupt mask
-	TIM5->SR = TIM_SR_CC4OF_Msk;
-	// Update OC values
-	TIM5->CCR1 = colours[i][0];
-	TIM5->CCR2 = colours[i][1];
-	TIM5->CCR3 = colours[i][2];
-	// Update index
-	i = (i + 1) & 3;
+	// Enable DMA stream
+	DMA1_Stream1->CR |= DMA_SxCR_EN_Msk;
 }
 
 void rgb_init()
 {
-	static const uint16_t clr[8][3] = {
+	static const uint16_t clr[4][3] = {
 		{0x3ff, 0, 0},
-		{0, 0x3ff, 0},
+		{0x3ff, 0, 0},
 		{0, 0, 0x3ff},
-		{0x3ff, 0x3ff, 0x3ff},
-		{0x1ff, 0, 0x3ff},
-		{0x1ff, 0, 0x3ff},
-		{0, 0x1ff, 0},
-		{0x3ff, 0x3ff, 0x3ff},
+		{0x3ff, 0x3ff, 0},
 	};
 	memcpy(&colours, &clr, sizeof(clr));
 
