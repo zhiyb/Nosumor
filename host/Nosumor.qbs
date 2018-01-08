@@ -13,6 +13,7 @@ Project {
         Export {
             Depends {name: "cpp"}
             Depends {name: "hidapi"}
+            cpp.commonCompilerFlags: ["-mno-ms-bitfields"]
             cpp.includePaths: [
                 "include",
                 "../device",
@@ -20,7 +21,8 @@ Project {
         }
 
         files: [
-            "include/dev_defs.h"
+            "include/dev_defs.h",
+            "../device/vendor_defs.h",
         ]
     }
 

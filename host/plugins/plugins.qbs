@@ -5,6 +5,7 @@ Project {
         "flash",
         "ping",
         "keycode",
+        "led",
     ]
 
     StaticLibrary {
