@@ -25,6 +25,10 @@ scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize);
 
 /* External interface functions */
 
+// Return type: status
+extern uint8_t scsi_sense(scsi_t *scsi, uint8_t *sense,
+			  uint8_t *asc, uint8_t *ascq);
+
 // Return 0 for success
 extern uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize);
 
