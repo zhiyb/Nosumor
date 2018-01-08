@@ -204,10 +204,10 @@ void led_init()
 const void *led_info(uint8_t *num)
 {
 	static const uint8_t info[LED_NUM][2] = {
-		{Bottom | Left, (3 << 4) | 12},
-		{Top | Right, (3 << 4) | 12},
-		{Top | Left, (3 << 4) | 12},
-		{Bottom | Right, (3 << 4) | 12},
+		{Bottom | Left,		(3 << 4) | 10},
+		{Top | Right,		(3 << 4) | 10},
+		{Top | Left,		(3 << 4) | 10},
+		{Bottom | Right,	(3 << 4) | 10},
 	};
 	if (num)
 		*num = LED_NUM;
@@ -216,17 +216,19 @@ const void *led_info(uint8_t *num)
 
 void led_set(uint32_t i, uint32_t size, const uint16_t *c)
 {
-	if (i >= LED_NUM || size != 3u)
+	if (i >= LED_NUM || size != 3u) {
+		dbgbkpt();
 		return;
+	}
 	uint16_t *p = &colours[i][0];
 	// Fix for out-of-order hardware connections
 	switch (i) {
 	case 1:
 	case 2: {
-		uint16_t b = *c++;
+		uint16_t *b = p++;
 		*p++ = *c++;
 		*p++ = *c++;
-		*p++ = b;
+		*b = *c++;
 		break;
 	}
 	default:
@@ -239,8 +241,10 @@ void led_set(uint32_t i, uint32_t size, const uint16_t *c)
 
 void led_get(uint32_t i, uint32_t size, uint16_t *c)
 {
-	if (i >= LED_NUM || size != 3u)
+	if (i >= LED_NUM || size != 3u) {
+		dbgbkpt();
 		return;
+	}
 	uint16_t *p = &colours[i][0];
 	// Fix for out-of-order hardware connections
 	switch (i) {

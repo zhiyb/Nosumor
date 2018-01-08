@@ -64,6 +64,7 @@ static void vendor_led_info(usb_hid_if_t *hid)
 	report.size = VENDOR_REPORT_BASE_SIZE + 1u;
 	const void *p = led_info(&report.payload[0]);
 	memcpy(&report.payload[1], p, report.payload[0] * 2u);
+	report.size += report.payload[0] * 2u;
 	usb_hid_vendor_send(hid, &report);
 }
 
@@ -81,9 +82,11 @@ static void vendor_led_config(usb_hid_if_t *hid, uint8_t size, void *payload)
 		memcpy(&report.payload[1], clr, sizeof(clr));
 		usb_hid_vendor_send(hid, &report);
 	} else {
-		if (size != 7)
+		if (size != 7) {
+			dbgbkpt();
 			return;
-		memcpy(&clr, payload, sizeof(clr));
+		}
+		memcpy(clr, payload, sizeof(clr));
 		led_set(id & 0x7f, 3u, clr);
 	}
 }
