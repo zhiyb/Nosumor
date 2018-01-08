@@ -99,6 +99,5 @@ void LEDs::led_t::set(QColor clr)
 void LEDs::led_t::set(uint16_t *clr)
 {
 	memcpy(colour, clr, 2u * elements);
-	qDebug() << colour[0] << colour[1] << colour[2];
 	button->setPalette(QPalette(qColor()));
 }
