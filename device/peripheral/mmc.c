@@ -38,6 +38,14 @@ uint32_t mmc_statistics()
 	return blocks;
 }
 
+void mmc_reset(DSTATUS s)
+{
+	if (status)
+		capacity = 0;
+	status = MMCIdle;
+	stat = s;
+}
+
 // Send command to card, with optional status output
 // Returns short response
 static uint32_t mmc_command(uint32_t cmd, uint32_t arg, uint32_t *stat);
@@ -102,9 +110,6 @@ static inline void mmc_base_init()
 	// Wait for IO compensation cell
 	while (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY));
 
-	// Initialise SDMMC module
-	RCC->APB2ENR |= RCC_APB2ENR_SDMMC1EN_Msk;
-
 	// DMA initialisation
 	RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN_Msk;
 	// Disable stream
@@ -128,21 +133,22 @@ static DSTATUS mmc_cd()
 #else
 	uint32_t cd_mask = 1ul << 15;
 #endif
-	if (!(GPIOA->IDR & cd_mask)) {
-		// Stop card clock
-		MMC->POWER = 0b00ul << SDMMC_POWER_PWRCTRL_Pos;
-		stat = STA_NODISK;
-		blocks = 0;
+	// Debouncing
+	if ((GPIOA->IDR & cd_mask) && (stat & STA_NODISK))
+		systick_delay(10);
+
+	if (GPIOA->IDR & cd_mask) {
+		if (stat & STA_NODISK)
+			mmc_reset(stat & ~STA_NODISK);
 		return stat;
 	}
 
-	if (!(stat & STA_NODISK))
-		return 0;
+	// Disable SDMMC module
+	RCC->APB2ENR &= ~RCC_APB2ENR_SDMMC1EN_Msk;
 
-	do {	// Debouncing
-		systick_delay(10);
-	} while (!(GPIOA->IDR & cd_mask));
-	return 0;
+	mmc_reset(STA_NODISK);
+	blocks = 0;
+	return stat;
 }
 
 static uint32_t mmc_command(uint32_t cmd, uint32_t arg, uint32_t *stat)
@@ -150,19 +156,25 @@ static uint32_t mmc_command(uint32_t cmd, uint32_t arg, uint32_t *stat)
 	MMC->ARG = arg;
 	MMC->CMD = cmd | SDMMC_CMD_CPSMEN_Msk;
 
-	if (!(cmd & SDMMC_CMD_WAITRESP_0))
-		// No response expected
-		while (!(MMC->STA & SDMMC_STA_CMDSENT_Msk));
+	// Response expected
+	uint32_t flag;
+	if (cmd & SDMMC_CMD_WAITRESP_0)
+		flag = SDMMC_STA_CMDREND_Msk;
 	else
-		while (!(MMC->STA & (SDMMC_STA_CMDREND_Msk |
-				     SDMMC_STA_CCRCFAIL_Msk |
-				     SDMMC_STA_CTIMEOUT_Msk)));
+		flag = SDMMC_STA_CMDSENT_Msk;
+
+	uint32_t tick = systick_cnt();
+	while (!(MMC->STA & (flag | SDMMC_STA_CCRCFAIL_Msk |
+			     SDMMC_STA_CTIMEOUT_Msk)) &&
+			systick_cnt() - tick < 100ul);
+
 	if (stat)
 		*stat = MMC->STA;
 
 	// Clear flags
 	MMC->ICR = SDMMC_ICR_CMDSENTC_Msk | SDMMC_ICR_CMDRENDC_Msk |
 			SDMMC_ICR_CCRCFAILC_Msk | SDMMC_ICR_CTIMEOUTC_Msk;
+
 	if (!(cmd & SDMMC_CMD_WAITRESP_0))
 		return MMC->RESPCMD;
 	else
@@ -184,6 +196,15 @@ static uint32_t mmc_app_command(uint32_t cmd, uint32_t rca, uint32_t arg, uint32
 
 static uint32_t mmc_ping()
 {
+	// Not in transfer mode
+	if (status != MMCIdle) {
+		uint32_t sta = MMC->STA;
+		if (sta & (SDMMC_STA_DCRCFAIL_Msk | SDMMC_STA_DTIMEOUT_Msk |
+			   SDMMC_STA_CCRCFAIL_Msk | SDMMC_STA_CTIMEOUT_Msk))
+			return STA_ERROR;
+		return 0;
+	}
+
 	uint32_t stat, resp;
 	resp = mmc_command(SEND_STATUS, rca, &stat);
 	if (!(stat & SDMMC_STA_CMDREND_Msk)) {
@@ -340,10 +361,6 @@ static uint32_t mmc_data(const void *p, uint32_t count)
 
 static int32_t mmc_busy()
 {
-	if (mmc_ping()) {
-		status = MMCIdle;
-		return -1;
-	}
 	if (MMC->STA & (SDMMC_STA_TXACT_Msk | SDMMC_STA_RXACT_Msk))
 		// Return as soon as FIFO become empty for performance
 		return MMC->FIFOCNT;
@@ -356,10 +373,6 @@ static int32_t mmc_busy()
 
 static int32_t mmc_transferred()
 {
-	if (mmc_ping()) {
-		status = MMCIdle;
-		return -1;
-	}
 	return 0xffffu - STREAM->NDTR;
 }
 
@@ -427,16 +440,19 @@ static uint32_t mmc_read_block(void *p, uint32_t start, uint32_t count)
 
 DSTATUS mmc_disk_init()
 {
-	if (stat == 0)
+	if (!stat)
 		return stat;
 
-	if (stat & STA_NOINIT) {
+	if (stat & STA_NOINIT)
 		mmc_base_init();
-		stat = STA_ERROR;
-	}
 
-	if (mmc_cd())
+	if (mmc_cd() & STA_NODISK)
 		return stat;
+
+	mmc_reset(STA_ERROR);
+
+	// Initialise SDMMC module
+	RCC->APB2ENR |= RCC_APB2ENR_SDMMC1EN_Msk;
 
 	// Disable interrupts
 	MMC->MASK = 0ul;
@@ -444,20 +460,18 @@ DSTATUS mmc_disk_init()
 	MMC->CLKCR = SDMMC_CLKCR_CLKEN_Msk | (CEIL(clkSDMMC1(), 400000ul) - 2ul);
 	// Start card clock
 	MMC->POWER = 0b11ul << SDMMC_POWER_PWRCTRL_Pos;
-	// The last busy in any write operation up to 500ms
-	MMC->DTIMER = clkSDMMC1() / 2ul;
-	// Card entering identification mode
-	systick_delay(5);
+	systick_delay(2);
 
-	// Reset card
-	mmc_command(GO_IDLE_STATE, 0, 0);
+	// Device may use up to 74 clocks for preparation
+	for (uint32_t i = 10; i != 0; i--)
+		// Reset card
+		mmc_command(GO_IDLE_STATE, 0, 0);
 
 	// Verify operation (2.7-3.6V, check pattern 0xa5)
 	uint32_t sta, arg = (0b0001ul << 8u) | (0xa5 << 0u);
 	uint32_t resp = mmc_command(SEND_IF_COND, arg, &sta);
 	if (!(sta & SDMMC_STA_CMDREND_Msk)) {
 		// Voltage mismatch or Ver.1 or not SD
-		dbgbkpt();
 		return stat;
 	}
 
@@ -502,21 +516,23 @@ DSTATUS mmc_disk_init()
 	}
 
 	// Initialised, switch to high-speed clock
+	// The last busy in any write operation up to 500ms
 	uint32_t clk;
-	if (!ccs)	// SDSC, up to 25MHz
+	if (!ccs) {	// SDSC, up to 25MHz
 		clk = CEIL(clkSDMMC1(), 25000000ul) - 2ul;
-	else		// SDHC/SDXC, up to 50MHz
+		MMC->DTIMER = (clkSDMMC1() / (clk + 2ul)) / 2ul;
+	} else {	// SDHC/SDXC, up to 50MHz
 		clk = SDMMC_CLKCR_BYPASS_Msk;
+		MMC->DTIMER = clkSDMMC1() / 2ul;
+	}
 	// Flow control, 4-bit bus, power saving, clock enable
 	MMC->CLKCR = SDMMC_CLKCR_HWFC_EN_Msk | (0b01ul << SDMMC_CLKCR_WIDBUS_Pos) |
 			SDMMC_CLKCR_PWRSAV_Msk | SDMMC_CLKCR_CLKEN_Msk | clk;
 
 	// Read CSD register
 	mmc_command(SEND_CSD, rca, &sta);
-	if (!(sta & SDMMC_STA_CMDREND_Msk)) {
-		dbgbkpt();
+	if (!(sta & SDMMC_STA_CMDREND_Msk))
 		return stat;
-	}
 
 	if ((MMC->RESP1 >> 30u) == 0u) {	// CSD V1
 		// Calculate card capacity from CSD register
@@ -534,6 +550,8 @@ DSTATUS mmc_disk_init()
 		capacity = ((((MMC->RESP2 << 16u) | (MMC->RESP3 >> 16u))
 			     & 0x003ffffful) + 1ul) * 1024ul;
 	}
+	printf(ESC_INFO "[MMC] Card capacity: " ESC_DATA "%lu"
+	       ESC_INFO " MiB\n", (uint32_t)(capacity / 2ull / 1024ull));
 
 	// Select card
 	resp = mmc_command(SELECT_CARD, rca, &sta);
@@ -562,17 +580,21 @@ DSTATUS mmc_disk_init()
 		return stat;
 	}
 
-	status = MMCIdle;
-	stat = 0;
+	// Clear SDMMC flags
+	MMC->ICR = SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_DATAENDC_Msk |
+			SDMMC_ICR_DTIMEOUTC_Msk | SDMMC_ICR_DCRCFAILC_Msk |
+			SDMMC_ICR_TXUNDERRC_Msk | SDMMC_ICR_RXOVERRC_Msk;
+
+	mmc_reset(0);
 	return stat;
 }
 
 DSTATUS mmc_disk_status()
 {
-	if ((stat & STA_NOINIT) || !mmc_cd())
+	if ((stat & STA_NOINIT) || !(mmc_cd() & STA_NODISK))
 		mmc_disk_init();
 	if (!(stat & STA_NODISK) && mmc_ping())
-		stat = STA_ERROR;
+		mmc_reset(STA_ERROR);
 	return stat;
 }
 
@@ -650,6 +672,10 @@ uint32_t scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 
 int32_t scsi_read_available(scsi_t *scsi)
 {
+	// Update status
+	if (mmc_disk_status())
+		return -1;
+
 	int32_t size = mmc_transferred();
 	if (size < 0)
 		return size;
@@ -687,6 +713,10 @@ uint32_t scsi_write_data(scsi_t *scsi, uint32_t length, const void *p)
 
 int32_t scsi_write_busy(scsi_t *scsi)
 {
+	// Update status
+	if (mmc_disk_status())
+		return -1;
+
 	return mmc_busy();
 }
 
