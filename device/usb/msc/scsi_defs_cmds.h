@@ -119,6 +119,7 @@ static const uint8_t cmd_size[256] = {
 	[WRITE_10] = 10u,
 	[READ_FORMAT_CAPACITIES] = 10u,
 	[SERVICE_ACTION_IN_16] = 16u,
+	[PREVENT_ALLOW_MEDIUM_REMOVAL] = 6u,
 };
 
 #endif // SCSI_DEFS_CMDS_H

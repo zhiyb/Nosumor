@@ -49,10 +49,11 @@ static scsi_ret_t sense_fixed(scsi_t *scsi, uint8_t response, uint8_t status,
 	data->sense = asc;
 	data->qualifier = ascq;
 
-	scsi_ret_t ret = {data, 7 + data->additional, SCSIFailure};
+	scsi_ret_t ret = {data, 7 + data->additional, scsi->state};
 	return ret;
 }
 
+#if 0
 static scsi_ret_t sense(scsi_t *scsi, uint8_t status,
 			uint8_t sense, uint8_t asc, uint8_t ascq)
 {
@@ -80,6 +81,7 @@ static scsi_ret_t sense(scsi_t *scsi, uint8_t status,
 	else
 		return sense_fixed(scsi, response, status, sense, asc, ascq);
 }
+#endif
 
 static scsi_ret_t unimplemented(scsi_t *scsi)
 {
@@ -97,8 +99,10 @@ static scsi_ret_t test_unit_ready(scsi_t *scsi, cmd_TEST_UNIT_READY_t *cmd)
 	// Check media status
 	scsi->sense.status = scsi_sense(scsi, &scsi->sense.sense,
 					&scsi->sense.asc, &scsi->sense.ascq);
-	if (scsi->sense.status != GOOD)
+	if (scsi->sense.status != GOOD) {
+		dbgprintf(ESC_ERROR "[SCSI] Unit not ready\n");
 		return (scsi_ret_t){0, 0, SCSIFailure};
+	}
 
 	scsi_ret_t ret = {0, 0, SCSIGood};
 	return ret;
@@ -157,6 +161,7 @@ static scsi_ret_t inquiry_vital(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 		memcpy(data->payload, SW_VERSION_STR, 4);
 		break;
 	default:
+		dbgprintf(ESC_ERROR "[SCSI] Unimplemented VPD page\n");
 		dbgbkpt();
 		// 24/00  DZTPROMAEBKVF  INVALID FIELD IN CDB
 		scsi->sense = (sense_t){CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00};
@@ -242,18 +247,21 @@ static scsi_ret_t read_capacity_10(scsi_t *scsi, cmd_READ_CAPACITY_10_t *cmd)
 
 	dbgprintf(ESC_DEBUG "[SCSI] Read capacity\n");
 
-	// Check media status
-	scsi->sense.status = scsi_sense(scsi, &scsi->sense.sense,
-					&scsi->sense.asc, &scsi->sense.ascq);
-	if (scsi->sense.status != GOOD)
-		return (scsi_ret_t){0, 0, SCSIFailure};
+	// Update sense data
+	scsi_ret_t ret = test_unit_ready(scsi, 0);
+	if (ret.state != SCSIGood)
+		return ret;
 
 	if (cmd->pmi) {
 		return unimplemented(scsi);
 	} else {
-		if (cmd->lbaddr != 0)
+		if (cmd->lbaddr != 0) {
+			dbgprintf(ESC_ERROR "[SCSI] Invalid LBA\n");
+			dbgbkpt();
 			// 24/00  DZTPROMAEBKVF  INVALID FIELD IN CDB
-			return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00);
+			scsi->sense = (sense_t){CHECK_CONDITION, ILLEGAL_REQUEST, 0x24, 0x00};
+			return (scsi_ret_t){0, 0, SCSIFailure};
+		}
 
 		data_READ_CAPACITY_10_t *data = (data_READ_CAPACITY_10_t *)scsi->buf;
 		scsi_capacity(scsi, &data->lbaddr, &data->lbsize);
@@ -269,12 +277,6 @@ static scsi_ret_t read_capacity_10(scsi_t *scsi, cmd_READ_CAPACITY_10_t *cmd)
 
 static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 {
-	// Check media status
-	scsi->sense.status = scsi_sense(scsi, &scsi->sense.sense,
-					&scsi->sense.asc, &scsi->sense.ascq);
-	if (scsi->sense.status != GOOD)
-		return (scsi_ret_t){0, 0, SCSIFailure};
-
 	// Endianness conversion
 	cmd->lbaddr = __REV(cmd->lbaddr);
 	cmd->length = __REV16(cmd->length);
@@ -286,11 +288,14 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 	uint32_t lbnum, lbsize;
 	scsi_capacity(scsi, &lbnum, &lbsize);
 
+	dbgprintf(ESC_READ "[SCSI] Read %u blocks from %lu\n", cmd->length, cmd->lbaddr);
+
 	// Logical block address check
 	if (cmd->lbaddr >= lbnum) {
-		dbgbkpt();
+		dbgprintf(ESC_ERROR "[SCSI] LBA out of range\n");
 		// 21/00  DZT RO   BK    LOGICAL BLOCK ADDRESS OUT OF RANGE
-		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x21, 0x00);
+		scsi->sense = (sense_t){CHECK_CONDITION, ILLEGAL_REQUEST, 0x21, 0x00};
+		return (scsi_ret_t){0, 0, SCSIFailure};
 	}
 
 	if (cmd->group != 0)
@@ -298,20 +303,22 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 
 	// Transfer length check
 	if (cmd->lbaddr + cmd->length > lbnum * lbsize) {
-		dbgbkpt();
+		dbgprintf(ESC_ERROR "[SCSI] Invalid transfer length\n");
 		// 21/00  DZT RO   BK    LOGICAL BLOCK ADDRESS OUT OF RANGE
-		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x21, 0x00);
+		scsi->sense = (sense_t){CHECK_CONDITION, ILLEGAL_REQUEST, 0x21, 0x00};
+		return (scsi_ret_t){0, 0, SCSIFailure};
 	}
-
-	dbgprintf(ESC_READ "[SCSI] Read %u blocks from %lu\n", cmd->length, cmd->lbaddr);
 
 	if (cmd->length == 0)
 		return (scsi_ret_t){0, 0, SCSIGood};
 
-	if (!scsi_read_start(scsi, cmd->lbaddr, cmd->length)) {
-		dbgbkpt();
+	if (scsi_read_start(scsi, cmd->lbaddr, cmd->length) != cmd->length) {
+		dbgprintf(ESC_ERROR "[SCSI] Failed initiating data read\n");
+		// Update sense data
+		test_unit_ready(scsi, 0);
 		return (scsi_ret_t){0, 0, SCSIFailure};
 	}
+
 	scsi->length = cmd->length;
 	scsi->state = SCSIRead;
 	return (scsi_ret_t){0, 0, SCSIRead};
@@ -319,12 +326,6 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 
 static scsi_ret_t write_10(scsi_t *scsi, cmd_WRITE_10_t *cmd)
 {
-	// Check media status
-	scsi->sense.status = scsi_sense(scsi, &scsi->sense.sense,
-					&scsi->sense.asc, &scsi->sense.ascq);
-	if (scsi->sense.status != GOOD)
-		return (scsi_ret_t){0, 0, SCSIFailure};
-
 	// Endianness conversion
 	cmd->lbaddr = __REV(cmd->lbaddr);
 	cmd->length = __REV16(cmd->length);
@@ -336,14 +337,13 @@ static scsi_ret_t write_10(scsi_t *scsi, cmd_WRITE_10_t *cmd)
 	uint32_t lbnum, lbsize;
 	scsi_capacity(scsi, &lbnum, &lbsize);
 
+	dbgprintf(ESC_WRITE "[SCSI] Write %u blocks from %lu\n", cmd->length, cmd->lbaddr);
+
 	// Logical block address check
 	if (cmd->lbaddr >= lbnum) {
-		dbgbkpt();
+		dbgprintf(ESC_ERROR "[SCSI] LBA out of range\n");
 		// 21/00  DZT RO   BK    LOGICAL BLOCK ADDRESS OUT OF RANGE
-		scsi->sense.status = CHECK_CONDITION;
-		scsi->sense.sense = ILLEGAL_REQUEST;
-		scsi->sense.asc = 0x21;
-		scsi->sense.ascq = 0x00;
+		scsi->sense = (sense_t){CHECK_CONDITION, ILLEGAL_REQUEST, 0x21, 0x00};
 		return (scsi_ret_t){0, 0, SCSIFailure};
 	}
 
@@ -352,21 +352,21 @@ static scsi_ret_t write_10(scsi_t *scsi, cmd_WRITE_10_t *cmd)
 
 	// Transfer length check
 	if (cmd->lbaddr + cmd->length > lbnum * lbsize) {
-		dbgbkpt();
+		dbgprintf(ESC_ERROR "[SCSI] Transfer length out of range\n");
 		// 21/00  DZT RO   BK    LOGICAL BLOCK ADDRESS OUT OF RANGE
-		scsi->sense.status = CHECK_CONDITION;
-		scsi->sense.sense = ILLEGAL_REQUEST;
-		scsi->sense.asc = 0x21;
-		scsi->sense.ascq = 0x00;
+		scsi->sense = (sense_t){CHECK_CONDITION, ILLEGAL_REQUEST, 0x21, 0x00};
 		return (scsi_ret_t){0, 0, SCSIFailure};
 	}
 
-	dbgprintf(ESC_WRITE "[SCSI] Write %u blocks from %lu\n", cmd->length, cmd->lbaddr);
+	if (scsi_write_start(scsi, cmd->lbaddr, cmd->length) != cmd->length) {
+		dbgprintf(ESC_ERROR "[SCSI] Failed initiating data write\n");
+		// Update sense data
+		test_unit_ready(scsi, 0);
+		return (scsi_ret_t){0, 0, SCSIFailure};
+	}
 
 	scsi->length = cmd->length;
 	scsi->state = SCSIWrite;
-	// TODO: Error checking
-	scsi_write_start(scsi, cmd->lbaddr, scsi->length);
 	return (scsi_ret_t){0, 0, SCSIWrite};
 }
 
@@ -381,9 +381,9 @@ scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
 		return unimplemented(scsi);
 	} else if (size < cmd_size[cmd->op]) {
 		dbgprintf(ESC_ERROR "[SCSI] Invalid cmd size\n");
-		dbgbkpt();
 		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
-		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
+		scsi->sense = (sense_t){CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00};
+		return (scsi_ret_t){0, 0, SCSIFailure};
 	}
 
 	// Command handling
@@ -401,20 +401,19 @@ scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size)
 	case WRITE_10:
 		return write_10(scsi, (cmd_WRITE_10_t *)cmd);
 	default:
-		// Unsupported commands
+		dbgprintf(ESC_WARNING "[SCSI] Unsupported command: "
+			  ESC_DATA "0x%02x\n", cmd->op);
 		// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
-		return sense(scsi, CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00);
+		scsi->sense = (sense_t){CHECK_CONDITION, ILLEGAL_REQUEST, 0x00, 0x00};
+		return (scsi_ret_t){0, 0, SCSIFailure};
 	}
 }
 
 scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 {
+	// Check SCSI state machine
 	if ((scsi->state & ~SCSIBusy) != SCSIWrite) {
-		dbgbkpt();
-		return SCSIFailure;
-	}
-
-	if (scsi->length < size) {
+		dbgprintf(ESC_ERROR "[SCSI] State machine error: " ESC_DATA "%u\n", scsi->state);
 		dbgbkpt();
 		return SCSIFailure;
 	}
@@ -423,15 +422,35 @@ scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 	uint32_t lbnum, lbsize;
 	scsi_capacity(scsi, &lbnum, &lbsize);
 
-	// Transfer data
+	// Check remaining data size
 	size /= lbsize;
+	if (scsi->length < size) {
+		dbgbkpt();
+		return SCSIFailure;
+	}
+
+	// Transfer data
 	if (!(scsi->state & SCSIBusy)) {
-		// TODO: Error checking
-		size = scsi_write_data(scsi, size, pdata);
+		if (scsi_write_data(scsi, size, pdata) != size) {
+			dbgprintf(ESC_ERROR "[SCSI] Write data failure\n");
+			// Update sense data
+			test_unit_ready(scsi, 0);
+			// Reset SCSI state machine
+			scsi->state = SCSIFailure;
+			return scsi->state;
+		}
 	}
 
 	// Check busy status
-	if (scsi_write_busy(scsi)) {
+	int32_t busy = scsi_write_busy(scsi);
+	if (busy < 0) {
+		dbgprintf(ESC_ERROR "[SCSI] Write failure\n");
+		// Update sense data
+		test_unit_ready(scsi, 0);
+		// Reset SCSI state machine
+		scsi->state = SCSIFailure;
+		return SCSIFailure;
+	} else if (busy) {
 		scsi->state = SCSIWrite | SCSIBusy;
 	} else {
 		// Update status
@@ -439,9 +458,15 @@ scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 		if (scsi->length) {
 			scsi->state = SCSIWrite;
 		} else {
-			if (!scsi_write_stop(scsi))
-				dbgbkpt();
-			scsi->state = SCSIGood;
+			if (scsi_write_stop(scsi)) {
+				dbgprintf(ESC_ERROR "[SCSI] Write failed\n");
+				// Update sense data
+				test_unit_ready(scsi, 0);
+				// Reset SCSI state machine
+				scsi->state = SCSIFailure;
+			} else {
+				scsi->state = SCSIGood;
+			}
 		}
 	}
 	return scsi->state;
@@ -449,6 +474,9 @@ scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 
 scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize)
 {
+	// Avoid failure sort packet looping
+	if (scsi->state == SCSIFailure)
+		return (scsi_ret_t){0, 0, SCSIGood};
 	// Only read events are currently processed here
 	if (scsi->state != SCSIRead)
 		return (scsi_ret_t){0, 0, scsi->state};
@@ -461,24 +489,43 @@ scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize)
 	maxsize /= lbsize;
 	uint32_t size = maxsize < scsi->length ? maxsize : scsi->length;
 
-	// Insufficient buffering
-	if (scsi_read_available(scsi) < size)
+	// Check again if insufficient buffering
+	int32_t available = scsi_read_available(scsi);
+	if (available < 0) {
+		dbgprintf(ESC_ERROR "[SCSI] Read failure\n");
+		// Update sense data
+		test_unit_ready(scsi, 0);
+		// Reset SCSI state machine
+		scsi->state = SCSIFailure;
+		return (scsi_ret_t){0, 0, scsi->state};
+	} else if ((uint32_t)available < size)
 		return (scsi_ret_t){0, 0, scsi->state};
 
 	// Read available data
 	uint32_t length = size;
 	void *p = scsi_read_data(scsi, &length);
 	if (!p || length != size) {
-		dbgbkpt();
+		dbgprintf(ESC_ERROR "[SCSI] Read data failure\n");
+		// Update sense data
+		test_unit_ready(scsi, 0);
+		// Reset SCSI state machine
+		scsi->state = SCSIFailure;
 		return (scsi_ret_t){0, 0, scsi->state};
 	}
 
 	// Update status
 	scsi->length -= size;
 	if (!scsi->length) {
-		if (!scsi_read_stop(scsi))
-			dbgbkpt();
-		scsi->state = SCSIGood;
+		if (scsi_read_stop(scsi)) {
+			dbgprintf(ESC_ERROR "[SCSI] Read failed\n");
+			// Update sense data
+			test_unit_ready(scsi, 0);
+			// Reset SCSI state machine
+			scsi->state = SCSIFailure;
+			return (scsi_ret_t){0, 0, scsi->state};
+		} else {
+			scsi->state = SCSIGood;
+		}
 	}
 	return (scsi_ret_t){p, size * lbsize, scsi->state};
 }

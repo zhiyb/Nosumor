@@ -193,7 +193,7 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	// Process SCSI initiated packets
 	csw_t *csw = &inbuf.csw;
 	scsi_ret_t ret = scsi_process(msc->scsi, MSC_IN_MAX_SIZE);
-	if (ret.length) {
+	if (ret.length || ret.state == SCSIFailure) {
 		if (usb_ep_in_transfer(usb->base, msc->ep_in,
 				       ret.p, ret.length) != ret.length)
 			dbgbkpt();
