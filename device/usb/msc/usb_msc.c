@@ -98,6 +98,36 @@ static void epout_init(usb_t *usb, uint32_t n)
 	epout_swap(usb, n);
 }
 
+static void epout_stall(usb_t *usb, uint32_t n, int stall)
+{
+	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
+	if (stall) {
+		__disable_irq();
+		// Set stall bit
+		DOEPCTL_SET(ep->DOEPCTL, USB_OTG_DOEPCTL_STALL_Msk);
+		// Clear interrupts
+		ep->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk;
+		__enable_irq();
+
+		// Flush buffers
+		usb_msc_t *data = (usb_msc_t *)usb->epout[n].data;
+		data->buf_size[0] = 0;
+		data->buf_size[1] = 0;
+
+		dbgprintf(ESC_MSG "[MSC] OUT endpoint " ESC_DISABLE "stalled\n");
+	} else {
+		if (!(ep->DOEPCTL & USB_OTG_DOEPCTL_STALL_Msk))
+			return;
+
+		// Clear stall bit, resume data transfer
+		DOEPCTL_SET(ep->DOEPCTL, USB_OTG_DOEPCTL_EPENA_Msk |
+			    USB_OTG_DOEPCTL_CNAK_Msk |
+			    USB_OTG_DOEPCTL_SD0PID_SEVNFRM_Msk);
+
+		dbgprintf(ESC_MSG "[MSC] OUT endpoint " ESC_ENABLE "resumed\n");
+	}
+}
+
 static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 {
 	usb_msc_t *data = (usb_msc_t *)usb->epout[n].data;
@@ -133,7 +163,7 @@ static void usbif_config(usb_t *usb, void *pdata)
 	const epout_t epout = {
 		.data = data,
 		.init = &epout_init,
-		//.halt = &epout_halt,
+		.halt = &epout_stall,
 		.xfr_cplt = &epout_xfr_cplt,
 	};
 	usb_ep_register(usb, &epin, &data->ep_in, &epout, &data->ep_out);
@@ -217,6 +247,7 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 		// Check with SCSI again if currently busy
 		if (ret.state & SCSIBusy)
 			return;
+
 		__disable_irq();
 		if (outbuf != msc->outbuf)
 			dbgbkpt();
@@ -229,10 +260,14 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 			epout_swap(usb, msc->ep_out);
 		// Update CSW
 		csw->dCSWDataResidue -= size;
+		// Wait for data if transfer have not finished
+		if (ret.state != SCSIGood && ret.state != SCSIFailure)
+			return;
+		// Stall the OUT endpoint if host data pending
+		if (csw->dCSWDataResidue)
+			epout_stall(usb, msc->ep_out, 1);
 		// Send CSW after transfer finished
-		if (ret.state == SCSIGood || ret.state == SCSIFailure)
-			goto s_csw;
-		return;
+		goto s_csw;
 	}
 
 	// Command block wrapper (CBW) processing
@@ -268,14 +303,18 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	__enable_irq();
 	if (buf_size)
 		epout_swap(usb, msc->ep_out);
-	// SCSI data transfer
-	if (dir == CBW_DIR_IN &&
-			(ret.state == SCSIGood || ret.state == SCSIFailure)) {
-		if (ret.length > csw->dCSWDataResidue)
-			ret.length = csw->dCSWDataResidue;
-		if (usb_ep_in_transfer(usb->base, msc->ep_in,
-				       ret.p, ret.length) != ret.length)
-			dbgbkpt();
+	// SCSI data ready for transfer
+	if (ret.state == SCSIGood || ret.state == SCSIFailure) {
+		if (dir == CBW_DIR_IN) {
+			if (ret.length > csw->dCSWDataResidue)
+				ret.length = csw->dCSWDataResidue;
+			if (usb_ep_in_transfer(usb->base, msc->ep_in,
+					       ret.p, ret.length) != ret.length)
+				dbgbkpt();
+		} else if (csw->dCSWDataResidue) {
+			// Host is sending data, stall the OUT endpoint
+			epout_stall(usb, msc->ep_out, 1);
+		}
 	}
 
 	// Prepare CSW
