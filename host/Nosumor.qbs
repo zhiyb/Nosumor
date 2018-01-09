@@ -1,6 +1,7 @@
 import qbs
 
 Project {
+    name: "Nosumor (host)"
     minimumQbsVersion: "1.7.1"
 
     references: [

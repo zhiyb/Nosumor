@@ -1,6 +1,9 @@
 import qbs
 
 Project {
+    name: "Nosumor (device)"
+    minimumQbsVersion: "1.7.1"
+
     property string device: "STM32F722"
     property bool cmsis_dsp: false
     property int hwver: 0x0003
