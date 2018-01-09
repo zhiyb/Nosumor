@@ -3,18 +3,94 @@ import qbs
 Project {
     property string device: "STM32F722"
     property bool cmsis_dsp: false
+    property int hwver: 0x0003
 
     references: ["CMSIS"]
 
     CppApplication {
+        name: "Nosumor"
         type: ["application", "hex", "size"]
-        Depends {name: "CMSIS"}
+        Depends {name: "core"}
         Depends {name: "gcc-none"}
 
-        property bool itcm: false
-        property bool bootloader: false
+        files: [
+            "main.c",
+            "vendor.c",
+        ]
 
-        cpp.defines: ["HWVER=0x0003"]
+        Group {
+            name: "FatFS"
+            cpp.optimization: "small"
+            cpp.commonCompilerFlags: outer.concat(["-Wno-comment"])
+            files: [
+                "fatfs/*",
+            ]
+        }
+
+        Group {
+            name: "Linker script for AXI"
+            condition: qbs.buildVariant === "debug"
+            files: "STM32F722RETx_FLASH_AXIM.ld"
+        }
+
+        Group {
+            name: "Linker script for ITCM"
+            condition: qbs.buildVariant === "release"
+            files: "STM32F722RETx_FLASH_ITCM.ld"
+        }
+
+        Group {     // Properties for the produced executable
+            fileTagsFilter: ["application", "hex", "bin"]
+            qbs.install: true
+        }
+    }
+
+    CppApplication {
+        name: "Bootloader"
+        type: ["application", "hex", "size"]
+        Depends {name: "core"}
+        Depends {name: "gcc-none"}
+
+        cpp.defines: ["BOOTLOADER"]
+        cpp.driverFlags: ["--specs=nano.specs"]
+
+        files: [
+            "bootloader.c",
+            "vendor.c",
+        ]
+
+        Group {
+            name: "FatFS"
+            cpp.optimization: "small"
+            cpp.commonCompilerFlags: outer.concat(["-Wno-comment"])
+            files: [
+                "fatfs/*",
+            ]
+        }
+
+        Group {
+            name: "Linker script for AXI"
+            condition: qbs.buildVariant === "debug"
+            files: "STM32F722RETx_FLASH_AXIM.ld"
+        }
+
+        Group {
+            name: "Linker script for ITCM BL"
+            condition: qbs.buildVariant === "release"
+            files: "STM32F722RETx_FLASH_ITCM_BL.ld"
+        }
+
+        Group {     // Properties for the produced executable
+            fileTagsFilter: ["application", "hex", "bin"]
+            qbs.install: true
+        }
+    }
+
+    StaticLibrary {
+        name: "core"
+        Depends {name: "CMSIS"}
+
+        cpp.defines: ["HWVER=" + hwver]
 
         cpp.commonCompilerFlags: [
             "-Wno-unused-parameter",
@@ -25,31 +101,20 @@ Project {
         cpp.includePaths: ["."]
 
         Properties {
-            condition: bootloader
-            cpp.defines: outer.concat(["BOOTLOADER"])
-            cpp.driverFlags: outer.concat(["--specs=nano.specs"])
-        }
-
-        Properties {
             condition: qbs.buildVariant == "debug"
             cpp.defines: outer.concat(["DEBUG"])
         }
 
         Properties {
             condition: qbs.buildVariant == "release"
-            cpp.defines: outer.concat(["FLASH_USE_ITCM"])
             cpp.optimization: "small"
-            itcm: true
         }
 
-        Group {
-            name: "FatFS"
-            condition: !bootloader
-            cpp.optimization: "small"
-            cpp.commonCompilerFlags: outer.concat(["-Wno-comment"])
-            files: [
-                "fatfs/*",
-            ]
+        Export {
+            Depends {name: "cpp"}
+            Depends {name: "CMSIS"}
+            cpp.includePaths: ["."]
+            cpp.defines: product.cpp.defines
         }
 
         Group {
@@ -75,7 +140,7 @@ Project {
         Group {
             name: "USB Audio Class 1"
             // Not working yet
-            condition: false && !bootloader
+            condition: false
             files: [
                 "usb/audio/usb_audio.c",
                 "usb/audio/usb_audio.h",
@@ -86,7 +151,6 @@ Project {
 
         Group {
             name: "USB Audio Class 2"
-            condition: !bootloader
             files: [
                 "usb/audio2/usb_audio2.c",
                 "usb/audio2/usb_audio2.h",
@@ -177,29 +241,10 @@ Project {
         }
 
         Group {
-            name: "Linker script for AXI"
-            condition: !itcm
-            files: "STM32F722RETx_FLASH_AXIM.ld"
-        }
-
-        Group {
-            name: "Linker script for ITCM"
-            condition: itcm && !bootloader
-            files: "STM32F722RETx_FLASH_ITCM.ld"
-        }
-
-        Group {
-            name: "Linker script for ITCM BL"
-            condition: itcm && bootloader
-            files: "STM32F722RETx_FLASH_ITCM_BL.ld"
-        }
-
-        Group {
             name: "Logic modules"
             files: [
                 "flash.c",
                 "flash.h",
-                "vendor.c",
                 "vendor.h",
                 "vendor_defs.h",
             ]
@@ -209,12 +254,6 @@ Project {
             "irq.h",
             "escape.h",
             "macros.h",
-            "main.c",
         ]
-
-        Group {     // Properties for the produced executable
-            fileTagsFilter: ["application", "hex", "bin"]
-            qbs.install: true
-        }
     }
 }
