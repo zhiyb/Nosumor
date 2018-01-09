@@ -35,13 +35,16 @@ extern uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize);
 // Read: Start -> ((Available?) -> Data) -> Stop
 extern uint32_t scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size);
 // Return < 0 for error
+// Return unit: Bytes
 extern int32_t scsi_read_available(scsi_t *scsi);
 // Returned address need to be aligned to 32-bytes boundary for DMA transfer
+// Length unit: Bytes
 extern void *scsi_read_data(scsi_t *scsi, uint32_t *length);
 extern uint32_t scsi_read_stop(scsi_t *scsi);
 
 // Write: Start -> (Data -> (Busy?)) -> Stop
 extern uint32_t scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size);
+// Length unit: Bytes
 extern uint32_t scsi_write_data(scsi_t *scsi, uint32_t length, const void *p);
 // Return < 0 for error
 extern int32_t scsi_write_busy(scsi_t *scsi);

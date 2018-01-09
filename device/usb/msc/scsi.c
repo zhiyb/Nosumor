@@ -319,7 +319,7 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 		return (scsi_ret_t){0, 0, SCSIFailure};
 	}
 
-	scsi->length = cmd->length;
+	scsi->length = cmd->length * lbsize;
 	scsi->state = SCSIRead;
 	return (scsi_ret_t){0, 0, SCSIRead};
 }
@@ -365,7 +365,7 @@ static scsi_ret_t write_10(scsi_t *scsi, cmd_WRITE_10_t *cmd)
 		return (scsi_ret_t){0, 0, SCSIFailure};
 	}
 
-	scsi->length = cmd->length;
+	scsi->length = cmd->length * lbsize;
 	scsi->state = SCSIWrite;
 	return (scsi_ret_t){0, 0, SCSIWrite};
 }
@@ -423,7 +423,6 @@ scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 	scsi_capacity(scsi, &lbnum, &lbsize);
 
 	// Check remaining data size
-	size /= lbsize;
 	if (scsi->length < size) {
 		dbgbkpt();
 		return SCSIFailure;
@@ -486,7 +485,6 @@ scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize)
 	scsi_capacity(scsi, &lbnum, &lbsize);
 
 	// Calculate packet size
-	maxsize /= lbsize;
 	uint32_t size = maxsize < scsi->length ? maxsize : scsi->length;
 
 	// Check again if insufficient buffering
@@ -527,5 +525,5 @@ scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize)
 			scsi->state = SCSIGood;
 		}
 	}
-	return (scsi_ret_t){p, size * lbsize, scsi->state};
+	return (scsi_ret_t){p, size, scsi->state};
 }

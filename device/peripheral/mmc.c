@@ -330,6 +330,9 @@ static uint32_t mmc_data(const void *p, uint32_t count)
 		return 0;
 	}
 
+	if (count == 0)
+		return 0;
+
 	// Wait for data block transmission
 	while (MMC->STA & (SDMMC_STA_TXACT_Msk | SDMMC_STA_RXACT_Msk));
 	// Wait for DMA
@@ -680,20 +683,20 @@ int32_t mmc_scsi_read_available(scsi_t *scsi)
 	int32_t size = mmc_transferred();
 	if (size < 0)
 		return size;
-	return (size * 4ul - (scsi_ptr - scsi_buf)) / 512ul;
+	return size * 4ul - (scsi_ptr - scsi_buf);
 }
 
 void *mmc_scsi_read_data(scsi_t *scsi, uint32_t *length)
 {
 	// Check buffer overflow
-	if (*length * 512ul + (scsi_ptr - scsi_buf) > sizeof(scsi_buf)) {
+	if (*length + (scsi_ptr - scsi_buf) > sizeof(scsi_buf)) {
 		dbgbkpt();
 		*length = 0;
 		return 0;
 	}
 
 	void *p = scsi_ptr;
-	scsi_ptr += *length * 512ul / sizeof(*scsi_ptr);
+	scsi_ptr += *length / sizeof(*scsi_ptr);
 	return p;
 }
 
@@ -709,7 +712,10 @@ uint32_t mmc_scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 
 uint32_t mmc_scsi_write_data(scsi_t *scsi, uint32_t length, const void *p)
 {
-	return mmc_data(p, length);
+	// Check for sector alignment
+	if (length % 512ul)
+		dbgbkpt();
+	return mmc_data(p, length / 512ul) * 512ul;
 }
 
 int32_t mmc_scsi_write_busy(scsi_t *scsi)
