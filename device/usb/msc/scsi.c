@@ -313,7 +313,7 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 		return (scsi_ret_t){0, 0, SCSIGood};
 
 	if (scsi_read_start(scsi, cmd->lbaddr, cmd->length) != cmd->length) {
-		dbgprintf(ESC_ERROR "[SCSI] Failed initiating data read\n");
+		dbgprintf(ESC_ERROR "[SCSI] initiating data read failed\n");
 		// Update sense data
 		test_unit_ready(scsi, 0);
 		return (scsi_ret_t){0, 0, SCSIFailure};
@@ -359,7 +359,7 @@ static scsi_ret_t write_10(scsi_t *scsi, cmd_WRITE_10_t *cmd)
 	}
 
 	if (scsi_write_start(scsi, cmd->lbaddr, cmd->length) != cmd->length) {
-		dbgprintf(ESC_ERROR "[SCSI] Failed initiating data write\n");
+		dbgprintf(ESC_ERROR "[SCSI] Initiating data write failed\n");
 		// Update sense data
 		test_unit_ready(scsi, 0);
 		return (scsi_ret_t){0, 0, SCSIFailure};

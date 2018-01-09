@@ -125,8 +125,6 @@ static inline void init()
 
 	puts(ESC_INIT "Initialising SD/MMC card...");
 	mmc_disk_init();
-	printf(ESC_INFO "Card capacity: " ESC_DATA "%llu"
-	       ESC_INFO " bytes\n", (uint64_t)mmc_capacity() * 512ull);
 	puts(ESC_INIT "Initialising USB mass storage...");
 	usb_msc = usb_msc_init(&usb);
 
