@@ -28,6 +28,16 @@ static DSTATUS stat = STA_NOINIT;
 static uint32_t ccs = 0, capacity = 0, blocks = 0, rca = 0;
 enum {MMCIdle = 0, MMCRead, MMCWrite, MMCMulti = 0x80} status = MMCIdle;
 
+uint32_t mmc_capacity()
+{
+	return capacity;
+}
+
+uint32_t mmc_statistics()
+{
+	return blocks;
+}
+
 // Send command to card, with optional status output
 // Returns short response
 static uint32_t mmc_command(uint32_t cmd, uint32_t arg, uint32_t *stat);
@@ -110,6 +120,31 @@ static inline void mmc_base_init()
 	STREAM->FCR = DMA_SxFCR_DMDIS_Msk | (0b11 << DMA_SxFCR_FTH_Pos);
 }
 
+static DSTATUS mmc_cd()
+{
+	// Switch opens when card inserted
+#if HWVER == 0x0002
+	uint32_t cd_mask = 1ul << 12;
+#else
+	uint32_t cd_mask = 1ul << 15;
+#endif
+	if (!(GPIOA->IDR & cd_mask)) {
+		// Stop card clock
+		MMC->POWER = 0b00ul << SDMMC_POWER_PWRCTRL_Pos;
+		stat = STA_NODISK;
+		blocks = 0;
+		return stat;
+	}
+
+	if (!(stat & STA_NODISK))
+		return 0;
+
+	do {	// Debouncing
+		systick_delay(10);
+	} while (!(GPIOA->IDR & cd_mask));
+	return 0;
+}
+
 static uint32_t mmc_command(uint32_t cmd, uint32_t arg, uint32_t *stat)
 {
 	MMC->ARG = arg;
@@ -147,21 +182,22 @@ static uint32_t mmc_app_command(uint32_t cmd, uint32_t rca, uint32_t arg, uint32
 	return mmc_command(cmd, arg, stat);
 }
 
-uint32_t mmc_capacity()
+static uint32_t mmc_ping()
 {
-	return capacity;
-}
-
-uint32_t mmc_statistics()
-{
-	return blocks;
+	uint32_t stat, resp;
+	resp = mmc_command(SEND_STATUS, rca, &stat);
+	if (!(stat & SDMMC_STA_CMDREND_Msk)) {
+		dbgprintf(ESC_ERROR "[MMC] Response timed out\n");
+		return STA_ERROR;
+	}
+	return 0;
 }
 
 static uint32_t mmc_read_prepare()
 {
 	if (status != MMCIdle) {
 		dbgbkpt();
-		return 0;
+		return 1;
 	}
 
 	// Peripheral to memory, 32bit -> 32bit, burst of 4 beats, low priority
@@ -174,15 +210,13 @@ static uint32_t mmc_read_prepare()
 	uint32_t resp, stat;
 	do {
 		resp = mmc_command(SEND_STATUS, rca, &stat);
-		if (!(stat & SDMMC_STA_CMDREND_Msk)) {
-			dbgbkpt();
-			return 0;
-		}
+		if (!(stat & SDMMC_STA_CMDREND_Msk))
+			return 2;
 	} while (resp >> 9u != 4u);
 
 	// Update status
 	status = MMCRead;
-	return 1;
+	return 0;
 }
 
 static uint32_t mmc_read_start(uint32_t start, uint32_t count)
@@ -205,7 +239,6 @@ static uint32_t mmc_read_start(uint32_t start, uint32_t count)
 	uint32_t resp, stat;
 	resp = mmc_command(count == 1 ? READ_SINGLE_BLOCK : READ_MULTIPLE_BLOCK, start, &stat);
 	if (!(stat & SDMMC_STA_CMDREND_Msk)) {
-		dbgbkpt();
 		status = MMCIdle;
 		return 0;
 	}
@@ -242,7 +275,6 @@ static uint32_t mmc_write_start(uint32_t start, uint32_t count)
 	do {
 		resp = mmc_command(SEND_STATUS, rca, &stat);
 		if (!(stat & SDMMC_STA_CMDREND_Msk)) {
-			dbgbkpt();
 			status = MMCIdle;
 			return 0;
 		}
@@ -252,7 +284,6 @@ static uint32_t mmc_write_start(uint32_t start, uint32_t count)
 	if (count != 1) {
 		resp = mmc_app_command(SET_WR_BLK_ERASE_COUNT, rca, count, &stat);
 		if (!(stat & (SDMMC_STA_CMDREND_Msk))) {
-			dbgbkpt();
 			status = MMCIdle;
 			return 0;
 		}
@@ -261,7 +292,6 @@ static uint32_t mmc_write_start(uint32_t start, uint32_t count)
 	// Start writing
 	resp = mmc_command(count == 1 ? WRITE_BLOCK : WRITE_MULTIPLE_BLOCK, start, &stat);
 	if (!(stat & (SDMMC_STA_CMDREND_Msk))) {
-		dbgbkpt();
 		status = MMCIdle;
 		return 0;
 	}
@@ -308,8 +338,12 @@ static uint32_t mmc_data(const void *p, uint32_t count)
 	return count;
 }
 
-static uint32_t mmc_busy()
+static int32_t mmc_busy()
 {
+	if (mmc_ping()) {
+		status = MMCIdle;
+		return -1;
+	}
 	if (MMC->STA & (SDMMC_STA_TXACT_Msk | SDMMC_STA_RXACT_Msk))
 		// Return as soon as FIFO become empty for performance
 		return MMC->FIFOCNT;
@@ -320,8 +354,12 @@ static uint32_t mmc_busy()
 		return 0;
 }
 
-static uint32_t mmc_transferred()
+static int32_t mmc_transferred()
 {
+	if (mmc_ping()) {
+		status = MMCIdle;
+		return -1;
+	}
 	return 0xffffu - STREAM->NDTR;
 }
 
@@ -329,7 +367,7 @@ static uint32_t mmc_stop()
 {
 	if (!(status & (MMCWrite | MMCRead))) {
 		dbgbkpt();
-		return 0;
+		return 1;
 	}
 
 	// Wait for data block transfer
@@ -340,6 +378,7 @@ static uint32_t mmc_stop()
 
 	// Clear SDMMC flags
 	MMC->ICR = SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_DATAENDC_Msk |
+			SDMMC_ICR_DTIMEOUTC_Msk | SDMMC_ICR_DCRCFAILC_Msk |
 			SDMMC_ICR_TXUNDERRC_Msk | SDMMC_ICR_RXOVERRC_Msk;
 	// Clear DMA interrupts
 	DMA2->LIFCR = DMA_LIFCR_CTCIF3_Msk | DMA_LIFCR_CHTIF3_Msk |
@@ -351,86 +390,37 @@ static uint32_t mmc_stop()
 		uint32_t resp, stat;
 		resp = mmc_command(STOP_TRANSMISSION, 0, &stat);
 		if (!(stat & SDMMC_STA_CMDREND_Msk)) {
-			dbgbkpt();
 			status = MMCIdle;
-			return 0;
+			return 2;
 		}
 	}
 
 	status = MMCIdle;
-	return 1;
+	return 0;
 }
 
 static uint32_t mmc_write_block(const void *p, uint32_t start, uint32_t count)
 {
-	if (mmc_write_start(start, count) != count) {
-		dbgbkpt();
+	if (mmc_write_start(start, count) != count)
 		return 0;
-	}
-	if (mmc_data(p, count) != count) {
-		dbgbkpt();
+	if (mmc_data(p, count) != count)
 		return 0;
-	}
-	if (mmc_stop() == 0) {
-		dbgbkpt();
+	if (mmc_stop() != 0)
 		return 0;
-	}
 	return count;
 }
 
 static uint32_t mmc_read_block(void *p, uint32_t start, uint32_t count)
 {
-	if (mmc_read_prepare() == 0) {
-		dbgbkpt();
+	if (mmc_read_prepare() != 0)
 		return 0;
-	}
-	if (mmc_data(p, count) != count) {
-		dbgbkpt();
+	if (mmc_data(p, count) != count)
 		return 0;
-	}
-	if (mmc_read_start(start, count) != count) {
-		dbgbkpt();
+	if (mmc_read_start(start, count) != count)
 		return 0;
-	}
-	if (mmc_stop() == 0) {
-		dbgbkpt();
+	if (mmc_stop() != 0)
 		return 0;
-	}
 	return count;
-}
-
-static DSTATUS mmc_cd()
-{
-	// Switch opens when card inserted
-#if HWVER == 0x0002
-	uint32_t cd_mask = 1ul << 12;
-#else
-	uint32_t cd_mask = 1ul << 15;
-#endif
-	if (!(GPIOA->IDR & cd_mask)) {
-		// Stop card clock
-		MMC->POWER = 0b00ul << SDMMC_POWER_PWRCTRL_Pos;
-		stat = STA_NODISK;
-		capacity = 0;
-		return stat;
-	}
-
-	if (!(stat & STA_NODISK))
-		return 0;
-
-	do {	// Debouncing
-		systick_delay(10);
-	} while (!(GPIOA->IDR & cd_mask));
-	return 0;
-}
-
-static uint32_t mmc_ping()
-{
-	uint32_t stat, resp;
-	resp = mmc_command(SEND_STATUS, rca, &stat);
-	if (!(stat & SDMMC_STA_CMDREND_Msk))
-		return STA_ERROR;
-	return 0;
 }
 
 /* FatFs interface functions */
@@ -572,6 +562,7 @@ DSTATUS mmc_disk_init()
 		return stat;
 	}
 
+	status = MMCIdle;
 	stat = 0;
 	return stat;
 }
@@ -580,10 +571,8 @@ DSTATUS mmc_disk_status()
 {
 	if ((stat & STA_NOINIT) || !mmc_cd())
 		mmc_disk_init();
-	if (!(stat & STA_NODISK) && mmc_ping()) {
+	if (!(stat & STA_NODISK) && mmc_ping())
 		stat = STA_ERROR;
-		capacity = 0;
-	}
 	return stat;
 }
 
@@ -633,39 +622,43 @@ uint8_t scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
 
 uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize)
 {
-	*lbnum = capacity;
+	*lbnum = stat ? 0ul : capacity;
 	*lbsize = 512ul;
 	return 0;
 }
 
 uint32_t scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 {
+	// Check buffer overflow
+	if (size * 512ul > sizeof(scsi_buf)) {
+		dbgbkpt();
+		return 0;
+	}
+
 	// Invalidate data cache for DMA operation
 	SCB_InvalidateDCache_by_Addr((void *)scsi_buf, size * 512ul);
 
-	if (mmc_read_prepare() == 0) {
-		dbgbkpt();
+	if (mmc_read_prepare() != 0)
 		return 0;
-	}
-	if (mmc_data(scsi_buf, size) != size) {
-		dbgbkpt();
+	if (mmc_data(scsi_buf, size) != size)
 		return 0;
-	}
-	if (mmc_read_start(offset, size) != size) {
-		dbgbkpt();
+	if (mmc_read_start(offset, size) != size)
 		return 0;
-	}
 	scsi_ptr = scsi_buf;
 	return size;
 }
 
-uint32_t scsi_read_available(scsi_t *scsi)
+int32_t scsi_read_available(scsi_t *scsi)
 {
-	return (mmc_transferred() * 4ul - (scsi_ptr - scsi_buf)) / 512ul;
+	int32_t size = mmc_transferred();
+	if (size < 0)
+		return size;
+	return (size * 4ul - (scsi_ptr - scsi_buf)) / 512ul;
 }
 
 void *scsi_read_data(scsi_t *scsi, uint32_t *length)
 {
+	// Check buffer overflow
 	if (*length * 512ul + (scsi_ptr - scsi_buf) > sizeof(scsi_buf)) {
 		dbgbkpt();
 		*length = 0;
@@ -692,7 +685,7 @@ uint32_t scsi_write_data(scsi_t *scsi, uint32_t length, const void *p)
 	return mmc_data(p, length);
 }
 
-uint32_t scsi_write_busy(scsi_t *scsi)
+int32_t scsi_write_busy(scsi_t *scsi)
 {
 	return mmc_busy();
 }
