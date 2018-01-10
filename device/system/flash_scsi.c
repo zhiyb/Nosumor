@@ -28,9 +28,6 @@ static flash_t flash[2] = {
 	{&__app_start__, &__app_end__, 5, 128ul * 1024ul, Good, 0, 0, 0},
 };
 
-// Borrow buffer space from MMC
-extern void *mmc_scsi_buffer(uint32_t *length);
-
 SECTION(.iram) STATIC_INLINE void flash_wait()
 {
 	__DSB();
@@ -197,7 +194,7 @@ static status_t flash_erase_region(uint32_t idx, uint32_t offset, uint32_t size)
 	// Erased pattern
 	static const uint64_t full = 0xffffffffffffffff;
 	// Borrow buffer space
-	uint64_t *buf = mmc_scsi_buffer(0);
+	uint64_t *buf = scsi_buffer(0);
 	// 8-byte aligned
 	size >>= 3ul;
 	ssize >>= 3ul;

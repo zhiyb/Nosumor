@@ -18,6 +18,7 @@ Project {
 
         files: [
             "main.c",
+            "logic/scsi_buf.c",
             "logic/vendor.c",
         ]
 
@@ -58,6 +59,7 @@ Project {
 
         files: [
             "bootloader.c",
+            "logic/scsi_buf.c",
             "logic/vendor.c",
         ]
 

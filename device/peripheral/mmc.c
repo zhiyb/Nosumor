@@ -614,7 +614,7 @@ DRESULT mmc_disk_read(BYTE *buff, DWORD sector, UINT count)
 
 /* SCSI interface functions */
 
-static uint8_t scsi_buf[128 * 1024] ALIGN(32), *scsi_ptr;
+void *scsi_ptr;
 
 static uint8_t scsi_sense(void *p, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
 {
@@ -656,22 +656,26 @@ static uint32_t scsi_capacity(void *p, uint32_t *lbnum, uint32_t *lbsize)
 
 static uint32_t scsi_read_start(void *p, uint32_t offset, uint32_t size)
 {
+	// Retrive SCSI buffer
+	uint32_t buf_size;
+	void *buf = scsi_buffer(&buf_size);
+
 	// Check buffer overflow
-	if (size * 512ul > sizeof(scsi_buf)) {
+	if (size * 512ul > buf_size) {
 		dbgbkpt();
 		return 0;
 	}
 
 	// Invalidate data cache for DMA operation
-	SCB_InvalidateDCache_by_Addr((void *)scsi_buf, size * 512ul);
+	SCB_InvalidateDCache_by_Addr(buf, size * 512ul);
 
 	if (mmc_read_prepare() != 0)
 		return 0;
-	if (mmc_data(scsi_buf, size) != size)
+	if (mmc_data(scsi_buffer(0), size) != size)
 		return 0;
 	if (mmc_read_start(offset, size) != size)
 		return 0;
-	scsi_ptr = scsi_buf;
+	scsi_ptr = buf;
 	return size;
 }
 
@@ -684,13 +688,17 @@ static int32_t scsi_read_available(void *p)
 	int32_t size = mmc_transferred();
 	if (size < 0)
 		return size;
-	return size * 4ul - (scsi_ptr - scsi_buf);
+	return size * 4ul - (scsi_ptr - scsi_buffer(0));
 }
 
 static void *scsi_read_data(void *p, uint32_t *length)
 {
+	// Retrive SCSI buffer
+	uint32_t buf_size;
+	void *buf = scsi_buffer(&buf_size);
+
 	// Check buffer overflow
-	if (*length + (scsi_ptr - scsi_buf) > sizeof(scsi_buf)) {
+	if (*length + (scsi_ptr - buf) > buf_size) {
 		dbgbkpt();
 		*length = 0;
 		return 0;
@@ -731,14 +739,6 @@ static int32_t scsi_write_busy(void *p)
 static uint32_t scsi_write_stop(void *p)
 {
 	return mmc_stop();
-}
-
-// In case some other modules need a large amount of buffer space
-void *mmc_scsi_buffer(uint32_t *length)
-{
-	if (length)
-		*length = sizeof(scsi_buf);
-	return scsi_buf;
 }
 
 static const char *scsi_name()
