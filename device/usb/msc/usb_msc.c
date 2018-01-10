@@ -49,11 +49,11 @@ static usb_msc_t msc SECTION(.dtcm);
 static union {
 	cbw_t cbw;
 	uint8_t raw[MSC_OUT_MAX_SIZE];
-} buf[2] ALIGN(32);
+} buf[2] SECTION(.dtcm);
 static union {
 	csw_t csw;
 	uint8_t raw[0];
-} inbuf ALIGN(32);
+} inbuf SECTION(.dtcm);
 
 static void epin_init(usb_t *usb, uint32_t n)
 {
@@ -79,8 +79,6 @@ static void epout_swap(usb_t *usb, uint32_t n)
 	// Receive packets
 	usb_msc_t *data = (usb_msc_t *)usb->epout[n].data;
 	uint8_t outbuf = data->outbuf;
-	// Invalidate packet cache
-	SCB_InvalidateDCache_by_Addr((void *)&buf[data->outbuf], MSC_OUT_MAX_SIZE);
 	usb_ep_out_transfer(usb->base, n, &buf[outbuf], 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
 	data->outbuf = !outbuf;
 }
@@ -149,8 +147,6 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 		return;
 	// Receive packets
 	epout_swap(usb, n);
-	// Invalidate packet cache
-	SCB_InvalidateDCache_by_Addr((void *)&buf[data->outbuf], MSC_OUT_MAX_SIZE);
 }
 
 static void usbif_config(usb_t *usb, void *pdata)
@@ -319,11 +315,9 @@ static uint32_t process(usb_t *usb, usb_msc_t *msc, uint8_t lun, uint8_t pkt)
 	csw->dCSWDataResidue -= ret.length;
 s_csw:	csw->bCSWStatus = ret.state == SCSIFailure;
 	// Send CSW after transfer finished
-	if (ret.state == SCSIGood || ret.state == SCSIFailure) {
-		SCB_CleanDCache_by_Addr((void *)&inbuf, sizeof(inbuf));
+	if (ret.state == SCSIGood || ret.state == SCSIFailure)
 		if (usb_ep_in_transfer(usb->base, msc->ep_in, csw, 13u) != 13u)
 			dbgbkpt();
-	}
 	// LUN just activated, wait for next round
 	return 0;
 }
