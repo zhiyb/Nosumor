@@ -58,6 +58,7 @@ Project {
 
         files: [
             "bootloader.c",
+            "flash_scsi.c",
             "vendor.c",
         ]
 
