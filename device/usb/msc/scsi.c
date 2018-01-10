@@ -128,8 +128,8 @@ static scsi_ret_t inquiry_standard(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 	data->peripheral = PERIPHERAL_TYPE;
 	if (lbnum == 0)	// Device not connected
 		data->peripheral |= 0x20;
-	// RMB(1b): Removable
-	data->peripheral_flags = 0x80;
+	// RMB: Removable
+	data->peripheral_flags = scsi->h->type & 0x80;
 	// Version(0h)
 	data->version = 0x00;
 	// NORMACA(0b), HISUP(0b), Format(2h)

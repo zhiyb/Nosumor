@@ -749,6 +749,7 @@ static const char *scsi_name()
 scsi_if_t mmc_scsi_handlers()
 {
 	static const scsi_handlers_t handlers = {
+		SCSIRemovable,
 		scsi_name,
 		scsi_sense,
 		scsi_capacity,

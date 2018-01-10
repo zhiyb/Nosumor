@@ -443,6 +443,7 @@ static const char *scsi_name(void *p)
 scsi_if_t flash_scsi_handlers(uint32_t region)
 {
 	static const scsi_handlers_t handlers = {
+		SCSIRemovable,
 		scsi_name,
 		scsi_sense,
 		scsi_capacity,

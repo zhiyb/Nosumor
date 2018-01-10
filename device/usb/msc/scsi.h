@@ -21,10 +21,14 @@ typedef struct scsi_ret_t {
 	scsi_state_t state;
 } scsi_ret_t;
 
+// Interface types
+typedef enum {SCSIDirectAccess = 0, SCSIRemovable = 0x80} scsi_type_t;
+
 // Interface handler functions
 typedef struct scsi_handlers_t {
 	// Generic
 
+	scsi_type_t type;
 	const char *(*name)(void *data);
 	// Return type: status
 	uint8_t (*sense)(void *data, uint8_t *sense,
