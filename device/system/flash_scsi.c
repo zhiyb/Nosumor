@@ -2,8 +2,8 @@
 #include <debug.h>
 #include <fatfs/ff.h>
 #include <peripheral/mmc.h>
-#include <usb/msc/scsi.h>
-#include <usb/msc/scsi_defs_sense.h>
+#include <logic/scsi.h>
+#include <logic/scsi_defs_sense.h>
 #include "flash_scsi.h"
 
 #define LBSZ	512ul

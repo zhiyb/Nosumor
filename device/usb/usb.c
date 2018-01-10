@@ -1,9 +1,9 @@
 #include <string.h>
 #include <stm32f7xx.h>
-#include "../macros.h"
-#include "../systick.h"
-#include "../irq.h"
-#include "../debug.h"
+#include <macros.h>
+#include <debug.h>
+#include <irq.h>
+#include <system/systick.h>
 #include "usb_macros.h"
 #include "usb_irq.h"
 #include "usb_ep0.h"

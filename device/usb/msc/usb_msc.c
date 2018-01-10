@@ -1,6 +1,7 @@
 #include <malloc.h>
 #include <string.h>
 #include <debug.h>
+#include <logic/scsi.h>
 #include "../usb.h"
 #include "../usb_structs.h"
 #include "../usb_ram.h"
@@ -9,7 +10,6 @@
 #include "../usb_macros.h"
 #include "usb_msc.h"
 #include "usb_msc_defs.h"
-#include "scsi.h"
 
 #define MSC_IN_MAX_SIZE		512u
 #define MSC_OUT_MAX_SIZE	512u

@@ -1,4 +1,4 @@
-#include "../clocks.h"
+#include <system/clocks.h>
 #include "uart.h"
 
 void uart_init(USART_TypeDef *uart)

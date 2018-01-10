@@ -1,7 +1,7 @@
 #include <malloc.h>
 #include <string.h>
-#include <vendor.h>
 #include <vendor_defs.h>
+#include <logic/vendor.h>
 #include "../debug.h"
 #include "usb_desc.h"
 #include "usb_ep0.h"

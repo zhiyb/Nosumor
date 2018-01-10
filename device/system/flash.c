@@ -5,7 +5,7 @@
 #include <macros.h>
 #include <debug.h>
 #include <escape.h>
-#include <pvd.h>
+#include <system/pvd.h>
 #include "flash.h"
 
 enum FlashInterface {AXI, ICTM};

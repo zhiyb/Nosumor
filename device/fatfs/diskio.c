@@ -9,8 +9,8 @@
 
 #include "diskio.h"		/* FatFs lower layer API */
 #include <debug.h>
-#include <flash_scsi.h>
 #include <peripheral/mmc.h>
+#include <system/flash_scsi.h>
 
 /* Definitions of physical drive number for each drive */
 #define DEV_MMC		0

@@ -2,11 +2,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stm32f7xx.h>
-#include <usb/hid/usb_hid.h>
 #include <irq.h>
-#include <systick.h>
 #include <macros.h>
 #include <debug.h>
+#include <system/systick.h>
+#include <usb/hid/usb_hid.h>
 #include "keyboard.h"
 
 // KEY_12:	PA6(K1), PB2(K2)

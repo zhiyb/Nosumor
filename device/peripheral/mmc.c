@@ -1,11 +1,11 @@
 #include <string.h>
 #include <stm32f7xx.h>
-#include <systick.h>
-#include <clocks.h>
 #include <macros.h>
 #include <escape.h>
 #include <debug.h>
-#include <usb/msc/scsi_defs_sense.h>
+#include <system/systick.h>
+#include <system/clocks.h>
+#include <logic/scsi_defs_sense.h>
 #include "mmc.h"
 #include "mmc_defs.h"
 

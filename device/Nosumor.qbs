@@ -18,7 +18,7 @@ Project {
 
         files: [
             "main.c",
-            "vendor.c",
+            "logic/vendor.c",
         ]
 
         Group {
@@ -58,7 +58,7 @@ Project {
 
         files: [
             "bootloader.c",
-            "vendor.c",
+            "logic/vendor.c",
         ]
 
         Group {
@@ -189,12 +189,6 @@ Project {
         Group {
             name: "USB Mass Storage"
             files: [
-                "usb/msc/scsi.c",
-                "usb/msc/scsi.h",
-                "usb/msc/scsi_defs.h",
-                "usb/msc/scsi_defs_cmds.h",
-                "usb/msc/scsi_defs_ops.h",
-                "usb/msc/scsi_defs_sense.h",
                 "usb/msc/usb_msc.c",
                 "usb/msc/usb_msc.h",
                 "usb/msc/usb_msc_defs.h",
@@ -228,28 +222,33 @@ Project {
             files: [
                 "startup_stm32f722xx.S",
                 "system_stm32f7xx.c",
-                "clocks.c",
-                "clocks.h",
-                "pvd.c",
-                "pvd.h",
-                "syscalls.c",
-                "debug.h",
-                "systick.c",
-                "systick.h",
-                "fio.c",
-                "fio.h",
-                "flash_scsi.c",
-                "flash_scsi.h",
+                "system/clocks.c",
+                "system/clocks.h",
+                "system/pvd.c",
+                "system/pvd.h",
+                "system/systick.c",
+                "system/systick.h",
+                "system/flash.c",
+                "system/flash.h",
+                "system/flash_scsi.c",
+                "system/flash_scsi.h",
             ]
         }
 
         Group {
             name: "Logic modules"
             files: [
-                "flash.c",
-                "flash.h",
-                "vendor.h",
                 "vendor_defs.h",
+                "logic/vendor.h",
+                "logic/syscalls.c",
+                "logic/fio.c",
+                "logic/fio.h",
+                "logic/scsi.c",
+                "logic/scsi.h",
+                "logic/scsi_defs.h",
+                "logic/scsi_defs_cmds.h",
+                "logic/scsi_defs_ops.h",
+                "logic/scsi_defs_sense.h",
             ]
         }
 
@@ -257,6 +256,7 @@ Project {
             "irq.h",
             "escape.h",
             "macros.h",
+            "debug.h",
         ]
     }
 }

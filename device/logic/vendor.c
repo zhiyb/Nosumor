@@ -3,12 +3,12 @@
 #include <string.h>
 #include <debug.h>
 #include <escape.h>
+#include <vendor_defs.h>
+#include <system/flash.h>
 #include <peripheral/keyboard.h>
 #include <peripheral/led.h>
 #include <usb/hid/usb_hid.h>
 #include "vendor.h"
-#include "vendor_defs.h"
-#include "flash.h"
 
 #define UID	((uint32_t *)UID_BASE)
 

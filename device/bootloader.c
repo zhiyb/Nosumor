@@ -5,16 +5,16 @@
 #include <inttypes.h>
 #include <stm32f722xx.h>
 // Miscellaneous macros and helpers
+#include "logic/fio.h"
 #include "macros.h"
 #include "debug.h"
 #include "escape.h"
-#include "fio.h"
 // Core peripherals
-#include "clocks.h"
-#include "pvd.h"
+#include "system/clocks.h"
+#include "system/pvd.h"
+#include "system/systick.h"
+#include "system/flash_scsi.h"
 #include "irq.h"
-#include "systick.h"
-#include "flash_scsi.h"
 // Peripherals
 #include "peripheral/uart.h"
 #include "peripheral/keyboard.h"
@@ -30,7 +30,7 @@
 // 3rd party libraries
 #include "fatfs/ff.h"
 // Processing functions
-#include "vendor.h"
+#include "logic/vendor.h"
 
 #define BOOTLOADER_BASE	0x00260000
 #define BOOTLOADER_FUNC	((void (*)())*(uint32_t *)(BOOTLOADER_BASE + 4u))
@@ -110,7 +110,7 @@ static inline void init()
 	puts(ESC_INIT "Initialising keyboard...");
 	keyboard_init(hid_keyboard);
 
-	puts(ESC_INIT "Initialising FatFs for Flash...");
+	puts(ESC_INIT "Initialising FatFs for flash...");
 	if (flash_fatfs_init(FLASH_CONF, 0))
 		dbgbkpt();
 	if (flash_fatfs_init(FLASH_APP, 1))

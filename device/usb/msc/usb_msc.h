@@ -1,7 +1,7 @@
 #ifndef USB_MSC_H
 #define USB_MSC_H
 
-#include "scsi.h"
+#include <logic/scsi.h>
 
 #ifdef __cplusplus
 extern "C" {

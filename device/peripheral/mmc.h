@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <fatfs/integer.h>
 #include <fatfs/diskio.h>
-#include <usb/msc/scsi.h>
+#include <logic/scsi.h>
 
 // Unit: 512 bytes
 uint32_t mmc_capacity();

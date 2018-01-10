@@ -4,10 +4,10 @@
 #include <malloc.h>
 #include <math.h>
 #include <stm32f7xx.h>
-#include "../macros.h"
-#include "../escape.h"
-#include "../debug.h"
-#include "../systick.h"
+#include <macros.h>
+#include <escape.h>
+#include <debug.h>
+#include <system/systick.h>
 #include "i2c.h"
 #include "audio.h"
 

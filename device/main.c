@@ -5,15 +5,16 @@
 #include <inttypes.h>
 #include <stm32f722xx.h>
 // Miscellaneous macros and helpers
+#include "logic/fio.h"
 #include "macros.h"
 #include "debug.h"
 #include "escape.h"
-#include "fio.h"
 // Core peripherals
-#include "clocks.h"
-#include "pvd.h"
+#include "system/clocks.h"
+#include "system/pvd.h"
+#include "system/systick.h"
+#include "system/flash_scsi.h"
 #include "irq.h"
-#include "systick.h"
 // Peripherals
 #include "peripheral/uart.h"
 #include "peripheral/keyboard.h"
@@ -31,7 +32,7 @@
 // 3rd party libraries
 #include "fatfs/ff.h"
 // Processing functions
-#include "vendor.h"
+#include "logic/vendor.h"
 
 #define BOOTLOADER_BASE	0x00260000
 #define BOOTLOADER_FUNC	((void (*)())*(uint32_t *)(BOOTLOADER_BASE + 4u))
@@ -125,9 +126,11 @@ static inline void init()
 
 	puts(ESC_INIT "Initialising SD/MMC card...");
 	mmc_disk_init();
+
 	puts(ESC_INIT "Initialising USB mass storage...");
 	usb_msc = usb_msc_init(&usb);
 	usb_msc_scsi_register(usb_msc, mmc_scsi_handlers());
+	usb_msc_scsi_register(usb_msc, flash_scsi_handlers(FLASH_CONF));
 
 	puts(ESC_GOOD "Initialisation done");
 	usb_connect(&usb, 1);
