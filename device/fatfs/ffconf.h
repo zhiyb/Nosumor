@@ -166,12 +166,20 @@
 / Drive/Volume Configurations
 /---------------------------------------------------------------------------*/
 
+#ifdef BOOTLOADER
 #define FF_VOLUMES		3
+#else
+#define FF_VOLUMES		2
+#endif
 /* Number of volumes (logical drives) to be used. (1-10) */
 
 
+#ifdef BOOTLOADER
+#define FF_STR_VOLUME_ID	0
+#else
 #define FF_STR_VOLUME_ID	1
-#define FF_VOLUME_STRS		"RAM","SD","USB"
+#endif
+#define FF_VOLUME_STRS		"MMC", "CONF", "APP"
 /* FF_STR_VOLUME_ID switches string support for volume ID.
 /  When FF_STR_VOLUME_ID is set to 1, also pre-defined strings can be used as drive
 /  number in the path name. FF_VOLUME_STRS defines the drive ID strings for each

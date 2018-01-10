@@ -141,14 +141,14 @@ static inline void fatfs_test()
 
 	// Mount volume
 	FRESULT res;
-	if ((res = f_mount(&fs, "SD:", 1)) != FR_OK) {
+	if ((res = f_mount(&fs, "MMC:", 1)) != FR_OK) {
 		printf(ESC_ERROR "f_mount: %d\n", res);
 		return;
 	}
 
 	// Open root directory for listing
 	DIR dir;
-	if ((res = f_opendir(&dir, "SD:/")) != FR_OK) {
+	if ((res = f_opendir(&dir, "MMC:/")) != FR_OK) {
 		printf(ESC_ERROR "f_opendir: %d\n", res);
 		return;
 	}
