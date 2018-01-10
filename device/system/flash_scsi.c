@@ -7,10 +7,15 @@
 #include "flash_scsi.h"
 
 #define LBSZ	512ul
+//#define SHADOW_CONF
 
 // Memory regions
 extern char __app_start__, __app_end__;
 extern char __conf_start__, __conf_end__;
+
+#ifdef SHADOW_CONF
+static uint8_t conf_shadow[48 * 1024] ALIGN(32);
+#endif
 
 typedef enum {Good = 0, RangeError,
 	      UnlockFailed, EraseError, ProgramError} status_t;
@@ -332,8 +337,14 @@ static uint32_t scsi_read_start(void *p, uint32_t offset, uint32_t size)
 		return 0;
 	}
 
-	flash[idx].read = flash[idx].start + offset * LBSZ;
 	flash[idx].length = size * LBSZ;
+	flash[idx].read = flash[idx].start + offset * LBSZ;
+#ifdef SHADOW_CONF
+	if (idx == FLASH_CONF) {
+		flash[idx].read = conf_shadow + offset * LBSZ;
+		SCB_CleanDCache_by_Addr(flash[idx].read, flash[idx].length);
+	}
+#endif
 	return size;
 }
 
@@ -375,21 +386,44 @@ static uint32_t scsi_write_start(void *p, uint32_t offset, uint32_t size)
 	}
 	dbgprintf(ESC_WRITE "[FLASH %lu] Write: "
 		  ESC_DATA "%lu+%lu\n", idx, offset, size);
+	offset *= LBSZ;
+
+#ifdef SHADOW_CONF
+	if (idx == FLASH_CONF) {
+		flash[idx].write = conf_shadow + offset;
+		flash[idx].length = size * LBSZ;
+		return size;
+	}
+#endif
 
 	// Erase related sectors
-	flash[idx].status = flash_erase_region(idx, offset * LBSZ, size * LBSZ);
+	flash[idx].status = flash_erase_region(idx, offset, size * LBSZ);
 	if (flash[idx].status != Good)
 		return 0;
 
 	// Set up write operation
-	flash[idx].write = flash[idx].start + offset * LBSZ;
+	flash[idx].write = flash[idx].start + offset;
 	flash[idx].length = size * LBSZ;
 	return size;
 }
 
 static uint32_t scsi_write_data(void *p, uint32_t length, const void *data)
 {
-	uint32_t idx = (uint32_t )p;
+	uint32_t idx = (uint32_t)p;
+
+#ifdef SHADOW_CONF
+	if (idx == FLASH_CONF) {
+		printf(ESC_WRITE "[FLASH] Shadow program: "
+		       ESC_DATA "@%p <= @%p+%lu\n",
+		       flash[idx].write, data, length);
+
+		memcpy(flash[idx].write, data, length);
+		flash[idx].write += length;
+		flash[idx].length -= length;
+		return length;
+	}
+#endif
+
 	flash[idx].status = flash_program(flash[idx].write, data, length);
 	if (flash[idx].status != Good)
 		return 0;
@@ -402,12 +436,22 @@ static uint32_t scsi_write_data(void *p, uint32_t length, const void *data)
 
 static int32_t scsi_write_busy(void *p)
 {
+#ifdef SHADOW_CONF
+	uint32_t idx = (uint32_t)p;
+	if (idx == FLASH_CONF)
+		return 0;
+#endif
 	return FLASH->SR & FLASH_SR_BSY_Msk;
 }
 
 static uint32_t scsi_write_stop(void *p)
 {
 	uint32_t idx = (uint32_t)p;
+
+#ifdef SHADOW_CONF
+	if (idx == FLASH_CONF)
+		return 0;
+#endif
 
 	// Clear flash operations
 	FLASH->CR = 0;
@@ -472,18 +516,31 @@ DSTATUS flash_disk_init(uint32_t idx)
 
 DRESULT flash_disk_read(uint32_t idx, BYTE *buff, DWORD sector, UINT count)
 {
-	memcpy(buff, flash[idx].start + sector * 512u, count * 512u);
+	sector = sector * 512ul / LBSZ;
+	count = count * 512ul / LBSZ;
+	if (scsi_read_start((void *)idx, sector, count) != count)
+		return RES_ERROR;
+	uint32_t length = count * LBSZ;
+	void *p = scsi_read_data((void *)idx, &length);
+	if (!p || !length)
+		return RES_ERROR;
+	if (scsi_read_stop((void *)idx))
+		return RES_ERROR;
+	memcpy(buff, p, length);
 	return RES_OK;
 }
 
 DRESULT flash_disk_write(uint32_t idx, const BYTE *buff,
 			 DWORD sector, UINT count)
 {
-	sector *= 512ul;
-	count *= 512ul;
-	if (flash_erase_region(idx, sector, count))
+	sector = sector * 512ul / LBSZ;
+	count = count * 512ul / LBSZ;
+	if (scsi_write_start((void *)idx, sector, count) != count)
 		return RES_WRPRT;
-	if (flash_program_region(idx, sector, buff, count))
+	count *= LBSZ;
+	if (scsi_write_data((void *)idx, count, buff) != count)
+		return RES_ERROR;
+	if (scsi_write_stop((void *)idx))
 		return RES_ERROR;
 	return RES_OK;
 }
@@ -516,6 +573,13 @@ uint32_t flash_fatfs_init(uint32_t idx, uint32_t erase)
 	FRESULT res;
 	memset(&fs, 0, sizeof(fs));
 
+#ifdef SHADOW_CONF
+	// Shadow copy configuration partition
+	if (idx == FLASH_CONF)
+		memcpy(conf_shadow, flash[idx].start,
+		       flash[idx].end - flash[idx].start);
+#endif
+
 	if (!erase) {
 		// Mount volume
 		if ((res = f_mount(&fs, vols[idx], 1)) != FR_OK) {
@@ -533,8 +597,13 @@ uint32_t flash_fatfs_init(uint32_t idx, uint32_t erase)
 		return FR_OK;
 	}
 
-	// Erase entire flash as initialisation
-erase:	flash_erase_all(idx);
+erase:	// Erase entire flash as initialisation
+#ifdef SHADOW_CONF
+	if (idx != FLASH_CONF)
+		flash_erase_all(idx);
+#else
+	flash_erase_all(idx);
+#endif
 
 	// Recreate volume
 	uint8_t buf[1024];
