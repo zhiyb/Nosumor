@@ -38,7 +38,7 @@ uint32_t usb_ep_in_transfer(USB_OTG_GlobalTypeDef *usb, int n, const void *p, ui
 	return size;
 }
 
-void usb_ep_in_descriptor(USB_OTG_GlobalTypeDef *usb, int ep, desc_t desc)
+void usb_ep_in_descriptor(USB_OTG_GlobalTypeDef *usb, int ep, desc_t desc, uint32_t zpkt)
 {
 	if (desc.size) {
 		if (ep == 0) {
@@ -47,14 +47,14 @@ void usb_ep_in_descriptor(USB_OTG_GlobalTypeDef *usb, int ep, desc_t desc)
 				// Endpoint 0 can only transfer 127 bytes maximum
 				uint32_t s = desc.size > 127u ? max : desc.size;
 				usb_ep_in_transfer(usb, ep, desc.p, s);
-				// 0-byte short packet
-				if (desc.size == max)
-					usb_ep_in_transfer(usb, ep, 0, 0);
 				desc.p += s;
 				desc.size -= s;
 			}
 		} else
 			usb_ep_in_transfer(usb, ep, desc.p, desc.size);
+		// 0-byte short packets
+		if (zpkt)
+			usb_ep_in_transfer(usb, ep, 0, 0);
 	} else
 		usb_ep_in_stall(usb, ep);
 }

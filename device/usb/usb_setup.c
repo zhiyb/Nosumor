@@ -26,7 +26,8 @@ static void usb_setup_standard_device(usb_t *usb, uint32_t ep, setup_t pkt)
 			desc_t desc = usb_get_descriptor(usb, pkt);
 			if (desc.size != 0) {
 				desc.size = desc.size > pkt.wLength ? pkt.wLength : desc.size;
-				usb_ep_in_descriptor(usb->base, ep, desc);
+				uint32_t zpkt = pkt.wLength != desc.size && !(desc.size & (64 - 1));
+				usb_ep_in_descriptor(usb->base, ep, desc, zpkt);
 			} else {
 				dbgprintf(ESC_MAGENTA "<D%x>", pkt.bType);
 				usb_ep_in_stall(usb->base, ep);

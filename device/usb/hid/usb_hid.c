@@ -186,7 +186,8 @@ static void usb_send_descriptor(usb_t *usb, usb_hid_t *data, uint32_t ep, setup_
 		return;
 	}
 	desc.size = desc.size > pkt.wLength ? pkt.wLength : desc.size;
-	usb_ep_in_descriptor(usb->base, ep, desc);
+	uint32_t zpkt = pkt.wLength != desc.size && !(desc.size & (64 - 1));
+	usb_ep_in_descriptor(usb->base, ep, desc, zpkt);
 }
 
 static void usb_send_report(usb_t *usb, usb_hid_t *data, uint32_t ep, setup_t pkt)
