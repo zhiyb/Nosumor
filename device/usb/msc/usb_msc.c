@@ -79,7 +79,8 @@ static void epout_swap(usb_t *usb, uint32_t n)
 	// Receive packets
 	usb_msc_t *data = (usb_msc_t *)usb->epout[n].data;
 	uint8_t outbuf = data->outbuf;
-	SCB_InvalidateDCache_by_Addr((void *)&buf[outbuf], MSC_OUT_MAX_SIZE);
+	// Invalidate packet cache
+	SCB_InvalidateDCache_by_Addr((void *)&buf[data->outbuf], MSC_OUT_MAX_SIZE);
 	usb_ep_out_transfer(usb->base, n, &buf[outbuf], 0u, MSC_OUT_MAX_PKT, MSC_OUT_MAX_SIZE);
 	data->outbuf = !outbuf;
 }
@@ -148,6 +149,8 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 		return;
 	// Receive packets
 	epout_swap(usb, n);
+	// Invalidate packet cache
+	SCB_InvalidateDCache_by_Addr((void *)&buf[data->outbuf], MSC_OUT_MAX_SIZE);
 }
 
 static void usbif_config(usb_t *usb, void *pdata)
@@ -223,6 +226,9 @@ static uint32_t process(usb_t *usb, usb_msc_t *msc, uint8_t lun, uint8_t pkt)
 		// LUN in progress, no more action to do
 		return 0;
 	}
+	// LUN read in progress, no more action to do
+	if ((ret.state & ~SCSIBusy) == SCSIRead)
+		return 0;
 
 	// Process USB packets
 	uint8_t outbuf = msc->outbuf;
