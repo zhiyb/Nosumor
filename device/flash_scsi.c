@@ -434,8 +434,8 @@ static const char *scsi_name(void *p)
 {
 	uint32_t region = (uint32_t)p;
 	static const char *names[] = {
-		"Configuration",
-		"System Flash",
+		"Configure",
+		"Firmware",
 	};
 	return names[region];
 }
@@ -514,31 +514,56 @@ DRESULT flash_disk_ioctl(uint32_t idx, BYTE cmd, void *buff)
 uint32_t flash_fatfs_init(uint32_t idx, uint32_t erase)
 {
 	static const char *vols[] = {"CONF:", "APP:"};
+	static const char *labels[] = {"CONF:Configure", "APP:Firmware"};
 	static FATFS fs SECTION(.dtcm);
 	FRESULT res;
 	memset(&fs, 0, sizeof(fs));
 
 	if (!erase) {
 		// Mount volume
-		if ((res = f_mount(&fs, vols[idx], 1)) == FR_OK) {
-			printf(ESC_GOOD "[FLASH %lu] Mount OK, skip\n", idx);
-			return 0;
+		if ((res = f_mount(&fs, vols[idx], 1)) != FR_OK) {
+			dbgprintf(ESC_ERROR "[FLASH %lu] Mount failed: "
+				  ESC_DATA "%u\n", idx, res);
+			goto erase;
 		}
-		dbgprintf(ESC_ERROR "[FLASH %lu] Mount failed: "
-			  ESC_DATA "%d\n", idx, res);
+		printf(ESC_GOOD "[FLASH %lu] Mount OK, skip\n", idx);
+
+		// Unmount
+		if ((res = f_unmount(vols[idx])) != FR_OK)
+			printf(ESC_WARNING "[FLASH %lu] Unmount failed: "
+			       ESC_DATA "%u\n", idx, res);
+
+		return FR_OK;
 	}
 
 	// Erase entire flash as initialisation
-	flash_erase_all(idx);
+erase:	flash_erase_all(idx);
 
 	// Recreate volume
 	uint8_t buf[1024];
 	if ((res = f_mkfs(vols[idx], FM_FAT | FM_SFD, 512,
 			  buf, sizeof(buf))) != FR_OK) {
 		printf(ESC_ERROR "[FLASH %lu] Create volume failed: "
-		       ESC_DATA "%d\n", idx, res);
+		       ESC_DATA "%u\n", idx, res);
 		return res;
 	}
 
-	return res;
+	// Mount volume
+	if ((res = f_mount(&fs, vols[idx], 1)) != FR_OK) {
+		printf(ESC_ERROR "[FLASH %lu] Mount failed: "
+			  ESC_DATA "%u\n", idx, res);
+		return res;
+	}
+
+	// Set label
+	if ((res = f_setlabel(labels[idx])) != FR_OK)
+		printf(ESC_WARNING "[FLASH %lu] Set volume label failed: "
+		       ESC_DATA "%u\n", idx, res);
+
+	// Unmount
+	if ((res = f_unmount(vols[idx])) != FR_OK)
+		printf(ESC_WARNING "[FLASH %lu] Unmount failed: "
+		       ESC_DATA "%u\n", idx, res);
+
+	return FR_OK;
 }
