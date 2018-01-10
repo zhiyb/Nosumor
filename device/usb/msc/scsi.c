@@ -17,6 +17,8 @@ typedef struct sense_t {
 
 // SCSI device info
 typedef struct scsi_t {
+	const scsi_handlers_t *h;
+
 	// SCSI state (next packet)
 	scsi_state_t state;
 	// Remaining transfer length (read/write)
@@ -29,11 +31,14 @@ typedef struct scsi_t {
 	sense_t sense;
 } scsi_t;
 
-scsi_t *scsi_init()
+scsi_t *scsi_init(const scsi_handlers_t *handlers)
 {
 	scsi_t *scsi = (scsi_t *)calloc(1u, sizeof(scsi_t));
-	if (!scsi)
-		panic();
+	if (!scsi) {
+		dbgbkpt();
+		return 0;
+	}
+	scsi->h = handlers;
 	return scsi;
 }
 
@@ -97,8 +102,8 @@ static scsi_ret_t test_unit_ready(scsi_t *scsi, cmd_TEST_UNIT_READY_t *cmd)
 	dbgprintf(ESC_DEBUG "[SCSI] Test unit ready\n");
 
 	// Check media status
-	scsi->sense.status = scsi_sense(scsi, &scsi->sense.sense,
-					&scsi->sense.asc, &scsi->sense.ascq);
+	scsi->sense.status = scsi->h->sense(scsi, &scsi->sense.sense,
+					    &scsi->sense.asc, &scsi->sense.ascq);
 	if (scsi->sense.status != GOOD) {
 		dbgprintf(ESC_ERROR "[SCSI] Unit not ready\n");
 		return (scsi_ret_t){0, 0, SCSIFailure};
@@ -112,7 +117,7 @@ static scsi_ret_t inquiry_standard(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 {
 	// Retrieve capacity information
 	uint32_t lbnum, lbsize;
-	scsi_capacity(scsi, &lbnum, &lbsize);
+	scsi->h->capacity(scsi, &lbnum, &lbsize);
 
 	dbgprintf(ESC_DEBUG "[SCSI] Standard INQUIRY\n");
 	data_INQUIRY_STANDARD_t *data = (data_INQUIRY_STANDARD_t *)scsi->buf;
@@ -145,7 +150,7 @@ static scsi_ret_t inquiry_vital(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 {
 	// Retrieve capacity information
 	uint32_t lbnum, lbsize;
-	scsi_capacity(scsi, &lbnum, &lbsize);
+	scsi->h->capacity(scsi, &lbnum, &lbsize);
 
 	data_INQUIRY_VITAL_t *data = (data_INQUIRY_VITAL_t *)scsi->buf;
 	data->peripheral = PERIPHERAL_TYPE;
@@ -264,7 +269,7 @@ static scsi_ret_t read_capacity_10(scsi_t *scsi, cmd_READ_CAPACITY_10_t *cmd)
 		}
 
 		data_READ_CAPACITY_10_t *data = (data_READ_CAPACITY_10_t *)scsi->buf;
-		scsi_capacity(scsi, &data->lbaddr, &data->lbsize);
+		scsi->h->capacity(scsi, &data->lbaddr, &data->lbsize);
 		data->lbaddr--;
 
 		scsi_ret_t ret = {data, 8, SCSIGood};
@@ -286,7 +291,7 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 
 	// Retrieve capacity information
 	uint32_t lbnum, lbsize;
-	scsi_capacity(scsi, &lbnum, &lbsize);
+	scsi->h->capacity(scsi, &lbnum, &lbsize);
 
 	dbgprintf(ESC_READ "[SCSI] Read %u blocks from %lu\n", cmd->length, cmd->lbaddr);
 
@@ -312,7 +317,7 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 	if (cmd->length == 0)
 		return (scsi_ret_t){0, 0, SCSIGood};
 
-	if (scsi_read_start(scsi, cmd->lbaddr, cmd->length) != cmd->length) {
+	if (scsi->h->read_start(scsi, cmd->lbaddr, cmd->length) != cmd->length) {
 		dbgprintf(ESC_ERROR "[SCSI] initiating data read failed\n");
 		// Update sense data
 		test_unit_ready(scsi, 0);
@@ -335,7 +340,7 @@ static scsi_ret_t write_10(scsi_t *scsi, cmd_WRITE_10_t *cmd)
 
 	// Retrieve capacity information
 	uint32_t lbnum, lbsize;
-	scsi_capacity(scsi, &lbnum, &lbsize);
+	scsi->h->capacity(scsi, &lbnum, &lbsize);
 
 	dbgprintf(ESC_WRITE "[SCSI] Write %u blocks from %lu\n", cmd->length, cmd->lbaddr);
 
@@ -358,7 +363,7 @@ static scsi_ret_t write_10(scsi_t *scsi, cmd_WRITE_10_t *cmd)
 		return (scsi_ret_t){0, 0, SCSIFailure};
 	}
 
-	if (scsi_write_start(scsi, cmd->lbaddr, cmd->length) != cmd->length) {
+	if (scsi->h->write_start(scsi, cmd->lbaddr, cmd->length) != cmd->length) {
 		dbgprintf(ESC_ERROR "[SCSI] Initiating data write failed\n");
 		// Update sense data
 		test_unit_ready(scsi, 0);
@@ -420,7 +425,7 @@ scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 
 	// Retrieve capacity information
 	uint32_t lbnum, lbsize;
-	scsi_capacity(scsi, &lbnum, &lbsize);
+	scsi->h->capacity(scsi, &lbnum, &lbsize);
 
 	// Check remaining data size
 	if (scsi->length < size) {
@@ -430,7 +435,7 @@ scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 
 	// Transfer data
 	if (!(scsi->state & SCSIBusy)) {
-		if (scsi_write_data(scsi, size, pdata) != size) {
+		if (scsi->h->write_data(scsi, size, pdata) != size) {
 			dbgprintf(ESC_ERROR "[SCSI] Write data failure\n");
 			// Update sense data
 			test_unit_ready(scsi, 0);
@@ -441,7 +446,7 @@ scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 	}
 
 	// Check busy status
-	int32_t busy = scsi_write_busy(scsi);
+	int32_t busy = scsi->h->write_busy(scsi);
 	if (busy < 0) {
 		dbgprintf(ESC_ERROR "[SCSI] Write failure\n");
 		// Update sense data
@@ -457,7 +462,7 @@ scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 		if (scsi->length) {
 			scsi->state = SCSIWrite;
 		} else {
-			if (scsi_write_stop(scsi)) {
+			if (scsi->h->write_stop(scsi)) {
 				dbgprintf(ESC_ERROR "[SCSI] Write failed\n");
 				// Update sense data
 				test_unit_ready(scsi, 0);
@@ -482,13 +487,13 @@ scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize)
 
 	// Retrieve capacity information
 	uint32_t lbnum, lbsize;
-	scsi_capacity(scsi, &lbnum, &lbsize);
+	scsi->h->capacity(scsi, &lbnum, &lbsize);
 
 	// Calculate packet size
 	uint32_t size = maxsize < scsi->length ? maxsize : scsi->length;
 
 	// Check again if insufficient buffering
-	int32_t available = scsi_read_available(scsi);
+	int32_t available = scsi->h->read_available(scsi);
 	if (available < 0) {
 		dbgprintf(ESC_ERROR "[SCSI] Read failure\n");
 		// Update sense data
@@ -501,7 +506,7 @@ scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize)
 
 	// Read available data
 	uint32_t length = size;
-	void *p = scsi_read_data(scsi, &length);
+	void *p = scsi->h->read_data(scsi, &length);
 	if (!p || length != size) {
 		dbgprintf(ESC_ERROR "[SCSI] Read data failure\n");
 		// Update sense data
@@ -514,7 +519,7 @@ scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize)
 	// Update status
 	scsi->length -= size;
 	if (!scsi->length) {
-		if (scsi_read_stop(scsi)) {
+		if (scsi->h->read_stop(scsi)) {
 			dbgprintf(ESC_ERROR "[SCSI] Read failed\n");
 			// Update sense data
 			test_unit_ready(scsi, 0);

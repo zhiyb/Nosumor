@@ -58,7 +58,6 @@ Project {
 
         files: [
             "bootloader.c",
-            "flash_scsi.c",
             "vendor.c",
         ]
 
@@ -240,6 +239,8 @@ Project {
                 "systick.h",
                 "fio.c",
                 "fio.h",
+                "flash_scsi.c",
+                "flash_scsi.h",
             ]
         }
 

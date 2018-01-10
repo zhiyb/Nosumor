@@ -127,6 +127,7 @@ static inline void init()
 	mmc_disk_init();
 	puts(ESC_INIT "Initialising USB mass storage...");
 	usb_msc = usb_msc_init(&usb);
+	usb_msc_scsi_register(usb_msc, mmc_scsi_handlers());
 
 	puts(ESC_GOOD "Initialisation done");
 	usb_connect(&usb, 1);

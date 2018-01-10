@@ -34,7 +34,7 @@ SECTION(.iram) STATIC_INLINE void flash_wait()
 
 /* SCSI interface functions */
 
-uint8_t scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
+static uint8_t scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
 {
 	state_t state = flash[F].state;
 	flash[F].state = Good;
@@ -79,7 +79,7 @@ uint8_t scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
 	}
 }
 
-uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize)
+static uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize)
 {
 	*lbsize = flash[F].bsize;
 	*lbnum = (flash[F].end - flash[F].start) / flash[F].bsize;
@@ -88,7 +88,7 @@ uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize)
 
 /* Read operations */
 
-uint32_t scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size)
+static uint32_t scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 {
 	if (size == 0)
 		return 0;
@@ -103,12 +103,12 @@ uint32_t scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 	return size;
 }
 
-int32_t scsi_read_available(scsi_t *scsi)
+static int32_t scsi_read_available(scsi_t *scsi)
 {
 	return flash[F].length;
 }
 
-void *scsi_read_data(scsi_t *scsi, uint32_t *length)
+static void *scsi_read_data(scsi_t *scsi, uint32_t *length)
 {
 	void *p = flash[F].read;
 	flash[F].read += *length;
@@ -116,7 +116,7 @@ void *scsi_read_data(scsi_t *scsi, uint32_t *length)
 	return p;
 }
 
-uint32_t scsi_read_stop(scsi_t *scsi)
+static uint32_t scsi_read_stop(scsi_t *scsi)
 {
 	flash[F].length = 0;
 	return 0;
@@ -124,7 +124,7 @@ uint32_t scsi_read_stop(scsi_t *scsi)
 
 /* Write operations */
 
-uint32_t scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size)
+static uint32_t scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 {
 	if (size == 0)
 		return 0;
@@ -178,7 +178,7 @@ uint32_t scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 	return size;
 }
 
-uint32_t scsi_write_data(scsi_t *scsi, uint32_t length, const void *p)
+static uint32_t scsi_write_data(scsi_t *scsi, uint32_t length, const void *p)
 {
 	// Align to 32-bit boundary
 	uint32_t *ptr = flash[F].write;
@@ -202,12 +202,12 @@ uint32_t scsi_write_data(scsi_t *scsi, uint32_t length, const void *p)
 	return length;
 }
 
-int32_t scsi_write_busy(scsi_t *scsi)
+static int32_t scsi_write_busy(scsi_t *scsi)
 {
 	return FLASH->SR & FLASH_SR_BSY_Msk;
 }
 
-uint32_t scsi_write_stop(scsi_t *scsi)
+static uint32_t scsi_write_stop(scsi_t *scsi)
 {
 	// Clear flash operations
 	FLASH->CR = 0;
@@ -220,4 +220,23 @@ uint32_t scsi_write_stop(scsi_t *scsi)
 		return -1;
 	}
 	return 0;
+}
+
+const scsi_handlers_t *flash_scsi_handlers()
+{
+	static const scsi_handlers_t handlers = {
+		scsi_sense,
+		scsi_capacity,
+
+		scsi_read_start,
+		scsi_read_available,
+		scsi_read_data,
+		scsi_read_stop,
+
+		scsi_write_start,
+		scsi_write_data,
+		scsi_write_busy,
+		scsi_write_stop,
+	};
+	return &handlers;
 }

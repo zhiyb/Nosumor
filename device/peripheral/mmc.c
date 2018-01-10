@@ -616,7 +616,7 @@ DRESULT mmc_disk_read(BYTE *buff, DWORD sector, UINT count)
 
 uint8_t scsi_buf[64 * 1024] ALIGN(32), *scsi_ptr;
 
-uint8_t mmc_scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
+static uint8_t scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
 {
 	// Update status
 	mmc_disk_status();
@@ -647,14 +647,14 @@ uint8_t mmc_scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *ascq
 	return GOOD;
 }
 
-uint32_t mmc_scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize)
+static uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize)
 {
 	*lbnum = stat ? 0ul : capacity;
 	*lbsize = 512ul;
 	return 0;
 }
 
-uint32_t mmc_scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size)
+static uint32_t scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 {
 	// Check buffer overflow
 	if (size * 512ul > sizeof(scsi_buf)) {
@@ -675,7 +675,7 @@ uint32_t mmc_scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 	return size;
 }
 
-int32_t mmc_scsi_read_available(scsi_t *scsi)
+static int32_t scsi_read_available(scsi_t *scsi)
 {
 	// Update status
 	if (mmc_disk_status())
@@ -687,7 +687,7 @@ int32_t mmc_scsi_read_available(scsi_t *scsi)
 	return size * 4ul - (scsi_ptr - scsi_buf);
 }
 
-void *mmc_scsi_read_data(scsi_t *scsi, uint32_t *length)
+static void *scsi_read_data(scsi_t *scsi, uint32_t *length)
 {
 	// Check buffer overflow
 	if (*length + (scsi_ptr - scsi_buf) > sizeof(scsi_buf)) {
@@ -701,17 +701,17 @@ void *mmc_scsi_read_data(scsi_t *scsi, uint32_t *length)
 	return p;
 }
 
-uint32_t mmc_scsi_read_stop(scsi_t *scsi)
+static uint32_t scsi_read_stop(scsi_t *scsi)
 {
 	return mmc_stop();
 }
 
-uint32_t mmc_scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size)
+static uint32_t scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 {
 	return mmc_write_start(offset, size);
 }
 
-uint32_t mmc_scsi_write_data(scsi_t *scsi, uint32_t length, const void *p)
+static uint32_t scsi_write_data(scsi_t *scsi, uint32_t length, const void *p)
 {
 	// Check for sector alignment
 	if (length % 512ul)
@@ -719,7 +719,7 @@ uint32_t mmc_scsi_write_data(scsi_t *scsi, uint32_t length, const void *p)
 	return mmc_data(p, length / 512ul) * 512ul;
 }
 
-int32_t mmc_scsi_write_busy(scsi_t *scsi)
+static int32_t scsi_write_busy(scsi_t *scsi)
 {
 	// Update status
 	if (mmc_disk_status())
@@ -728,32 +728,26 @@ int32_t mmc_scsi_write_busy(scsi_t *scsi)
 	return mmc_busy();
 }
 
-uint32_t mmc_scsi_write_stop(scsi_t *scsi)
+static uint32_t scsi_write_stop(scsi_t *scsi)
 {
 	return mmc_stop();
 }
 
-/* Provide default SCSI functions aliases */
+const scsi_handlers_t *mmc_scsi_handlers()
+{
+	static const scsi_handlers_t handlers = {
+		scsi_sense,
+		scsi_capacity,
 
-uint8_t scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
-	__attribute__((weak, alias("mmc_scsi_sense")));
-uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize)
-	__attribute__((weak, alias("mmc_scsi_capacity")));
+		scsi_read_start,
+		scsi_read_available,
+		scsi_read_data,
+		scsi_read_stop,
 
-uint32_t scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size)
-	__attribute__((weak, alias("mmc_scsi_read_start")));
-int32_t scsi_read_available(scsi_t *scsi)
-	__attribute__((weak, alias("mmc_scsi_read_available")));
-void *scsi_read_data(scsi_t *scsi, uint32_t *length)
-	__attribute__((weak, alias("mmc_scsi_read_data")));
-uint32_t scsi_read_stop(scsi_t *scsi)
-	__attribute__((weak, alias("mmc_scsi_read_stop")));
-
-uint32_t scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size)
-	__attribute__((weak, alias("mmc_scsi_write_start")));
-uint32_t scsi_write_data(scsi_t *scsi, uint32_t length, const void *p)
-	__attribute__((weak, alias("mmc_scsi_write_data")));
-int32_t scsi_write_busy(scsi_t *scsi)
-	__attribute__((weak, alias("mmc_scsi_write_busy")));
-uint32_t scsi_write_stop(scsi_t *scsi)
-	__attribute__((weak, alias("mmc_scsi_write_stop")));
+		scsi_write_start,
+		scsi_write_data,
+		scsi_write_busy,
+		scsi_write_stop,
+	};
+	return &handlers;
+}

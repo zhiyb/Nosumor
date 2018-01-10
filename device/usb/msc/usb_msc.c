@@ -38,7 +38,7 @@ typedef struct PACKED csw_t {
 
 typedef struct usb_msc_t {
 	int ep_in, ep_out;
-	scsi_t *scsi;
+	scsi_t **scsi;
 	volatile uint32_t buf_size[2];
 	volatile uint8_t outbuf;
 	uint8_t lun_max ALIGN(4);
@@ -152,27 +152,31 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 
 static void usbif_config(usb_t *usb, void *pdata)
 {
-	usb_msc_t *data = (usb_msc_t *)pdata;
+	usb_msc_t *msc = (usb_msc_t *)pdata;
+	// If no LUNs available
+	if (msc->lun_max == 0xff)
+		return;
+
 	// Register endpoints
 	const epin_t epin = {
-		.data = data,
+		.data = msc,
 		.init = &epin_init,
 		//.halt = &epin_halt,
 		//.xfr_cplt = &epin_xfr_cplt,
 	};
 	const epout_t epout = {
-		.data = data,
+		.data = msc,
 		.init = &epout_init,
 		.halt = &epout_stall,
 		.xfr_cplt = &epout_xfr_cplt,
 	};
-	usb_ep_register(usb, &epin, &data->ep_in, &epout, &data->ep_out);
+	usb_ep_register(usb, &epin, &msc->ep_in, &epout, &msc->ep_out);
 
 	uint32_t s = usb_desc_add_string(usb, 0, LANG_EN_US, "USB Mass Storage");
 	usb_desc_add_interface(usb, 0u, 2u, MASS_STORAGE, SCSI_TRANSPARENT, BBB, s);
-	usb_desc_add_endpoint(usb, EP_DIR_IN | data->ep_in,
+	usb_desc_add_endpoint(usb, EP_DIR_IN | msc->ep_in,
 			      EP_BULK, MSC_IN_MAX_SIZE, 0u);
-	usb_desc_add_endpoint(usb, EP_DIR_OUT | data->ep_out,
+	usb_desc_add_endpoint(usb, EP_DIR_OUT | msc->ep_out,
 			      EP_BULK, MSC_OUT_MAX_SIZE, 0u);
 }
 
@@ -200,29 +204,13 @@ static void usbif_setup_class(usb_t *usb, void *pdata, uint32_t ep, setup_t pkt)
 	}
 }
 
-usb_msc_t *usb_msc_init(usb_t *usb)
+static void process(usb_t *usb, usb_msc_t *msc, uint8_t lun)
 {
-	usb_msc_t *data = &msc;
-	memset(data, 0, sizeof(usb_msc_t));
-	data->scsi = scsi_init();
-	// Audio control interface
-	const usb_if_t usbif = {
-		.data = data,
-		.config = &usbif_config,
-		.setup_class = &usbif_setup_class,
-	};
-	usb_interface_register(usb, &usbif);
-	return data;
-}
-
-void usb_msc_process(usb_t *usb, usb_msc_t *msc)
-{
-	if (!msc)
-		return;
+	scsi_t *scsi = *(msc->scsi + lun);
 
 	// Process SCSI initiated packets
 	csw_t *csw = &inbuf.csw;
-	scsi_ret_t ret = scsi_process(msc->scsi, MSC_IN_MAX_SIZE);
+	scsi_ret_t ret = scsi_process(scsi, MSC_IN_MAX_SIZE);
 	if (ret.length || ret.state == SCSIFailure) {
 		if (usb_ep_in_transfer(usb->base, msc->ep_in,
 				       ret.p, ret.length) != ret.length)
@@ -243,7 +231,7 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	// Data packet
 	if ((ret.state & ~SCSIBusy) == SCSIWrite) {
 		uint32_t size = msc->buf_size[outbuf];
-		ret.state = scsi_data(msc->scsi, buf[outbuf].raw, size);
+		ret.state = scsi_data(scsi, buf[outbuf].raw, size);
 		// Check with SCSI again if currently busy
 		if (ret.state & SCSIBusy)
 			return;
@@ -279,17 +267,15 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	}
 
 	int dir = cbw->bmCBWFlags & CBW_DIR_Msk;
-	if (cbw->bCBWLUN > msc->lun_max) {
-		dbgbkpt();
+	if (cbw->bCBWLUN != lun)
 		return;
-	}
 	if (cbw->bCBWCBLength < 1u || cbw->bCBWCBLength > 16u) {
 		dbgbkpt();
 		return;
 	}
 
 	// Process SCSI commands
-	ret = scsi_cmd(msc->scsi, cbw->CBWCB, cbw->bCBWCBLength);
+	ret = scsi_cmd(scsi, cbw->CBWCB, cbw->bCBWCBLength);
 	// Prepare CSW
 	csw->dCSWDataResidue = cbw->dCBWDataTransferLength;
 	csw->dCSWTag = cbw->dCBWTag;
@@ -326,4 +312,45 @@ s_csw:	csw->bCSWStatus = ret.state == SCSIFailure;
 		if (usb_ep_in_transfer(usb->base, msc->ep_in, csw, 13u) != 13u)
 			dbgbkpt();
 	}
+}
+
+usb_msc_t *usb_msc_init(usb_t *usb)
+{
+	usb_msc_t *data = &msc;
+	memset(data, 0, sizeof(usb_msc_t));
+	data->lun_max = 0xff;
+	// Audio control interface
+	const usb_if_t usbif = {
+		.data = data,
+		.config = &usbif_config,
+		.setup_class = &usbif_setup_class,
+	};
+	usb_interface_register(usb, &usbif);
+	return data;
+}
+
+scsi_t *usb_msc_scsi_register(usb_msc_t *msc, const scsi_handlers_t *handlers)
+{
+	// Allocate new space for SCSI object
+	msc->lun_max++;
+	msc->scsi = realloc(msc->scsi, sizeof(*msc->scsi) * (msc->lun_max + 1));
+
+	// Initialise SCSI
+	scsi_t *scsi = scsi_init(handlers);
+	msc->scsi[msc->lun_max] = scsi;
+
+	// If failed
+	if (!scsi)
+		msc->lun_max--;
+	return scsi;
+}
+
+void usb_msc_process(usb_t *usb, usb_msc_t *msc)
+{
+	if (!msc || msc->lun_max == 0xff)
+		return;
+
+	uint8_t num = msc->lun_max + 1;
+	for (uint8_t i = 0; i != num; i++)
+		process(usb, msc, i);
 }

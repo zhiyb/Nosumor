@@ -14,6 +14,7 @@
 #include "pvd.h"
 #include "irq.h"
 #include "systick.h"
+#include "flash_scsi.h"
 // Peripherals
 #include "peripheral/uart.h"
 #include "peripheral/keyboard.h"
@@ -111,6 +112,8 @@ static inline void init()
 
 	puts(ESC_INIT "Initialising USB mass storage...");
 	usb_msc = usb_msc_init(&usb);
+	usb_msc_scsi_register(usb_msc, mmc_scsi_handlers());
+	usb_msc_scsi_register(usb_msc, flash_scsi_handlers());
 
 	puts(ESC_GOOD "Initialisation done");
 	usb_connect(&usb, 1);
