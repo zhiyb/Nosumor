@@ -111,8 +111,8 @@ static inline void init()
 	keyboard_init(hid_keyboard);
 
 	puts(ESC_INIT "Initialising FatFs for Flash...");
-	//if (flash_fatfs_init(FLASH_CONF, 0))
-	//	dbgbkpt();
+	if (flash_fatfs_init(FLASH_CONF, 0))
+		dbgbkpt();
 	if (flash_fatfs_init(FLASH_APP, 1))
 		dbgbkpt();
 

@@ -495,7 +495,7 @@ DRESULT flash_disk_ioctl(uint32_t idx, BYTE cmd, void *buff)
 	DWORD dword;
 	switch (cmd) {
 	case GET_BLOCK_SIZE:
-		dword = LBSZ;
+		dword = 1;//LBSZ;
 		memcpy(buff, &dword, sizeof(DWORD));
 		return RES_OK;
 	case GET_SECTOR_COUNT:
