@@ -17,6 +17,6 @@ DSTATUS mmc_disk_status();
 DRESULT mmc_disk_read(BYTE *buff, DWORD sector, UINT count);
 
 /* SCSI interface function handlers */
-const scsi_handlers_t *mmc_scsi_handlers();
+scsi_if_t mmc_scsi_handlers();
 
 #endif // MMC_IO_H

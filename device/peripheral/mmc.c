@@ -616,7 +616,7 @@ DRESULT mmc_disk_read(BYTE *buff, DWORD sector, UINT count)
 
 uint8_t scsi_buf[64 * 1024] ALIGN(32), *scsi_ptr;
 
-static uint8_t scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
+static uint8_t scsi_sense(void *p, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
 {
 	// Update status
 	mmc_disk_status();
@@ -647,14 +647,14 @@ static uint8_t scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *a
 	return GOOD;
 }
 
-static uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize)
+static uint32_t scsi_capacity(void *p, uint32_t *lbnum, uint32_t *lbsize)
 {
 	*lbnum = stat ? 0ul : capacity;
 	*lbsize = 512ul;
 	return 0;
 }
 
-static uint32_t scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size)
+static uint32_t scsi_read_start(void *p, uint32_t offset, uint32_t size)
 {
 	// Check buffer overflow
 	if (size * 512ul > sizeof(scsi_buf)) {
@@ -675,7 +675,7 @@ static uint32_t scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 	return size;
 }
 
-static int32_t scsi_read_available(scsi_t *scsi)
+static int32_t scsi_read_available(void *p)
 {
 	// Update status
 	if (mmc_disk_status())
@@ -687,7 +687,7 @@ static int32_t scsi_read_available(scsi_t *scsi)
 	return size * 4ul - (scsi_ptr - scsi_buf);
 }
 
-static void *scsi_read_data(scsi_t *scsi, uint32_t *length)
+static void *scsi_read_data(void *p, uint32_t *length)
 {
 	// Check buffer overflow
 	if (*length + (scsi_ptr - scsi_buf) > sizeof(scsi_buf)) {
@@ -696,30 +696,30 @@ static void *scsi_read_data(scsi_t *scsi, uint32_t *length)
 		return 0;
 	}
 
-	void *p = scsi_ptr;
+	void *ptr = scsi_ptr;
 	scsi_ptr += *length / sizeof(*scsi_ptr);
-	return p;
+	return ptr;
 }
 
-static uint32_t scsi_read_stop(scsi_t *scsi)
+static uint32_t scsi_read_stop(void *p)
 {
 	return mmc_stop();
 }
 
-static uint32_t scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size)
+static uint32_t scsi_write_start(void *p, uint32_t offset, uint32_t size)
 {
 	return mmc_write_start(offset, size);
 }
 
-static uint32_t scsi_write_data(scsi_t *scsi, uint32_t length, const void *p)
+static uint32_t scsi_write_data(void *p, uint32_t length, const void *data)
 {
 	// Check for sector alignment
 	if (length % 512ul)
 		dbgbkpt();
-	return mmc_data(p, length / 512ul) * 512ul;
+	return mmc_data(data, length / 512ul) * 512ul;
 }
 
-static int32_t scsi_write_busy(scsi_t *scsi)
+static int32_t scsi_write_busy(void *p)
 {
 	// Update status
 	if (mmc_disk_status())
@@ -728,7 +728,7 @@ static int32_t scsi_write_busy(scsi_t *scsi)
 	return mmc_busy();
 }
 
-static uint32_t scsi_write_stop(scsi_t *scsi)
+static uint32_t scsi_write_stop(void *p)
 {
 	return mmc_stop();
 }
@@ -738,7 +738,7 @@ static const char *scsi_name()
 	return "SD Card Reader";
 }
 
-const scsi_handlers_t *mmc_scsi_handlers()
+scsi_if_t mmc_scsi_handlers()
 {
 	static const scsi_handlers_t handlers = {
 		scsi_name,
@@ -755,5 +755,5 @@ const scsi_handlers_t *mmc_scsi_handlers()
 		scsi_write_busy,
 		scsi_write_stop,
 	};
-	return &handlers;
+	return (scsi_if_t){&handlers, 0};
 }

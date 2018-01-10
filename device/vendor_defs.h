@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 
+#define MANUFACTURER	"zhiyb"
+
+#define PRODUCT		"Nosumor"
 #define PRODUCT_NAME	"Nosumor remake"
 
 #define SW_VERSION	0x0004

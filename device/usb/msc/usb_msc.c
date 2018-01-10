@@ -329,14 +329,14 @@ usb_msc_t *usb_msc_init(usb_t *usb)
 	return data;
 }
 
-scsi_t *usb_msc_scsi_register(usb_msc_t *msc, const scsi_handlers_t *handlers)
+scsi_t *usb_msc_scsi_register(usb_msc_t *msc, const scsi_if_t iface)
 {
 	// Allocate new space for SCSI object
 	msc->lun_max++;
 	msc->scsi = realloc(msc->scsi, sizeof(*msc->scsi) * (msc->lun_max + 1));
 
 	// Initialise SCSI
-	scsi_t *scsi = scsi_init(handlers);
+	scsi_t *scsi = scsi_init(iface);
 	msc->scsi[msc->lun_max] = scsi;
 
 	// If failed

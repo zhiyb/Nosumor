@@ -58,7 +58,7 @@ static desc_t usb_desc_device(usb_t *usb)
 		panic();
 	memcpy(pd, &desc_dev, desc_dev.bLength);
 	pd->bMaxPacketSize0 = usb_ep0_max_size(usb->base);
-	pd->iManufacturer = usb_desc_add_string(usb, 0, LANG_EN_US, "zhiyb");
+	pd->iManufacturer = usb_desc_add_string(usb, 0, LANG_EN_US, MANUFACTURER);
 	pd->iProduct = usb_desc_add_string(usb, 0, LANG_EN_US, PRODUCT_NAME);
 	// Construct serial number from UID
 	char uid[25];

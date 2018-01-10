@@ -25,39 +25,45 @@ typedef struct scsi_ret_t {
 typedef struct scsi_handlers_t {
 	// Generic
 
-	const char *(*name)(scsi_t *scsi);
+	const char *(*name)(void *data);
 	// Return type: status
-	uint8_t (*sense)(scsi_t *scsi, uint8_t *sense,
-		       uint8_t *asc, uint8_t *ascq);
+	uint8_t (*sense)(void *data, uint8_t *sense,
+			 uint8_t *asc, uint8_t *ascq);
 	// Return != 0 for error
-	uint32_t (*capacity)(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize);
+	uint32_t (*capacity)(void *data, uint32_t *lbnum, uint32_t *lbsize);
 
 	// Read operations
 
 	// Read: Start -> ((Available?) -> Data) -> Stop
-	uint32_t (*read_start)(scsi_t *scsi, uint32_t offset, uint32_t size);
+	uint32_t (*read_start)(void *data, uint32_t offset, uint32_t size);
 	// Return < 0 for error
 	// Return unit: Bytes
-	int32_t (*read_available)(scsi_t *scsi);
+	int32_t (*read_available)(void *data);
 	// Returned address need to be aligned to 32-bytes boundary for DMA
 	// Length unit: Bytes
-	void *(*read_data)(scsi_t *scsi, uint32_t *length);
-	uint32_t (*read_stop)(scsi_t *scsi);
+	void *(*read_data)(void *data, uint32_t *length);
+	uint32_t (*read_stop)(void *data);
 
 	// Write operations
 
 	// Write: Start -> (Data -> (Busy?)) -> Stop
-	uint32_t (*write_start)(scsi_t *scsi, uint32_t offset, uint32_t size);
+	uint32_t (*write_start)(void *data, uint32_t offset, uint32_t size);
 	// Length unit: Bytes
-	uint32_t (*write_data)(scsi_t *scsi, uint32_t length, const void *p);
+	uint32_t (*write_data)(void *data, uint32_t length, const void *p);
 	// Return < 0 for error
-	int32_t (*write_busy)(scsi_t *scsi);
+	int32_t (*write_busy)(void *data);
 	// Return != 0 for error
-	uint32_t (*write_stop)(scsi_t *scsi);
+	uint32_t (*write_stop)(void *data);
 } scsi_handlers_t;
 
+// SCSI interface register
+typedef struct scsi_if_t {
+	const scsi_handlers_t * const handlers;
+	void *data;
+} scsi_if_t;
+
 // SCSI functions
-scsi_t *scsi_init(const scsi_handlers_t *handlers);
+scsi_t *scsi_init(const scsi_if_t iface);
 scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size);
 scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size);
 scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize);

@@ -4,8 +4,6 @@
 #include <usb/msc/scsi_defs_sense.h>
 #include <debug.h>
 
-#define F	0
-
 // Memory regions
 extern char __app_start__, __app_end__;
 extern char __conf_start__, __conf_end__;
@@ -34,10 +32,11 @@ SECTION(.iram) STATIC_INLINE void flash_wait()
 
 /* SCSI interface functions */
 
-static uint8_t scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
+static uint8_t scsi_sense(void *p, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
 {
-	state_t state = flash[F].state;
-	flash[F].state = Good;
+	uint32_t idx = (uint32_t)p;
+	state_t state = flash[idx].state;
+	flash[idx].state = Good;
 
 	switch (state) {
 	case Good:
@@ -79,58 +78,63 @@ static uint8_t scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *a
 	}
 }
 
-static uint32_t scsi_capacity(scsi_t *scsi, uint32_t *lbnum, uint32_t *lbsize)
+static uint32_t scsi_capacity(void *p, uint32_t *lbnum, uint32_t *lbsize)
 {
-	*lbsize = flash[F].bsize;
-	*lbnum = (flash[F].end - flash[F].start) / flash[F].bsize;
+	uint32_t idx = (uint32_t)p;
+	*lbsize = flash[idx].bsize;
+	*lbnum = (flash[idx].end - flash[idx].start) / flash[idx].bsize;
 	return 0;
 }
 
 /* Read operations */
 
-static uint32_t scsi_read_start(scsi_t *scsi, uint32_t offset, uint32_t size)
+static uint32_t scsi_read_start(void *p, uint32_t offset, uint32_t size)
 {
+	uint32_t idx = (uint32_t)p;
 	if (size == 0)
 		return 0;
 	else if (offset + size >
-		 (flash[F].end - flash[F].start) / flash[F].bsize) {
-		flash[F].state = RangeError;
+		 (flash[idx].end - flash[idx].start) / flash[idx].bsize) {
+		flash[idx].state = RangeError;
 		return 0;
 	}
 
-	flash[F].read = flash[F].start + offset * flash[F].bsize;
-	flash[F].length = size * flash[F].bsize;
+	flash[idx].read = flash[idx].start + offset * flash[idx].bsize;
+	flash[idx].length = size * flash[idx].bsize;
 	return size;
 }
 
-static int32_t scsi_read_available(scsi_t *scsi)
+static int32_t scsi_read_available(void *p)
 {
-	return flash[F].length;
+	uint32_t idx = (uint32_t)p;
+	return flash[idx].length;
 }
 
-static void *scsi_read_data(scsi_t *scsi, uint32_t *length)
+static void *scsi_read_data(void *p, uint32_t *length)
 {
-	void *p = flash[F].read;
-	flash[F].read += *length;
-	flash[F].length -= *length;
-	return p;
+	uint32_t idx = (uint32_t)p;
+	void *ptr = flash[idx].read;
+	flash[idx].read += *length;
+	flash[idx].length -= *length;
+	return ptr;
 }
 
-static uint32_t scsi_read_stop(scsi_t *scsi)
+static uint32_t scsi_read_stop(void *p)
 {
-	flash[F].length = 0;
+	uint32_t idx = (uint32_t)p;
+	flash[idx].length = 0;
 	return 0;
 }
 
 /* Write operations */
-
-static uint32_t scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size)
+static uint32_t scsi_write_start(void *p, uint32_t offset, uint32_t size)
 {
+	uint32_t idx = (uint32_t)p;
 	if (size == 0)
 		return 0;
 	else if (offset + size >
-		 (flash[F].end - flash[F].start) / flash[F].bsize) {
-		flash[F].state = RangeError;
+		 (flash[idx].end - flash[idx].start) / flash[idx].bsize) {
+		flash[idx].state = RangeError;
 		return 0;
 	}
 
@@ -146,13 +150,13 @@ static uint32_t scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 
 		flash_wait();
 		if (FLASH->CR & FLASH_CR_LOCK_Msk) {
-			flash[F].state = UnlockFailed;
+			flash[idx].state = UnlockFailed;
 			return 0;
 		}
 	}
 
 	// Erase flash sectors
-	uint32_t sec = flash[F].sector + offset;
+	uint32_t sec = flash[idx].sector + offset;
 	for (uint32_t i = size; i != 0; i--) {
 		// Program size x32
 		FLASH->CR = (0b10 << FLASH_CR_PSIZE_Pos) | FLASH_CR_SER_Msk |
@@ -166,23 +170,24 @@ static uint32_t scsi_write_start(scsi_t *scsi, uint32_t offset, uint32_t size)
 	// Check for erase errors
 	if (FLASH->SR & (FLASH_SR_ERSERR_Msk | FLASH_SR_WRPERR_Msk |
 			 FLASH_SR_PGPERR_Msk | FLASH_SR_PGAERR_Msk)) {
-		flash[F].state = EraseError;
+		flash[idx].state = EraseError;
 		return 0;
 	}
 
 	// Set up write operation
 	// Program size x32
 	FLASH->CR = (0b00 << FLASH_CR_PSIZE_Pos) | FLASH_CR_PG_Msk;
-	flash[F].write = flash[F].start + offset * flash[F].bsize;
-	flash[F].length = size * flash[F].bsize;
+	flash[idx].write = flash[idx].start + offset * flash[idx].bsize;
+	flash[idx].length = size * flash[idx].bsize;
 	return size;
 }
 
-static uint32_t scsi_write_data(scsi_t *scsi, uint32_t length, const void *p)
+static uint32_t scsi_write_data(void *p, uint32_t length, const void *data)
 {
+	uint32_t idx = (uint32_t)p;
 	// Align to 32-bit boundary
-	uint32_t *ptr = flash[F].write;
-	const uint32_t *dptr = p;
+	uint32_t *ptr = flash[idx].write;
+	const uint32_t *dptr = data;
 	uint32_t size = length >> 2u;
 
 	// Program flash
@@ -193,22 +198,24 @@ static uint32_t scsi_write_data(scsi_t *scsi, uint32_t length, const void *p)
 		// Check for program errors
 		if (FLASH->SR & (FLASH_SR_ERSERR_Msk | FLASH_SR_WRPERR_Msk |
 				 FLASH_SR_PGPERR_Msk | FLASH_SR_PGAERR_Msk)) {
-			flash[F].state = ProgramError;
+			flash[idx].state = ProgramError;
 			return 0;
 		}
 	}
 
-	flash[F].length -= length;
+	flash[idx].length -= length;
 	return length;
 }
 
-static int32_t scsi_write_busy(scsi_t *scsi)
+static int32_t scsi_write_busy(void *p)
 {
 	return FLASH->SR & FLASH_SR_BSY_Msk;
 }
 
-static uint32_t scsi_write_stop(scsi_t *scsi)
+static uint32_t scsi_write_stop(void *p)
 {
+	uint32_t region = (uint32_t)p;
+
 	// Clear flash operations
 	FLASH->CR = 0;
 	flash_wait();
@@ -216,18 +223,23 @@ static uint32_t scsi_write_stop(scsi_t *scsi)
 	// Check for errors
 	if (FLASH->SR & (FLASH_SR_ERSERR_Msk | FLASH_SR_WRPERR_Msk |
 			 FLASH_SR_PGPERR_Msk | FLASH_SR_PGAERR_Msk)) {
-		flash[F].state = ProgramError;
+		flash[region].state = ProgramError;
 		return -1;
 	}
 	return 0;
 }
 
-static const char *scsi_name()
+static const char *scsi_name(void *p)
 {
-	return "System Flash";
+	uint32_t region = (uint32_t)p;
+	static const char *names[] = {
+		"Configuration",
+		"System Flash",
+	};
+	return names[region];
 }
 
-const scsi_handlers_t *flash_scsi_handlers()
+scsi_if_t flash_scsi_handlers(uint32_t region)
 {
 	static const scsi_handlers_t handlers = {
 		scsi_name,
@@ -244,5 +256,5 @@ const scsi_handlers_t *flash_scsi_handlers()
 		scsi_write_busy,
 		scsi_write_stop,
 	};
-	return &handlers;
+	return (scsi_if_t){&handlers, (void *)region};
 }
