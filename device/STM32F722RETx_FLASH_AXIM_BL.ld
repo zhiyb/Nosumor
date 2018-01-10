@@ -5,7 +5,7 @@
 **  File        : LinkerScript.ld
 **
 **  Abstract    : Linker script for STM32F722ZETx Device with
-**                512KByte APP, 256KByte RAM
+**                512KByte FLASH, 256KByte RAM
 **
 **                Set heap size, stack size and stack location according
 **                to application requirements.
@@ -33,11 +33,14 @@
 ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
-_estack = 0x20040000;       /* end of RAM */
-__heap_end__ = 0x20010000;  /* end of DTCM */
-/* Generate a link error if heap and stack don't fit into RAM */
-_Min_Heap_Size = 0x400;      /* required amount of heap  */
-_Min_Stack_Size = 0x1000; /* required amount of stack */
+_estack = ORIGIN(RAM) + LENGTH(RAM);       /* end of RAM */
+__heap_end__ = ORIGIN(DTCM) + LENGTH(DTCM);  /* end of DTCM */
+
+/* Flash disk regions */
+__app_start__	= ORIGIN(APP);
+__app_end__	= ORIGIN(APP) + LENGTH(APP);
+__conf_start__	= ORIGIN(CONF);
+__conf_end__	= ORIGIN(CONF) + LENGTH(CONF);
 
 /* Specify the memory areas */
 MEMORY
@@ -55,15 +58,15 @@ MEMORY
 /* Define output sections */
 SECTIONS
 {
-  /* The startup code goes first into APP */
+  /* The startup code goes first into FLASH */
   .isr_vector :
   {
     . = ALIGN(4);
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
-  } >APP
+  } >BOOT
 
-  /* The program code and other data goes into APP */
+  /* The program code and other data goes into FLASH */
   .text :
   {
     . = ALIGN(4);
@@ -78,44 +81,44 @@ SECTIONS
 
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
-  } >APP
+  } >LOADER
 
-  /* Constant data goes into APP */
+  /* Constant data goes into FLASH */
   .rodata :
   {
     . = ALIGN(4);
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);
-  } >APP
+  } >LOADER
 
-  .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >APP
+  .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >LOADER
   .ARM : {
     __exidx_start = .;
     *(.ARM.exidx*)
     __exidx_end = .;
-  } >APP
+  } >LOADER
 
   .preinit_array     :
   {
     PROVIDE_HIDDEN (__preinit_array_start = .);
     KEEP (*(.preinit_array*))
     PROVIDE_HIDDEN (__preinit_array_end = .);
-  } >APP
+  } >LOADER
   .init_array :
   {
     PROVIDE_HIDDEN (__init_array_start = .);
     KEEP (*(SORT(.init_array.*)))
     KEEP (*(.init_array*))
     PROVIDE_HIDDEN (__init_array_end = .);
-  } >APP
+  } >LOADER
   .fini_array :
   {
     PROVIDE_HIDDEN (__fini_array_start = .);
     KEEP (*(SORT(.fini_array.*)))
     KEEP (*(.fini_array*))
     PROVIDE_HIDDEN (__fini_array_end = .);
-  } >APP
+  } >LOADER
 
   /* Code segments in ITCM RAM */
   _siiram = LOADADDR(.iram);
@@ -128,10 +131,10 @@ SECTIONS
 
     . = ALIGN(4);
     _eiram = .;
-  } >IRAM AT >APP
+  } >IRAM AT >LOADER
 
   /* Special RAM sections */
-  .dtcm :
+  .dtcm (NOLOAD) :
   {
     . = ALIGN(4);
     *(.dtcm)
@@ -157,7 +160,7 @@ SECTIONS
 
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
-  } >RAM AT >APP
+  } >RAM AT >LOADER
 
   
   /* Uninitialized data section */
@@ -175,26 +178,6 @@ SECTIONS
     _ebss = .;         /* define a global symbol at bss end */
     __bss_end__ = _ebss;
   } >RAM
-
-  /* User_stack section, used to check that there is enough RAM left */
-  ._user_stack :
-  {
-    . = ALIGN(8);
-    PROVIDE ( end = . );
-    PROVIDE ( _end = . );
-    . = . + _Min_Stack_Size;
-    . = ALIGN(8);
-  } >RAM
-
-  /* User_heap section, used to check that there is enough RAM left */
-  ._user_heap :
-  {
-    . = ALIGN(8);
-    PROVIDE ( end = . );
-    PROVIDE ( _end = . );
-    . = . + _Min_Heap_Size;
-    . = ALIGN(8);
-  } >DTCM
 
   /* Remove information from the standard libraries */
   /DISCARD/ :

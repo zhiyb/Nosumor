@@ -109,8 +109,6 @@ static inline void init()
 	puts(ESC_INIT "Initialising keyboard...");
 	keyboard_init(hid_keyboard);
 
-	puts(ESC_INIT "Initialising SD/MMC card...");
-	mmc_disk_init();
 	puts(ESC_INIT "Initialising USB mass storage...");
 	usb_msc = usb_msc_init(&usb);
 
@@ -122,48 +120,8 @@ int main()
 {
 	init();
 
-#ifdef DEBUG
-	uint32_t mask = keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4];
-	struct {
-		uint32_t tick, blocks, heap, usbram;
-	} cur, diff, prev = {
-		systick_cnt(), mmc_statistics(), 0, 0,
-	};
-#endif
 loop:	;
 	uint32_t s = keyboard_status();
-#if 0
-	int up = s & (keyboard_masks[0] | keyboard_masks[1]);
-	if (up)
-		GPIOA->ODR |= GPIO_ODR_ODR_10 | GPIO_ODR_ODR_11;
-	else
-		GPIOA->ODR &= ~(GPIO_ODR_ODR_10 | GPIO_ODR_ODR_11);
-	if (s & keyboard_masks[0])
-		GPIOB->ODR &= ~GPIO_ODR_ODR_15;
-	else
-		GPIOB->ODR |= GPIO_ODR_ODR_15;
-	if (s & keyboard_masks[1])
-		GPIOB->ODR &= ~GPIO_ODR_ODR_14;
-	else
-		GPIOB->ODR |= GPIO_ODR_ODR_14;
-	int down = s & (keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4]);
-	if (up && !down) {
-		GPIOA->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_2 | GPIO_ODR_ODR_1);
-	} else {
-		if (s & keyboard_masks[2])
-			GPIOA->ODR &= ~GPIO_ODR_ODR_0;
-		else
-			GPIOA->ODR |= GPIO_ODR_ODR_0;
-		if (s & keyboard_masks[3])
-			GPIOA->ODR &= ~GPIO_ODR_ODR_2;
-		else
-			GPIOA->ODR |= GPIO_ODR_ODR_2;
-		if (s & keyboard_masks[4])
-			GPIOA->ODR &= ~GPIO_ODR_ODR_1;
-		else
-			GPIOA->ODR |= GPIO_ODR_ODR_1;
-	}
-#endif
 
 	// Process time consuming tasks
 	usb_process(&usb);
@@ -171,53 +129,6 @@ loop:	;
 	usb_hid_vendor_process(usb_hid_vendor, &vendor_process);
 	fflush(stdout);
 
-#ifdef DEBUG
-	if ((s & mask) == mask) {
-		usb_connect(&usb, 0);
-		while (keyboard_status());
-		usb_connect(&usb, 1);
-	}
-
-	// Every 1024 systick ticks
-	cur.tick = systick_cnt();
-	if ((cur.tick - prev.tick) & ~(1023ul)) {
-		// Update current values
-		cur.blocks = mmc_statistics();
-		cur.heap = heap_usage();
-		cur.usbram = usb_ram_usage(&usb);
-
-		// Calculate difference
-		diff.blocks = cur.blocks - prev.blocks;
-		diff.heap = cur.heap - prev.heap;
-		diff.usbram = cur.usbram - prev.usbram;
-
-		if (diff.heap)
-			dbgprintf(ESC_INFO "[HEAP] "
-				  ESC_DATA "%.2f%%" ESC_INFO ", "
-				  ESC_DATA "%lu" ESC_INFO "/"
-				  ESC_DATA "%u" ESC_INFO " bytes\n",
-				  (float)cur.heap * 100.f / (float)heap_size(),
-				  cur.heap, heap_size());
-
-		if (diff.usbram)
-			dbgprintf(ESC_INFO "[USBRAM] "
-				  ESC_DATA "%.2f%%" ESC_INFO ", "
-				  ESC_DATA "%lu" ESC_INFO "/"
-				  ESC_DATA "%lu" ESC_INFO " bytes\n",
-				  (float)cur.usbram * 100.f / (float)usb_ram_size(&usb),
-				  cur.usbram, usb_ram_size(&usb));
-
-		// SDMMC statistics
-		if (diff.blocks)
-			printf(ESC_INFO "[SDMMC] " ESC_DATA "%lu + %lu"
-			       ESC_INFO " blocks\n", prev.blocks, diff.blocks);
-
-		// Update previous values
-		uint32_t tick = prev.tick + 1024ul;
-		memcpy(&prev, &cur, sizeof(cur));
-		prev.tick = tick;
-	}
-#endif
 #ifndef DEBUG
 	__WFI();
 #endif

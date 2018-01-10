@@ -23,7 +23,6 @@ Project {
 
         Group {
             name: "FatFS"
-            cpp.optimization: "small"
             cpp.commonCompilerFlags: outer.concat(["-Wno-comment"])
             files: [
                 "fatfs/*",
@@ -74,7 +73,7 @@ Project {
         Group {
             name: "Linker script for AXI"
             condition: qbs.buildVariant === "debug"
-            files: "STM32F722RETx_FLASH_AXIM.ld"
+            files: "STM32F722RETx_FLASH_AXIM_BL.ld"
         }
 
         Group {
