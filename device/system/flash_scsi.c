@@ -7,7 +7,7 @@
 #include "flash_scsi.h"
 
 #define LBSZ	512ul
-//#define SHADOW_CONF
+#define SHADOW_CONF
 
 // Memory regions
 extern char __app_start__, __app_end__;

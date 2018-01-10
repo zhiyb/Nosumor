@@ -127,10 +127,14 @@ static inline void init()
 	puts(ESC_INIT "Initialising SD/MMC card...");
 	mmc_disk_init();
 
+	puts(ESC_INIT "Initialising FatFs for flash...");
+	uint32_t err = flash_fatfs_init(FLASH_CONF, 0);
+
 	puts(ESC_INIT "Initialising USB mass storage...");
 	usb_msc = usb_msc_init(&usb);
 	usb_msc_scsi_register(usb_msc, mmc_scsi_handlers());
-	usb_msc_scsi_register(usb_msc, flash_scsi_handlers(FLASH_CONF));
+	if (!err)
+		usb_msc_scsi_register(usb_msc, flash_scsi_handlers(FLASH_CONF));
 
 	puts(ESC_GOOD "Initialisation done");
 	usb_connect(&usb, 1);
@@ -175,7 +179,7 @@ static inline void fatfs_test()
 	}
 
 	// Unmount volume
-	if ((res = f_mount(NULL, "SD:", 0)) != FR_OK) {
+	if ((res = f_mount(NULL, "MMC:", 0)) != FR_OK) {
 		printf(ESC_ERROR "f_unmount: %d\n", res);
 		return;
 	}
