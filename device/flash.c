@@ -66,8 +66,8 @@ SECTION(.iram) extern void flash_erase(uint32_t addr)
 		return;
 	// Erase sector
 	flash_wait();
-	// Program size x64
-	FLASH->CR = (0b11 << FLASH_CR_PSIZE_Pos) |
+	// Program size x32
+	FLASH->CR = (0b10 << FLASH_CR_PSIZE_Pos) |
 			FLASH_CR_SER_Msk | (sec << FLASH_CR_SNB_Pos);
 	FLASH->CR |= FLASH_CR_STRT_Msk;
 	sector = sec;

@@ -164,6 +164,7 @@ static uint32_t mmc_command(uint32_t cmd, uint32_t arg, uint32_t *stat)
 	else
 		flag = SDMMC_STA_CMDSENT_Msk;
 
+	__DSB();
 	uint32_t tick = systick_cnt();
 	while (!(MMC->STA & (flag | SDMMC_STA_CCRCFAIL_Msk |
 			     SDMMC_STA_CTIMEOUT_Msk)) &&
@@ -627,13 +628,13 @@ uint8_t mmc_scsi_sense(scsi_t *scsi, uint8_t *sense, uint8_t *asc, uint8_t *ascq
 		*ascq = 0x00;
 		return CHECK_CONDITION;
 	} else if (stat & STA_ERROR) {
-		*sense = NOT_READY;
+		*sense = MEDIUM_ERROR;
 		// 30/00  DZT ROM  BK    INCOMPATIBLE MEDIUM INSTALLED
 		*asc = 0x30;
 		*ascq = 0x00;
 		return CHECK_CONDITION;
 	} else if (stat) {
-		*sense = NOT_READY;
+		*sense = HARDWARE_ERROR;
 		// 04/00  DZTPROMAEBKVF  LOGICAL UNIT NOT READY, CAUSE NOT REPORTABLE
 		*asc = 0x04;
 		*ascq = 0x00;
