@@ -733,9 +733,15 @@ static uint32_t scsi_write_stop(scsi_t *scsi)
 	return mmc_stop();
 }
 
+static const char *scsi_name()
+{
+	return "SD Card Reader";
+}
+
 const scsi_handlers_t *mmc_scsi_handlers()
 {
 	static const scsi_handlers_t handlers = {
+		scsi_name,
 		scsi_sense,
 		scsi_capacity,
 

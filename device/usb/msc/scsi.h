@@ -25,6 +25,7 @@ typedef struct scsi_ret_t {
 typedef struct scsi_handlers_t {
 	// Generic
 
+	const char *(*name)(scsi_t *scsi);
 	// Return type: status
 	uint8_t (*sense)(scsi_t *scsi, uint8_t *sense,
 		       uint8_t *asc, uint8_t *ascq);

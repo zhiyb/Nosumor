@@ -139,7 +139,7 @@ static scsi_ret_t inquiry_standard(scsi_t *scsi, cmd_INQUIRY_t *cmd)
 	// Obs, Obs, WBUS16(a), SYNC(a), LINKED (obs), Obs, CMDQUE, VS
 	data->flags[2] = 0x00;
 	memcpy(data->vendor, "ST MICRO", 8);
-	strcpy((void *)data->product, PRODUCT_NAME);
+	strncpy((void *)data->product, scsi->h->name(scsi), sizeof(data->product));
 	memcpy(data->revision, SW_VERSION_STR, 4);
 
 	scsi_ret_t ret = {data, 4 + data->additional, SCSIGood};

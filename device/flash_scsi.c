@@ -222,9 +222,15 @@ static uint32_t scsi_write_stop(scsi_t *scsi)
 	return 0;
 }
 
+static const char *scsi_name()
+{
+	return "System Flash";
+}
+
 const scsi_handlers_t *flash_scsi_handlers()
 {
 	static const scsi_handlers_t handlers = {
+		scsi_name,
 		scsi_sense,
 		scsi_capacity,
 
