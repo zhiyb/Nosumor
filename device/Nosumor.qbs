@@ -63,7 +63,6 @@ Project {
 
         Group {
             name: "FatFS"
-            cpp.optimization: "small"
             cpp.commonCompilerFlags: outer.concat(["-Wno-comment"])
             files: [
                 "fatfs/*",

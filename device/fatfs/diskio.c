@@ -9,9 +9,8 @@
 
 #include "diskio.h"		/* FatFs lower layer API */
 #include <debug.h>
+#include <flash_scsi.h>
 #include <peripheral/mmc.h>
-#include "../peripheral/mmc.h"
-#include "../debug.h"
 
 /* Definitions of physical drive number for each drive */
 #define DEV_MMC		0
@@ -30,7 +29,12 @@ DSTATUS disk_status (
 	switch (pdrv) {
 	case DEV_MMC:
 		return mmc_disk_status();
-
+	case DEV_CONF:
+		return flash_disk_status(FLASH_CONF);
+#ifdef BOOTLOADER
+	case DEV_APP:
+		return flash_disk_status(FLASH_APP);
+#endif
 	default:
 		return STA_NOINIT;
 	}
@@ -49,7 +53,12 @@ DSTATUS disk_initialize (
 	switch (pdrv) {
 	case DEV_MMC:
 		return mmc_disk_init();
-
+	case DEV_CONF:
+		return flash_disk_init(FLASH_CONF);
+#ifdef BOOTLOADER
+	case DEV_APP:
+		return flash_disk_init(FLASH_APP);
+#endif
 	default:
 		return STA_NOINIT;
 	}
@@ -71,7 +80,12 @@ DRESULT disk_read (
 	switch (pdrv) {
 	case DEV_MMC:
 		return mmc_disk_read(buff, sector, count);
-
+	case DEV_CONF:
+		return flash_disk_read(FLASH_CONF, buff, sector, count);
+#ifdef BOOTLOADER
+	case DEV_APP:
+		return flash_disk_read(FLASH_APP, buff, sector, count);
+#endif
 	default:
 		return RES_PARERR;
 	}
@@ -90,11 +104,15 @@ DRESULT disk_write (
 	UINT count			/* Number of sectors to write */
 )
 {
-	dbgbkpt();
 	switch (pdrv) {
 	case DEV_MMC:
 		return RES_PARERR;
-
+	case DEV_CONF:
+		return flash_disk_write(FLASH_CONF, buff, sector, count);
+#ifdef BOOTLOADER
+	case DEV_APP:
+		return flash_disk_write(FLASH_APP, buff, sector, count);
+#endif
 	default:
 		return RES_PARERR;
 	}
@@ -112,12 +130,18 @@ DRESULT disk_ioctl (
 	void *buff		/* Buffer to send/receive control data */
 )
 {
-	dbgbkpt();
 	switch (pdrv) {
 	case DEV_MMC:
+		dbgbkpt();
 		return RES_PARERR;
-
+	case DEV_CONF:
+		return flash_disk_ioctl(FLASH_CONF, cmd, buff);
+#ifdef BOOTLOADER
+	case DEV_APP:
+		return flash_disk_ioctl(FLASH_APP, cmd, buff);
+#endif
 	default:
+		dbgbkpt();
 		return RES_PARERR;
 	}
 }

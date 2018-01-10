@@ -110,6 +110,12 @@ static inline void init()
 	puts(ESC_INIT "Initialising keyboard...");
 	keyboard_init(hid_keyboard);
 
+	puts(ESC_INIT "Initialising FatFs for Flash...");
+	//if (flash_fatfs_init(FLASH_CONF, 0))
+	//	dbgbkpt();
+	if (flash_fatfs_init(FLASH_APP, 1))
+		dbgbkpt();
+
 	puts(ESC_INIT "Initialising USB mass storage...");
 	usb_msc = usb_msc_init(&usb);
 	usb_msc_scsi_register(usb_msc, mmc_scsi_handlers());

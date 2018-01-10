@@ -614,7 +614,7 @@ DRESULT mmc_disk_read(BYTE *buff, DWORD sector, UINT count)
 
 /* SCSI interface functions */
 
-uint8_t scsi_buf[64 * 1024] ALIGN(32), *scsi_ptr;
+static uint8_t scsi_buf[128 * 1024] ALIGN(32), *scsi_ptr;
 
 static uint8_t scsi_sense(void *p, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
 {
@@ -731,6 +731,14 @@ static int32_t scsi_write_busy(void *p)
 static uint32_t scsi_write_stop(void *p)
 {
 	return mmc_stop();
+}
+
+// In case some other modules need a large amount of buffer space
+void *mmc_scsi_buffer(uint32_t *length)
+{
+	if (length)
+		*length = sizeof(scsi_buf);
+	return scsi_buf;
 }
 
 static const char *scsi_name()

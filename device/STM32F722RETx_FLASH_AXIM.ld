@@ -39,6 +39,12 @@ __heap_end__ = 0x20010000;  /* end of DTCM */
 _Min_Heap_Size = 0x400;      /* required amount of heap  */
 _Min_Stack_Size = 0x1000; /* required amount of stack */
 
+/* Flash disk regions */
+__app_start__	= ORIGIN(APP);
+__app_end__	= ORIGIN(APP) + LENGTH(APP);
+__conf_start__	= ORIGIN(CONF);
+__conf_end__	= ORIGIN(CONF) + LENGTH(CONF);
+
 /* Specify the memory areas */
 MEMORY
 {

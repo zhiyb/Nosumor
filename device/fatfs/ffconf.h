@@ -8,7 +8,7 @@
 / Function Configurations
 /---------------------------------------------------------------------------*/
 
-#define FF_FS_READONLY	1
+#define FF_FS_READONLY	0
 /* This option switches read-only configuration. (0:Read/Write or 1:Read-only)
 /  Read-only configuration removes writing API functions, f_write(), f_sync(),
 /  f_unlink(), f_mkdir(), f_chmod(), f_rename(), f_truncate(), f_getfree()
@@ -38,7 +38,7 @@
 /  f_findnext(). (0:Disable, 1:Enable 2:Enable with matching altname[] too) */
 
 
-#define FF_USE_MKFS		0
+#define FF_USE_MKFS		1
 /* This option switches f_mkfs() function. (0:Disable or 1:Enable) */
 
 
@@ -174,11 +174,7 @@
 /* Number of volumes (logical drives) to be used. (1-10) */
 
 
-#ifdef BOOTLOADER
-#define FF_STR_VOLUME_ID	0
-#else
 #define FF_STR_VOLUME_ID	1
-#endif
 #define FF_VOLUME_STRS		"MMC", "CONF", "APP"
 /* FF_STR_VOLUME_ID switches string support for volume ID.
 /  When FF_STR_VOLUME_ID is set to 1, also pre-defined strings can be used as drive
@@ -242,10 +238,10 @@
 /  Note that enabling exFAT discards ANSI C (C89) compatibility. */
 
 
-#define FF_FS_NORTC		0
+#define FF_FS_NORTC		1
 #define FF_NORTC_MON	1
 #define FF_NORTC_MDAY	1
-#define FF_NORTC_YEAR	2017
+#define FF_NORTC_YEAR	2018
 /* The option FF_FS_NORTC switches timestamp functiton. If the system does not have
 /  any RTC function or valid timestamp is not needed, set FF_FS_NORTC = 1 to disable
 /  the timestamp function. All objects modified by FatFs will have a fixed timestamp
