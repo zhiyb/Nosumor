@@ -4768,10 +4768,10 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <part name="GND24" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
 <part name="P+2" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="+5V" device=""/>
 <part name="V2" library="supply" deviceset="+1V8" device=""/>
-<part name="TP9" library="testpad" library_urn="urn:adsk.eagle:library:385" deviceset="TP" device="B1,27" package3d_urn="urn:adsk.eagle:package:27944/1"/>
-<part name="TP10" library="testpad" library_urn="urn:adsk.eagle:library:385" deviceset="TP" device="B1,27" package3d_urn="urn:adsk.eagle:package:27944/1"/>
-<part name="TP11" library="testpad" library_urn="urn:adsk.eagle:library:385" deviceset="TP" device="B1,27" package3d_urn="urn:adsk.eagle:package:27944/1"/>
-<part name="TP12" library="testpad" library_urn="urn:adsk.eagle:library:385" deviceset="TP" device="B1,27" package3d_urn="urn:adsk.eagle:package:27944/1"/>
+<part name="SLP" library="testpad" library_urn="urn:adsk.eagle:library:385" deviceset="TP" device="B1,27" package3d_urn="urn:adsk.eagle:package:27944/1"/>
+<part name="SLM" library="testpad" library_urn="urn:adsk.eagle:library:385" deviceset="TP" device="B1,27" package3d_urn="urn:adsk.eagle:package:27944/1"/>
+<part name="SRP" library="testpad" library_urn="urn:adsk.eagle:library:385" deviceset="TP" device="B1,27" package3d_urn="urn:adsk.eagle:package:27944/1"/>
+<part name="SRM" library="testpad" library_urn="urn:adsk.eagle:library:385" deviceset="TP" device="B1,27" package3d_urn="urn:adsk.eagle:package:27944/1"/>
 <part name="C40" library="Seeed-Capacitor" library_urn="urn:adsk.eagle:library:464" deviceset="CERAMIC-47NF-25V-10%-X7R(0402)" device="" value="470nf"/>
 <part name="R25" library="Seeed-Resistor" library_urn="urn:adsk.eagle:library:474" deviceset="SMD-RES-1K-5%-1/16W(0402)" device="" value="2.2K"/>
 <part name="C41" library="Seeed-Capacitor" library_urn="urn:adsk.eagle:library:464" deviceset="CERAMIC-100UF-6.3V-20%-X5R(1206)" device="" value="100uf"/>
@@ -4821,7 +4821,7 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <part name="R18" library="Seeed-Resistor" library_urn="urn:adsk.eagle:library:474" deviceset="SMD-RES-10K-1%-1/16W(0402)" device="" value="10K 1/16W"/>
 <part name="R16" library="Seeed-Resistor" library_urn="urn:adsk.eagle:library:474" deviceset="SMD-RES-10K-1%-1/16W(0402)" device="" value="10K 1/16W"/>
 <part name="+3V39" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="+3V3" device=""/>
-<part name="SJ1" library="jumper" library_urn="urn:adsk.eagle:library:252" deviceset="SJ" device="" package3d_urn="urn:adsk.eagle:package:15471/1"/>
+<part name="BOOT" library="jumper" library_urn="urn:adsk.eagle:library:252" deviceset="SJ" device="" package3d_urn="urn:adsk.eagle:package:15471/1"/>
 <part name="J4" library="Wurth_Elektronik_Electromechanic_Input-Output_Connectors_rev16b" deviceset="629105150521" device=""/>
 <part name="J1" library="Wurth_Elektronik_Electromechanic_Input-Output_Connectors_rev16b" deviceset="629105150521" device=""/>
 <part name="U6" library="SparkFun-Sensors" library_urn="urn:adsk.eagle:library:534" deviceset="MPU-9250" device="" package3d_urn="urn:adsk.eagle:package:39982/1" value="9DoF IMU"/>
@@ -4846,6 +4846,9 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <part name="C38" library="Seeed-Capacitor" library_urn="urn:adsk.eagle:library:464" deviceset="CERAMIC-1UF-6.3V-10%-X5R(0402)" device="" value="1UF 6.3V"/>
 <part name="GND29" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
 <part name="C31" library="Seeed-Capacitor" library_urn="urn:adsk.eagle:library:464" deviceset="CERAMIC-1UF-6.3V-10%-X5R(0402)" device="" value="1UF 6.3V"/>
+<part name="SDA" library="testpad" library_urn="urn:adsk.eagle:library:385" deviceset="TP" device="B1,27" package3d_urn="urn:adsk.eagle:package:27944/1"/>
+<part name="SCL" library="testpad" library_urn="urn:adsk.eagle:library:385" deviceset="TP" device="B1,27" package3d_urn="urn:adsk.eagle:package:27944/1"/>
+<part name="GND$2" library="testpad" library_urn="urn:adsk.eagle:library:385" deviceset="TP" device="B1,27" package3d_urn="urn:adsk.eagle:package:27944/1"/>
 </parts>
 <sheets>
 <sheet>
@@ -4960,10 +4963,10 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <instance part="GND24" gate="1" x="86.36" y="91.44"/>
 <instance part="P+2" gate="1" x="86.36" y="111.76"/>
 <instance part="V2" gate="G$1" x="111.76" y="111.76"/>
-<instance part="TP9" gate="G$1" x="114.3" y="-45.72"/>
-<instance part="TP10" gate="G$1" x="119.38" y="-45.72"/>
-<instance part="TP11" gate="G$1" x="124.46" y="-45.72"/>
-<instance part="TP12" gate="G$1" x="129.54" y="-45.72"/>
+<instance part="SLP" gate="G$1" x="114.3" y="-45.72"/>
+<instance part="SLM" gate="G$1" x="119.38" y="-45.72"/>
+<instance part="SRP" gate="G$1" x="124.46" y="-45.72"/>
+<instance part="SRM" gate="G$1" x="129.54" y="-45.72"/>
 <instance part="C40" gate="G$1" x="116.84" y="-38.1"/>
 <instance part="R25" gate="G$1" x="111.76" y="-33.02"/>
 <instance part="C41" gate="G$1" x="116.84" y="-60.96"/>
@@ -5013,7 +5016,7 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <instance part="R18" gate="G$1" x="-33.02" y="91.44"/>
 <instance part="R16" gate="G$1" x="-33.02" y="106.68"/>
 <instance part="+3V39" gate="G$1" x="-25.4" y="114.3"/>
-<instance part="SJ1" gate="1" x="-76.2" y="-88.9"/>
+<instance part="BOOT" gate="1" x="-76.2" y="-88.9"/>
 <instance part="J4" gate="G$1" x="157.48" y="20.32" rot="MR180"/>
 <instance part="J1" gate="G$1" x="-63.5" y="78.74"/>
 <instance part="U6" gate="G$1" x="121.92" y="60.96"/>
@@ -5038,6 +5041,9 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <instance part="C38" gate="G$1" x="111.76" y="101.6" rot="R90"/>
 <instance part="GND29" gate="1" x="111.76" y="91.44"/>
 <instance part="C31" gate="G$1" x="81.28" y="101.6" rot="R90"/>
+<instance part="SDA" gate="G$1" x="-50.8" y="10.16"/>
+<instance part="SCL" gate="G$1" x="-43.18" y="10.16"/>
+<instance part="GND$2" gate="G$1" x="-35.56" y="10.16"/>
 </instances>
 <busses>
 </busses>
@@ -5481,6 +5487,11 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <wire x1="111.76" y1="93.98" x2="111.76" y2="97.79" width="0.1524" layer="91"/>
 <pinref part="C38" gate="G$1" pin="1"/>
 </segment>
+<segment>
+<pinref part="GND$2" gate="G$1" pin="TP"/>
+<wire x1="-35.56" y1="7.62" x2="-35.56" y2="-2.54" width="0.1524" layer="91"/>
+<label x="-35.56" y="-2.54" size="1.778" layer="95" rot="R90"/>
+</segment>
 </net>
 <net name="+3V3" class="0">
 <segment>
@@ -5562,7 +5573,7 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <segment>
 <pinref part="+3V36" gate="G$1" pin="+3V3"/>
 <wire x1="-83.82" y1="-88.9" x2="-83.82" y2="-86.36" width="0.1524" layer="91"/>
-<pinref part="SJ1" gate="1" pin="1"/>
+<pinref part="BOOT" gate="1" pin="1"/>
 <wire x1="-81.28" y1="-88.9" x2="-83.82" y2="-88.9" width="0.1524" layer="91"/>
 </segment>
 <segment>
@@ -6148,7 +6159,7 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <wire x1="-60.96" y1="-86.36" x2="-43.18" y2="-86.36" width="0.1524" layer="91"/>
 <label x="-55.88" y="-86.36" size="1.778" layer="95"/>
 <wire x1="-60.96" y1="-86.36" x2="-60.96" y2="-88.9" width="0.1524" layer="91"/>
-<pinref part="SJ1" gate="1" pin="2"/>
+<pinref part="BOOT" gate="1" pin="2"/>
 <wire x1="-71.12" y1="-88.9" x2="-68.58" y2="-88.9" width="0.1524" layer="91"/>
 <wire x1="-68.58" y1="-88.9" x2="-68.58" y2="-93.98" width="0.1524" layer="91"/>
 <pinref part="R14" gate="G$1" pin="1"/>
@@ -6410,7 +6421,7 @@ You are welcome to use this library for commercial purposes. For attribution, we
 </net>
 <net name="N$7" class="0">
 <segment>
-<pinref part="TP9" gate="G$1" pin="TP"/>
+<pinref part="SLP" gate="G$1" pin="TP"/>
 <wire x1="114.3" y1="-48.26" x2="114.3" y2="-50.8" width="0.1524" layer="91"/>
 <pinref part="U4" gate="G$1" pin="SPLP"/>
 <wire x1="114.3" y1="-50.8" x2="104.14" y2="-50.8" width="0.1524" layer="91"/>
@@ -6419,7 +6430,7 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <net name="N$30" class="0">
 <segment>
 <pinref part="U4" gate="G$1" pin="SPLM"/>
-<pinref part="TP10" gate="G$1" pin="TP"/>
+<pinref part="SLM" gate="G$1" pin="TP"/>
 <wire x1="104.14" y1="-53.34" x2="119.38" y2="-53.34" width="0.1524" layer="91"/>
 <wire x1="119.38" y1="-53.34" x2="119.38" y2="-48.26" width="0.1524" layer="91"/>
 </segment>
@@ -6427,7 +6438,7 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <net name="N$44" class="0">
 <segment>
 <pinref part="U4" gate="G$1" pin="SPRP"/>
-<pinref part="TP11" gate="G$1" pin="TP"/>
+<pinref part="SRP" gate="G$1" pin="TP"/>
 <wire x1="104.14" y1="-55.88" x2="124.46" y2="-55.88" width="0.1524" layer="91"/>
 <wire x1="124.46" y1="-55.88" x2="124.46" y2="-48.26" width="0.1524" layer="91"/>
 </segment>
@@ -6435,7 +6446,7 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <net name="N$45" class="0">
 <segment>
 <pinref part="U4" gate="G$1" pin="SPRM"/>
-<pinref part="TP12" gate="G$1" pin="TP"/>
+<pinref part="SRM" gate="G$1" pin="TP"/>
 <wire x1="104.14" y1="-58.42" x2="129.54" y2="-58.42" width="0.1524" layer="91"/>
 <wire x1="129.54" y1="-58.42" x2="129.54" y2="-48.26" width="0.1524" layer="91"/>
 </segment>
@@ -6490,6 +6501,11 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <wire x1="139.7" y1="58.42" x2="152.4" y2="58.42" width="0.1524" layer="91"/>
 <label x="142.24" y="58.42" size="1.778" layer="95"/>
 </segment>
+<segment>
+<pinref part="SDA" gate="G$1" pin="TP"/>
+<wire x1="-50.8" y1="7.62" x2="-50.8" y2="-2.54" width="0.1524" layer="91"/>
+<label x="-50.8" y="-2.54" size="1.778" layer="95" rot="R90"/>
+</segment>
 </net>
 <net name="I2C_SCL" class="0">
 <segment>
@@ -6508,6 +6524,11 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <pinref part="U6" gate="G$1" pin="SCL/SCLK"/>
 <wire x1="139.7" y1="60.96" x2="152.4" y2="60.96" width="0.1524" layer="91"/>
 <label x="142.24" y="60.96" size="1.778" layer="95"/>
+</segment>
+<segment>
+<pinref part="SCL" gate="G$1" pin="TP"/>
+<wire x1="-43.18" y1="7.62" x2="-43.18" y2="-2.54" width="0.1524" layer="91"/>
+<label x="-43.18" y="-2.54" size="1.778" layer="95" rot="R90"/>
 </segment>
 </net>
 <net name="AIC_DOUT" class="0">
@@ -6568,6 +6589,7 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <pinref part="U6" gate="G$1" pin="FSYNC"/>
 <wire x1="104.14" y1="60.96" x2="91.44" y2="60.96" width="0.1524" layer="91"/>
 <label x="91.44" y="60.96" size="1.778" layer="95"/>
+<wire x1="104.14" y1="60.96" x2="91.44" y2="60.96" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="MMC_CMD" class="0">
@@ -7056,6 +7078,7 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <pinref part="U6" gate="G$1" pin="INT"/>
 <wire x1="104.14" y1="63.5" x2="91.44" y2="63.5" width="0.1524" layer="91"/>
 <label x="91.44" y="63.5" size="1.778" layer="95"/>
+<wire x1="104.14" y1="63.5" x2="91.44" y2="63.5" width="0.1524" layer="91"/>
 </segment>
 <segment>
 <pinref part="IC1" gate="G$1" pin="PB15"/>
@@ -7104,12 +7127,14 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <approved hash="104,1,-43.18,-71.12,IC1,VBAT,+3V3,,,"/>
 <approved hash="104,1,-43.18,-91.44,IC1,VCAP1,N$29,,,"/>
 <approved hash="106,1,-157.48,78.74,NRST_N,,,,,"/>
-<approved hash="113,1,5.5245,36.7767,J2,,,,,"/>
+<approved hash="108,1,104.14,60.96,AIC_GPIO,,,,,"/>
+<approved hash="108,1,104.14,63.5,MPU_INT,,,,,"/>
+<approved hash="113,1,5.5245,36.6818,J2,,,,,"/>
 <approved hash="113,1,-132.08,59.69,U1,,,,,"/>
-<approved hash="113,1,-40.4139,20.0829,JP1,,,,,"/>
-<approved hash="113,1,-76.2,-87.2896,SJ1,,,,,"/>
-<approved hash="113,1,154.871,21.8846,J4,,,,,"/>
-<approved hash="113,1,-66.1093,77.1754,J1,,,,,"/>
+<approved hash="113,1,-40.5088,20.0829,JP1,,,,,"/>
+<approved hash="113,1,-76.2,-87.3845,BOOT,,,,,"/>
+<approved hash="113,1,154.591,21.9795,J4,,,,,"/>
+<approved hash="113,1,-66.3889,77.0805,J1,,,,,"/>
 </errors>
 </schematic>
 </drawing>
