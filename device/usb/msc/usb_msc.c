@@ -11,7 +11,7 @@
 #include "usb_msc.h"
 #include "usb_msc_defs.h"
 
-#define MSC_IN_MAX_SIZE		512u
+#define MSC_IN_MAX_SIZE		1024u
 #define MSC_OUT_MAX_SIZE	512u
 #define MSC_OUT_MAX_PKT		1u
 
@@ -40,8 +40,9 @@ typedef struct usb_msc_t {
 	int ep_in, ep_out;
 	scsi_t **scsi;
 	volatile uint32_t buf_size[2];
-	volatile uint8_t outbuf;
 	uint8_t lun_max ALIGN(4);
+	volatile uint8_t outbuf;
+	uint8_t active;
 } usb_msc_t;
 
 static usb_msc_t msc SECTION(.dtcm);
@@ -203,87 +204,32 @@ static void usbif_setup_class(usb_t *usb, void *pdata, uint32_t ep, setup_t pkt)
 	}
 }
 
-static uint32_t process(usb_t *usb, usb_msc_t *msc, uint8_t lun, uint8_t pkt)
+static void process_cmd(usb_t *usb, usb_msc_t *msc)
 {
-	scsi_t *scsi = *(msc->scsi + lun);
-
-	// Process SCSI initiated packets
-	csw_t *csw = &inbuf.csw;
-	scsi_ret_t ret = scsi_process(scsi, MSC_IN_MAX_SIZE);
-	if (ret.length || ret.state == SCSIFailure) {
-		if (usb_ep_in_transfer(usb->base, msc->ep_in,
-				       ret.p, ret.length) != ret.length)
-			dbgbkpt();
-		// Update Command Status Wrapper (CSW)
-		csw->dCSWDataResidue -= ret.length;
-		// Send CSW after transfer finished
-		if (ret.state == SCSIGood || ret.state == SCSIFailure)
-			goto s_csw;
-		// LUN in progress, no more action to do
-		return 0;
-	}
-	// LUN read in progress, no more action to do
-	if ((ret.state & ~SCSIBusy) == SCSIRead)
-		return 0;
-
 	// Process USB packets
 	uint8_t outbuf = msc->outbuf;
 	if (!msc->buf_size[outbuf])
-		return __LINE__;
-
-	// Data packet
-	if ((ret.state & ~SCSIBusy) == SCSIWrite) {
-		uint32_t size = msc->buf_size[outbuf];
-		ret.state = scsi_data(scsi, buf[outbuf].raw, size);
-		// Check with SCSI again if currently busy
-		if (ret.state & SCSIBusy)
-			// LUN in progress, no more action to do
-			return 0;
-
-		__disable_irq();
-		if (outbuf != msc->outbuf)
-			dbgbkpt();
-		// Mark buffer as available
-		msc->buf_size[outbuf] = 0;
-		// Check alternative buffer status
-		uint32_t buf_size = msc->buf_size[!outbuf];
-		__enable_irq();
-		if (buf_size)
-			epout_swap(usb, msc->ep_out);
-		// Update CSW
-		csw->dCSWDataResidue -= size;
-		// Wait for data if transfer have not finished
-		if (ret.state != SCSIGood && ret.state != SCSIFailure)
-			// LUN in progress, no more action to do
-			return 0;
-		// Stall the OUT endpoint if host data pending
-		if (csw->dCSWDataResidue)
-			epout_stall(usb, msc->ep_out, 1);
-		// Send CSW after transfer finished
-		goto s_csw;
-	}
-
-	if (!pkt)
-		return __LINE__;
+		return;
 
 	// Command block wrapper (CBW) processing
 	cbw_t *cbw = &buf[outbuf].cbw;
 	if (cbw->dCBWSignature != 0x43425355) {
 		// TODO: Stall bulk pipes
 		dbgbkpt();
-		return __LINE__;
+		return;
 	}
 
 	int dir = cbw->bmCBWFlags & CBW_DIR_Msk;
-	if (cbw->bCBWLUN != lun)
-		return __LINE__;
+	uint8_t lun = cbw->bCBWLUN;
+	scsi_t *scsi = *(msc->scsi + lun);
 	if (cbw->bCBWCBLength < 1u || cbw->bCBWCBLength > 16u) {
 		dbgbkpt();
-		return __LINE__;
+		return;
 	}
 
 	// Process SCSI commands
-	ret = scsi_cmd(scsi, cbw->CBWCB, cbw->bCBWCBLength);
+	csw_t *csw = &inbuf.csw;
+	scsi_ret_t ret = scsi_cmd(scsi, cbw->CBWCB, cbw->bCBWCBLength);
 	// Prepare CSW
 	csw->dCSWDataResidue = cbw->dCBWDataTransferLength;
 	csw->dCSWTag = cbw->dCBWTag;
@@ -309,24 +255,89 @@ static uint32_t process(usb_t *usb, usb_msc_t *msc, uint8_t lun, uint8_t pkt)
 			// Host is sending data, stall the OUT endpoint
 			epout_stall(usb, msc->ep_out, 1);
 		}
+	} else {
+		// SCSI data transfer active
+		msc->active = lun;
 	}
 
 	// Prepare CSW
 	csw->dCSWDataResidue -= ret.length;
-s_csw:	csw->bCSWStatus = ret.state == SCSIFailure;
+	csw->bCSWStatus = ret.state == SCSIFailure;
 	// Send CSW after transfer finished
 	if (ret.state == SCSIGood || ret.state == SCSIFailure)
 		if (usb_ep_in_transfer(usb->base, msc->ep_in, csw, 13u) != 13u)
 			dbgbkpt();
-	// LUN just activated, wait for next round
-	return 0;
+}
+
+static void process_data(usb_t *usb, usb_msc_t *msc)
+{
+	csw_t *csw = &inbuf.csw;
+	scsi_t *scsi = *(msc->scsi + msc->active);
+
+	// Process SCSI initiated data packets
+	scsi_ret_t ret = scsi_process(scsi, MSC_IN_MAX_SIZE);
+	if (ret.length || ret.state == SCSIFailure) {
+		if (usb_ep_in_transfer(usb->base, msc->ep_in,
+				       ret.p, ret.length) != ret.length)
+			dbgbkpt();
+		// Update Command Status Wrapper (CSW)
+		csw->dCSWDataResidue -= ret.length;
+		// Send CSW after transfer finished
+		if (ret.state == SCSIGood || ret.state == SCSIFailure)
+			goto s_csw;
+		return;
+	}
+
+	// Check if SCSI is not receiving data packets
+	if ((ret.state & ~SCSIBusy) != SCSIWrite)
+		return;
+
+	// Process USB data packets
+	uint8_t outbuf = msc->outbuf;
+	if (!msc->buf_size[outbuf])
+		return;
+
+	uint32_t size = msc->buf_size[outbuf];
+	ret.state = scsi_data(scsi, buf[outbuf].raw, size);
+	// Check with SCSI again if currently busy
+	if (ret.state & SCSIBusy)
+		return;
+
+	__disable_irq();
+	if (outbuf != msc->outbuf)
+		dbgbkpt();
+	// Mark buffer as available
+	msc->buf_size[outbuf] = 0;
+	// Check alternative buffer status
+	uint32_t buf_size = msc->buf_size[!outbuf];
+	__enable_irq();
+	if (buf_size)
+		epout_swap(usb, msc->ep_out);
+
+	// Update CSW
+	csw->dCSWDataResidue -= size;
+	// Wait for more data packets if transfer have not finished
+	if (ret.state != SCSIGood && ret.state != SCSIFailure)
+		return;
+	// Stall the OUT endpoint if host data pending
+	if (csw->dCSWDataResidue)
+		epout_stall(usb, msc->ep_out, 1);
+
+	// Send CSW after transfer finished
+s_csw:	csw->bCSWStatus = ret.state == SCSIFailure;
+	if (ret.state == SCSIGood || ret.state == SCSIFailure) {
+		if (usb_ep_in_transfer(usb->base, msc->ep_in, csw, 13u) != 13u)
+			dbgbkpt();
+		// Process new CBW packets
+		msc->active = 0xff;
+	}
 }
 
 usb_msc_t *usb_msc_init(usb_t *usb)
 {
 	usb_msc_t *data = &msc;
 	memset(data, 0, sizeof(usb_msc_t));
-	data->lun_max = 0xff;
+	data->active = data->lun_max = 0xff;
 	// Audio control interface
 	const usb_if_t usbif = {
 		.data = data,
@@ -358,15 +369,8 @@ void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 	if (!msc || msc->lun_max == 0xff)
 		return;
 
-	uint8_t num = msc->lun_max + 1;
-
-	// Find LUN with ongoing transfer
-	for (uint8_t i = 0; i != num; i++)
-		if (!process(usb, msc, i, 0))
-			return;
-
-	// Process CBW packet
-	for (uint8_t i = 0; i != num; i++)
-		if (!process(usb, msc, i, 1))
-			return;
+	if (msc->active == 0xff)
+		process_cmd(usb, msc);
+	else
+		process_data(usb, msc);
 }
