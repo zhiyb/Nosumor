@@ -1,5 +1,7 @@
 #include <stdint.h>
+#include <string.h>
 #include <debug.h>
+#include <escape.h>
 #include <fatfs/ff.h>
 #include <peripheral/mmc.h>
 #include <logic/scsi.h>

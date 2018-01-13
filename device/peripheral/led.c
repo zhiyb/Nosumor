@@ -1,3 +1,4 @@
+#include <string.h>
 #include <stm32f7xx.h>
 #include <macros.h>
 #include <debug.h>
