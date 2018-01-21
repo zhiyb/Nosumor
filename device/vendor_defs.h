@@ -51,6 +51,6 @@ typedef struct PACKED led_config_t {
 enum Positions {Top = 0x10, Bottom = 0x20, Left = 0x01, Right = 0x02};
 
 enum ReportTypes {Ping = 0, FlashReset, FlashData, FlashCheck, FlashStart,
-		KeycodeUpdate, LEDInfo, LEDConfig, Reply = 0x80};
+		KeycodeUpdate, LEDInfo, LEDConfig, I2CData, Reply = 0x80};
 
 #endif // VENDOR_DEFS_H

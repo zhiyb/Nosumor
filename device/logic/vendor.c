@@ -7,6 +7,8 @@
 #include <system/flash.h>
 #include <peripheral/keyboard.h>
 #include <peripheral/led.h>
+#include <peripheral/i2c.h>
+#include <peripheral/audio.h>
 #include <usb/hid/usb_hid.h>
 #include "vendor.h"
 
@@ -91,6 +93,24 @@ static void vendor_led_config(usb_hid_if_t *hid, uint8_t size, void *payload)
 	}
 }
 
+static void vendor_i2c(usb_hid_if_t *hid, uint8_t size, void *payload)
+{
+	if (size-- == 0)
+		return;
+
+	uint8_t *p = payload;
+	uint8_t addr = *p++;
+
+	report.type = I2CData | Reply;
+	report.size = VENDOR_REPORT_BASE_SIZE + 2u;
+	report.payload[0] = addr;
+	if (addr & 1u)
+		report.payload[1] = i2c_read_reg(AUDIO_I2C, addr >> 1u, *p);
+	else
+		report.payload[1] = i2c_write(AUDIO_I2C, addr >> 1u, p, size);
+	usb_hid_vendor_send(hid, &report);
+}
+
 void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp)
 {
 	if (!rp->size)
@@ -130,6 +150,9 @@ void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp)
 		break;
 	case LEDConfig:
 		vendor_led_config(hid, size, rp->payload);
+		break;
+	case I2CData:
+		vendor_i2c(hid, size, rp->payload);
 		break;
 	}
 }
