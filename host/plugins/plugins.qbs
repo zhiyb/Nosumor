@@ -6,6 +6,7 @@ Project {
         "ping",
         "keycode",
         "led",
+        "i2c",
     ]
 
     StaticLibrary {
