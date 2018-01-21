@@ -43,6 +43,15 @@ typedef struct {
 
 volatile cfg_t cfg;
 
+void audio_init_reset()
+{
+	// Reset audio configurations
+	i2c_write_reg(I2C, I2C_ADDR, 0x00, 0x00);
+	i2c_write_reg(I2C, I2C_ADDR, 0x01, 0x01);
+	// Wait for audio reset
+	while (i2c_read_reg(I2C, I2C_ADDR, 0x01) & 0x01);
+}
+
 // Initial configuration
 void audio_init_config()
 {
@@ -62,12 +71,12 @@ void audio_init_config()
 		//0x1d, 0x20,		// DIN-DOUT loopback
 		//0x1d, 0x10,		// ADC-DAC loopback
 		0x1d, 0x00,		// No loopback, DAC_CLK => BCLK
-		0x1e, 0x82,		// Enable BCLK N, N = 2
+		0x1e, 0x84,		// Enable BCLK N, N = 4
 		0x20, 0x00,		// Using primary interface inputs
 		0x21, 0x00,		// Using primary interface outputs
 		0x35, 0x12,		// Bus keeper disabled, DOUT from codec
-		0x0b, 0x84,		// DAC NDAC = 4
-		0x0c, 0x84,		// DAC MDAC = 4
+		0x0b, 0x82,		// DAC NDAC = 2
+		0x0c, 0x88,		// DAC MDAC = 8
 		0x0d, 0,		// DAC DOSR = 32
 		0x0e, 32,
 		0x12, 0x84,		// ADC NADC = 4
@@ -92,15 +101,15 @@ void audio_init_config()
 		0x74, 0x00,		// DAC volume control pin disabled
 
 		0x00, 0x01,		// Page 1
-		0x1f, 0xc4,		// Headphone drivers on, 1.35V
+		0x1f, 0xd4,		// Headphone drivers on, 1.65V
 		0x20, 0xc6,		// Speaker amplifiers on
 		0x23, 0x44,		// DAC to HP
 		0x24, 0x0f,		// HPL analog volume = -7.5dB
 		0x25, 0x0f,		// HPR analog volume = -7.5dB
 		0x26, 0x00,		// SPL analog volume = 0dB
 		0x27, 0x00,		// SPR analog volume = 0dB
-		0x2c, 0x10,		// DAC high current, HP as headphone
-		0x2e, 0x0a,		// MICBIAS force on, MICBIAS = 2.5V
+		0x2c, 0x18,		// DAC high current, HP as headphone
+		0x2e, 0x00,		// MICBIAS powered down
 		//0x2f, 0x00,		// MIC PGA 0dB
 		0x30, 0x10,		// MIC1RP selected for MIC PGA
 		0x31, 0x40,		// CM selected fvoidor MIC PGA

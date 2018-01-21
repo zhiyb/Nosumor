@@ -27,6 +27,7 @@ static struct {
 	int32_t offset;
 } data SECTION(.dtcm);
 
+void audio_init_reset();
 void audio_init_config();
 void audio_usb_config(usb_t *usb, usb_audio_t *audio);
 void audio_config_update();
@@ -60,8 +61,7 @@ void audio_init(usb_t *usb, usb_audio_t *audio)
 	}
 
 	// Software reset
-	i2c_write_reg(I2C, I2C_ADDR, 0x00, 0x00);	// Page 0
-	i2c_write_reg(I2C, I2C_ADDR, 0x01, 1u);
+	audio_init_reset();
 	// Reset audio buffer
 	memset(&data, 0, sizeof(data));
 	// Waiting for reset
