@@ -18,7 +18,10 @@ I2C::I2C(hid_device *dev, QWidget *parent) : PluginWidget(parent)
 	auto pb = new QPushButton(tr("&Send"));
 	layout->addWidget(pb);
 
+	connect(addr, &QLineEdit::returnPressed, data,
+		QOverload<>::of(&QLineEdit::setFocus));
 	connect(read, &QCheckBox::toggled, this, &I2C::readToggled);
+	connect(data, &QLineEdit::returnPressed, pb, &QPushButton::click);
 	connect(pb, &QPushButton::clicked, this, &I2C::send);
 }
 
