@@ -104,10 +104,10 @@ void audio_init_config()
 		0x1f, 0xd4,		// Headphone drivers on, 1.65V
 		0x20, 0xc6,		// Speaker amplifiers on
 		0x23, 0x44,		// DAC to HP
-		0x24, 0x0f,		// HPL analog volume = -7.5dB
-		0x25, 0x0f,		// HPR analog volume = -7.5dB
-		0x26, 0x00,		// SPL analog volume = 0dB
-		0x27, 0x00,		// SPR analog volume = 0dB
+		0x24, 0x8f,		// HPL analog volume = -7.5dB
+		0x25, 0x8f,		// HPR analog volume = -7.5dB
+		0x26, 0x80,		// SPL analog volume = 0dB
+		0x27, 0x80,		// SPR analog volume = 0dB
 		0x2c, 0x18,		// DAC high current, HP as headphone
 		0x2e, 0x00,		// MICBIAS powered down
 		//0x2f, 0x00,		// MIC PGA 0dB
@@ -117,10 +117,10 @@ void audio_init_config()
 
 	cfg.ch[0].vol = 0x00;	// DAC left volume = 0dB
 	cfg.ch[1].vol = 0x00;	// DAC right volume = 0dB
-	cfg.hp[0].atten = 0x8f,	// HPL analog volume = -7.5dB
-	cfg.hp[1].atten = 0x8f,	// HPR analog volume = -7.5dB
-	cfg.sp[0].atten = 0x80,	// SPL analog volume = 0dB
-	cfg.sp[1].atten = 0x80,	// SPR analog volume = 0dB
+	cfg.hp[0].atten = 0xc8;	// HPL analog volume = -36.2dB
+	cfg.hp[1].atten = 0xc8;	// HPR analog volume = -36.2dB
+	cfg.sp[0].atten = 0x80;	// SPL analog volume = 0dB
+	cfg.sp[1].atten = 0x80;	// SPR analog volume = 0dB
 	cfg.hp[0].gain = 0x06;	// HPL driver PGA = 0dB, not muted
 	cfg.hp[1].gain = 0x06;	// HPR driver PGA = 0dB, not muted
 	cfg.sp[0].gain = 0x14;	// SPL driver PGA = 6dB, not muted
@@ -333,8 +333,9 @@ int fu_volume_set(usb_audio_t *audio, const uint8_t id, const int cn, const layo
 uint32_t fu_volume_range(usb_audio_t *audio, const uint8_t id, const int cn, layout2_range_t *buf)
 {
 	static const layout2_range_t fu_dac[] = {
-		// DAC volume
-		{(int)(-63.5 * 256), (int)(24 * 256), (int)(0.5 * 256)},
+		// DAC digital volume
+		// Change maximum to 0dB to avoid clipping
+		{(int)(-63.5 * 256), (int)(0 * 256), (int)(0.5 * 256)},
 	};
 	static const layout2_range_t fu_atten[] = {
 		// Analog attenuation
