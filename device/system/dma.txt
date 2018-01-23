@@ -1,0 +1,19 @@
+#if HWVER >= 0x0100
+
+SDMMC	SDMMC1	DMA2_Stream3(4)
+
+AIC_TX	SAI1_A	DMA2_Stream1(0)
+AIC_RX	SAI2_B	DMA2_Stream7(0)
+
+RGB	TM1_CH1	DMA2_Stream6(0)
+
+#else
+
+SDMMC	SDMMC1	DMA2_Stream3(4)
+
+I2S_TX	SPI1_TX	DMA2_Stream5(3)
+I2S_RX	SPI2_RX	DMA1_Stream3(0)
+
+RGB	TM5_CH4	DMA1_Stream1(6)
+
+#endif
