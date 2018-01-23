@@ -6,14 +6,105 @@
 #include <system/clocks.h>
 #include "led.h"
 
+#if HWVER >= 0x0100
+#define STREAM	DMA2_Stream6
+#else
+#define STREAM	DMA1_Stream1
+#endif
+
 typedef uint32_t colour_t;
 
 static colour_t colours[LED_NUM][3] ALIGN(4) SECTION(.dtcm);
 
 static void base_scan_init()
 {
+#if HWVER >= 0x0100
 	// Initialise scan GPIOs
-	// LED:	PB14(1), PB15(2), PA11(3), PA10(4)	| TIM12_CH12, TIM1_CH43
+	// LED:	1(PA6), 2(PA7), 3(PA15), 4(PB3)		| TIM3_CH12, TIM2_CH12
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN;
+	// 10: Alternative function mode
+	GPIO_MODER(GPIOA, 6, 0b10);
+	GPIO_MODER(GPIOA, 7, 0b10);
+	GPIO_MODER(GPIOA, 15, 0b10);
+	GPIO_MODER(GPIOB, 3, 0b10);
+	// Output push-pull
+	GPIO_OTYPER_PP(GPIOA, 6);
+	GPIO_OTYPER_PP(GPIOA, 7);
+	GPIO_OTYPER_PP(GPIOA, 15);
+	GPIO_OTYPER_PP(GPIOB, 3);
+	// Low speed (2~8MHz)
+	GPIO_OSPEEDR(GPIOA, 6, 0b00);
+	GPIO_OSPEEDR(GPIOA, 7, 0b00);
+	GPIO_OSPEEDR(GPIOA, 15, 0b00);
+	GPIO_OSPEEDR(GPIOB, 3, 0b00);
+	// AF2: Timer 3
+	GPIO_AFRL(GPIOA, 6, 2);
+	GPIO_AFRL(GPIOA, 7, 2);
+	// AF1: Timer 2
+	GPIO_AFRH(GPIOA, 15, 1);
+	GPIO_AFRL(GPIOB, 3, 1);
+
+	// Initialise scan timer TIM3_CH12
+	RCC->APB1ENR |= RCC_APB1ENR_TIM3EN_Msk;
+	// Auto reload buffered, continuous
+	TIM3->CR1 = TIM_CR1_ARPE_Msk;
+	TIM3->CR2 = 0;
+	// Slave mode, external clock from timer 1
+	TIM3->SMCR = (0 << TIM_SMCR_TS_Pos) | (0b111 << TIM_SMCR_SMS_Pos);
+	// DMA & interrupts disabled
+	TIM3->DIER = 0;
+	// OC1 mode PWM2, OC2 mode PWM1, preload enable
+	TIM3->CCMR1 = (0b111 << TIM_CCMR1_OC1M_Pos) | TIM_CCMR1_OC1PE_Msk |
+			(0b110 << TIM_CCMR1_OC2M_Pos) | TIM_CCMR1_OC2PE_Msk;
+	TIM3->CCMR2 = 0;
+	// No prescaler
+	TIM3->PSC = 0;
+	// Auto reload value
+	TIM3->ARR = 7;
+	// Output compare values
+	TIM3->CCR1 = 6;
+	TIM3->CCR2 = 2;
+	// Initialise registers
+	TIM3->EGR = TIM_EGR_UG_Msk;
+	// Reset counter
+	TIM3->CNT = 0;
+	// OC1/OC2 enable, active low
+	TIM3->CCER = TIM_CCER_CC1E_Msk | TIM_CCER_CC2E_Msk |
+			TIM_CCER_CC1P_Msk | TIM_CCER_CC2P_Msk;
+	// Enable timer
+	TIM3->CR1 |= TIM_CR1_CEN_Msk;
+
+	// Initialise scan timer TIM2_CH12
+	RCC->APB1ENR |= RCC_APB1ENR_TIM2EN_Msk;
+	// Auto reload buffered, continuous
+	TIM2->CR1 = TIM_CR1_ARPE_Msk;
+	// Slave mode, external clock from timer 1
+	TIM2->SMCR = (0 << TIM_SMCR_TS_Pos) | (0b111 << TIM_SMCR_SMS_Pos);
+	// Interrupts disabled
+	TIM2->DIER = 0;
+	// OC1 mode PWM2, OC2 mode PWM1, preload enable
+	TIM2->CCMR1 = (0b111 << TIM_CCMR1_OC1M_Pos) | TIM_CCMR1_OC1PE_Msk |
+			(0b110 << TIM_CCMR1_OC2M_Pos) | TIM_CCMR1_OC2PE_Msk;
+	TIM2->CCMR2 = 0;
+	// No prescaler
+	TIM2->PSC = 0;
+	// Auto reload value
+	TIM2->ARR = 7;
+	// Output compare values
+	TIM2->CCR1 = 6;
+	TIM2->CCR2 = 2;
+	// Initialise registers
+	TIM2->EGR = TIM_EGR_UG_Msk;
+	// Reset counter
+	TIM2->CNT = 4;
+	// OC1/OC2 enable, active low
+	TIM2->CCER = TIM_CCER_CC1E_Msk | TIM_CCER_CC2E_Msk |
+			TIM_CCER_CC1P_Msk | TIM_CCER_CC2P_Msk;
+	// Enable timer
+	TIM2->CR1 |= TIM_CR1_CEN_Msk;
+#else
+	// Initialise scan GPIOs
+	// LED:	1(PB14), 2(PB15), 3(PA11), 4(PA10)	| TIM12_CH12, TIM1_CH43
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN;
 	// 10: Alternative function mode
 	GPIO_MODER(GPIOB, 14, 0b10);
@@ -37,7 +128,35 @@ static void base_scan_init()
 	GPIO_AFRH(GPIOA, 10, 1);
 	GPIO_AFRH(GPIOA, 11, 1);
 
-	// Initialise scan timer
+	// Initialise scan timer TIM12_CH12
+	RCC->APB1ENR |= RCC_APB1ENR_TIM12EN_Msk;
+	// Auto reload buffered, continuous
+	TIM12->CR1 = TIM_CR1_ARPE_Msk;
+	// Slave mode, external clock from timer 5
+	TIM12->SMCR = (1 << TIM_SMCR_TS_Pos) | (0b111 << TIM_SMCR_SMS_Pos);
+	// Interrupts disabled
+	TIM12->DIER = 0;
+	// OC1 mode PWM1, OC2 mode PWM2, preload enable
+	TIM12->CCMR1 = (0b110 << TIM_CCMR1_OC1M_Pos) | TIM_CCMR1_OC1PE_Msk |
+			(0b111 << TIM_CCMR1_OC2M_Pos) | TIM_CCMR1_OC2PE_Msk;
+	// No prescaler
+	TIM12->PSC = 0;
+	// Auto reload value
+	TIM12->ARR = 7;
+	// Output compare values
+	TIM12->CCR1 = 2;
+	TIM12->CCR2 = 6;
+	// Initialise registers
+	TIM12->EGR = TIM_EGR_UG_Msk;
+	// Reset counter
+	TIM12->CNT = 0;
+	// OC1/OC2 enable, active low
+	TIM12->CCER = TIM_CCER_CC1E_Msk | TIM_CCER_CC2E_Msk |
+			TIM_CCER_CC1P_Msk | TIM_CCER_CC2P_Msk;
+	// Enable timer
+	TIM12->CR1 |= TIM_CR1_CEN_Msk;
+
+	// Initialise scan timer TIM1_CH43
 	RCC->APB2ENR |= RCC_APB2ENR_TIM1EN_Msk;
 	// Auto reload buffered, continuous
 	TIM1->CR1 = TIM_CR1_ARPE_Msk;
@@ -68,40 +187,98 @@ static void base_scan_init()
 			TIM_CCER_CC3P_Msk | TIM_CCER_CC4P_Msk;
 	// Enable timer
 	TIM1->CR1 |= TIM_CR1_CEN_Msk;
-
-	// Initialise scan timer
-	RCC->APB1ENR |= RCC_APB1ENR_TIM12EN_Msk;
-	// Auto reload buffered, continuous
-	TIM12->CR1 = TIM_CR1_ARPE_Msk;
-	// Slave mode, external clock from timer 5
-	TIM12->SMCR = (1 << TIM_SMCR_TS_Pos) | (0b111 << TIM_SMCR_SMS_Pos);
-	// Interrupts disabled
-	TIM12->DIER = 0;
-	// OC1 mode PWM1, OC2 mode PWM2, preload enable
-	TIM12->CCMR1 = (0b110 << TIM_CCMR1_OC1M_Pos) | TIM_CCMR1_OC1PE_Msk |
-			(0b111 << TIM_CCMR1_OC2M_Pos) | TIM_CCMR1_OC2PE_Msk;
-	// No prescaler
-	TIM12->PSC = 0;
-	// Auto reload value
-	TIM12->ARR = 7;
-	// Output compare values
-	TIM12->CCR1 = 2;
-	TIM12->CCR2 = 6;
-	// Initialise registers
-	TIM12->EGR = TIM_EGR_UG_Msk;
-	// Reset counter
-	TIM12->CNT = 0;
-	// OC1/OC2 enable, active low
-	TIM12->CCER = TIM_CCER_CC1E_Msk | TIM_CCER_CC2E_Msk |
-			TIM_CCER_CC1P_Msk | TIM_CCER_CC2P_Msk;
-	// Enable timer
-	TIM12->CR1 |= TIM_CR1_CEN_Msk;
+#endif
 }
 
 static void base_rgb_init()
 {
+#if HWVER >= 0x0100
 	// Initialise RGB GPIOs
-	// RGB:	PA0(R), PA1(G), PA2(B)			| TIM5_CH123
+	// RGB:	R(PA9), G(PA10), B(PA11)		| TIM1_CH234
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+	// 10: Alternative function mode
+	GPIO_MODER(GPIOA, 9, 0b10);
+	GPIO_MODER(GPIOA, 10, 0b10);
+	GPIO_MODER(GPIOA, 11, 0b10);
+	// Output open drain
+	GPIO_OTYPER_OD(GPIOA, 9);
+	GPIO_OTYPER_OD(GPIOA, 10);
+	GPIO_OTYPER_OD(GPIOA, 11);
+	// Low speed (2~8MHz)
+	GPIO_OSPEEDR(GPIOA, 9, 0b00);
+	GPIO_OSPEEDR(GPIOA, 10, 0b00);
+	GPIO_OSPEEDR(GPIOA, 11, 0b00);
+	// AF1: Timer 1
+	GPIO_AFRH(GPIOA, 9, 1);
+	GPIO_AFRH(GPIOA, 10, 1);
+	GPIO_AFRH(GPIOA, 11, 1);
+
+	// Initialise RGB DMA (DMA2, Stream 6, Channel 0)
+	RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN_Msk;
+	// Clear DMA flags
+	DMA2->HIFCR = DMA_HIFCR_CTCIF6_Msk | DMA_HIFCR_CHTIF6_Msk |
+			DMA_HIFCR_CTEIF6_Msk | DMA_HIFCR_CDMEIF6_Msk |
+			DMA_HIFCR_CFEIF6_Msk;
+	// Memory to peripheral, circular, 16bit -> 16bit, low priority
+	STREAM->CR = (0ul << DMA_SxCR_CHSEL_Pos) | (0b00ul << DMA_SxCR_PL_Pos) |
+			(0b10ul << DMA_SxCR_MSIZE_Pos) | (0b10ul << DMA_SxCR_PSIZE_Pos) |
+			(0b01ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk | DMA_SxCR_CIRC_Msk;
+	// Peripheral address
+	STREAM->PAR = (uint32_t)&TIM1->DMAR;
+	// FIFO control
+	STREAM->FCR = DMA_SxFCR_DMDIS_Msk | (0b11ul << DMA_SxFCR_FTH_Pos);
+	// Memory address
+	STREAM->M0AR = (uint32_t)&colours[0][0];
+	// Number of data items
+	STREAM->NDTR = sizeof(colours) / sizeof(colours[0][0]);
+
+	// Initialise RGB timer
+	RCC->APB2ENR |= RCC_APB2ENR_TIM1EN_Msk;
+	// Auto reload buffered, centre-align mode 2, continuous
+	TIM1->CR1 = TIM_CR1_ARPE_Msk | TIM_CR1_URS_Msk | (2 << TIM_CR1_CMS_Pos);
+	// Update event as TRGO, DMA request with CCx event
+	TIM1->CR2 = (0b010 << TIM_CR2_MMS_Pos);
+	// Slave mode disabled
+	TIM1->SMCR = 0;
+	// Enable DMA request from OC1, disable interrupts
+	TIM1->DIER = TIM_DIER_CC1DE_Msk;
+	// OC1 mode PWM1, OC2 mode PWM1, preload enable
+	TIM1->CCMR1 = (0b110 << TIM_CCMR1_OC1M_Pos) | TIM_CCMR1_OC1PE_Msk |
+			(0b110 << TIM_CCMR1_OC2M_Pos) | TIM_CCMR1_OC2PE_Msk;
+	// OC3 mode PWM1, OC4 mode PWM1, preload enable
+	TIM1->CCMR2 = (0b110 << TIM_CCMR2_OC3M_Pos) | TIM_CCMR2_OC3PE_Msk |
+			(0b110 << TIM_CCMR2_OC4M_Pos) | TIM_CCMR2_OC4PE_Msk;
+	// Break function disable, output enable
+	TIM1->BDTR = TIM_BDTR_AOE_Msk | TIM_BDTR_MOE_Msk;
+	// DMA burst 3 transfers, from CCR2
+	TIM1->DCR = (2 << TIM_DCR_DBL_Pos) |
+			((&TIM5->CCR2 - &TIM5->CR1) << TIM_DCR_DBA_Pos);
+	// Input remap options
+	TIM1->OR = 0;
+	// Prescaler 120fps * 4 * 2 * (2^10) ~ 1MHz
+	TIM1->PSC = clkTimer(1) / 1000000ul - 1;
+	// Auto reload value 0x03ff (10bit)
+	TIM1->ARR = 0x03ff;
+	// Output compare values
+	TIM1->CCR2 = 0x01ff;
+	TIM1->CCR3 = 0x02ff;
+	TIM1->CCR4 = 0x03ff;
+	// Update values at next update event, when counter reaches 0
+	TIM1->CCR1 = 0x0000;
+	// Reset counter
+	TIM1->CNT = 0;
+	// Initialise registers
+	TIM1->EGR = TIM_EGR_UG_Msk;
+	// Clear interrupt mask
+	TIM1->SR = TIM_SR_UIF_Msk;
+	// OC2/OC3/OC4 enable, active low
+	TIM1->CCER = TIM_CCER_CC2E_Msk | TIM_CCER_CC3E_Msk | TIM_CCER_CC4E_Msk |
+			TIM_CCER_CC2P_Msk | TIM_CCER_CC3P_Msk | TIM_CCER_CC4P_Msk;
+	// Enable timer
+	TIM1->CR1 |= TIM_CR1_CEN_Msk;
+#else
+	// Initialise RGB GPIOs
+	// RGB:	R(PA0), G(PA1), B(PA2)			| TIM5_CH123
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 	// 10: Alternative function mode
 	GPIO_MODER(GPIOA, 0, 0b10);
@@ -127,17 +304,17 @@ static void base_rgb_init()
 			DMA_LIFCR_CTEIF1_Msk | DMA_LIFCR_CDMEIF1_Msk |
 			DMA_LIFCR_CFEIF1_Msk;
 	// Memory to peripheral, circular, 16bit -> 16bit, low priority
-	DMA1_Stream1->CR = (6ul << DMA_SxCR_CHSEL_Pos) | (0b00ul << DMA_SxCR_PL_Pos) |
+	STREAM->CR = (6ul << DMA_SxCR_CHSEL_Pos) | (0b00ul << DMA_SxCR_PL_Pos) |
 			(0b10ul << DMA_SxCR_MSIZE_Pos) | (0b10ul << DMA_SxCR_PSIZE_Pos) |
 			(0b01ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk | DMA_SxCR_CIRC_Msk;
 	// Peripheral address
-	DMA1_Stream1->PAR = (uint32_t)&TIM5->DMAR;
+	STREAM->PAR = (uint32_t)&TIM5->DMAR;
 	// FIFO control
-	DMA1_Stream1->FCR = DMA_SxFCR_DMDIS_Msk | (0b11ul << DMA_SxFCR_FTH_Pos);
+	STREAM->FCR = DMA_SxFCR_DMDIS_Msk | (0b11ul << DMA_SxFCR_FTH_Pos);
 	// Memory address
-	DMA1_Stream1->M0AR = (uint32_t)&colours[0][0];
+	STREAM->M0AR = (uint32_t)&colours[0][0];
 	// Number of data items
-	DMA1_Stream1->NDTR = sizeof(colours) / sizeof(colours[0][0]);
+	STREAM->NDTR = sizeof(colours) / sizeof(colours[0][0]);
 
 	// Initialise RGB timer
 	RCC->APB1ENR |= RCC_APB1ENR_TIM5EN_Msk;
@@ -181,9 +358,10 @@ static void base_rgb_init()
 			TIM_CCER_CC1P_Msk | TIM_CCER_CC2P_Msk | TIM_CCER_CC3P_Msk;
 	// Enable timer
 	TIM5->CR1 |= TIM_CR1_CEN_Msk;
+#endif
 
 	// Enable DMA stream
-	DMA1_Stream1->CR |= DMA_SxCR_EN_Msk;
+	STREAM->CR |= DMA_SxCR_EN_Msk;
 }
 
 void led_init()
@@ -191,10 +369,17 @@ void led_init()
 	static const colour_t clr[LED_NUM][3] = {
 		// Bottom-left, RGB
 		{0x3ff, 0, 0},
-		// Top-right, BRG
-		{0x3ff, 0, 0},
+#if HWVER >= 0x0100
+		// Top-left, RGB
+		{0, 0x3ff, 0},
+		// Top-right, RGB
+		{0, 0, 0x3ff},
+#else
 		// Top-left, BRG
 		{0, 0, 0x3ff},
+		// Top-right, BRG
+		{0x3ff, 0, 0},
+#endif
 		// Bottom-right, RGB
 		{0x3ff, 0x3ff, 0},
 	};
@@ -208,8 +393,8 @@ const void *led_info(uint8_t *num)
 {
 	static const uint8_t info[LED_NUM][2] = {
 		{Bottom | Left,		(3 << 4) | 10},
-		{Top | Right,		(3 << 4) | 10},
 		{Top | Left,		(3 << 4) | 10},
+		{Top | Right,		(3 << 4) | 10},
 		{Bottom | Right,	(3 << 4) | 10},
 	};
 	if (num)
@@ -226,6 +411,7 @@ void led_set(uint32_t i, uint32_t size, const uint16_t *c)
 	colour_t *p = &colours[i][0];
 	// Fix for out-of-order hardware connections
 	switch (i) {
+#if HWVER < 0x0100
 	case 1:
 	case 2: {
 		colour_t *b = p++;
@@ -234,6 +420,7 @@ void led_set(uint32_t i, uint32_t size, const uint16_t *c)
 		*b = *c++;
 		break;
 	}
+#endif
 	default:
 		*p++ = *c++;
 		*p++ = *c++;
@@ -251,6 +438,7 @@ void led_get(uint32_t i, uint32_t size, uint16_t *c)
 	colour_t *p = &colours[i][0];
 	// Fix for out-of-order hardware connections
 	switch (i) {
+#if HWVER < 0x0100
 	case 1:
 	case 2: {
 		uint16_t b = *p++;
@@ -259,6 +447,7 @@ void led_get(uint32_t i, uint32_t size, uint16_t *c)
 		*c++ = b;
 		break;
 	}
+#endif
 	default:
 		*c++ = *p++;
 		*c++ = *p++;
