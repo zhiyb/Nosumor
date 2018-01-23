@@ -223,6 +223,7 @@ Project {
             name: "System modules"
             files: [
                 "startup_stm32f722xx.S",
+                "system/dma.txt",
                 "system_stm32f7xx.c",
                 "system/clocks.c",
                 "system/clocks.h",

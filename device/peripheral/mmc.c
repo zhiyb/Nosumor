@@ -9,6 +9,11 @@
 #include "mmc.h"
 #include "mmc_defs.h"
 
+#if HWVER >= 0x0100
+#define GPIO	GPIOB
+#else
+#define GPIO	GPIOA
+#endif
 #define MMC	SDMMC1
 #define STREAM	DMA2_Stream3
 
@@ -61,16 +66,25 @@ static inline void mmc_base_init()
 		SYSCFG->CMPCR |= SYSCFG_CMPCR_CMP_PD;
 	}
 	// Initialise GPIOs
+#if HWVER >= 0x0100
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN_Msk |
+			RCC_AHB1ENR_GPIOCEN_Msk | RCC_AHB1ENR_GPIODEN_Msk;
+#else
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN_Msk |
 			RCC_AHB1ENR_GPIOCEN_Msk | RCC_AHB1ENR_GPIODEN_Msk;
-#if HWVER == 0x0002
-	// PA12, CD, input
-	GPIO_MODER(GPIOA, 12, 0b00);
-	GPIO_PUPDR(GPIOA, 12, GPIO_PUPDR_UP);
-#else
+#endif
+#if HWVER >= 0x0100
+	// PB14, CD, input
+	GPIO_MODER(GPIO, 14, 0b00);
+	GPIO_PUPDR(GPIO, 14, GPIO_PUPDR_UP);
+#elif HWVER == 0x0003
 	// PA15, CD, input
-	GPIO_MODER(GPIOA, 15, 0b00);
-	GPIO_PUPDR(GPIOA, 15, GPIO_PUPDR_UP);
+	GPIO_MODER(GPIO, 15, 0b00);
+	GPIO_PUPDR(GPIO, 15, GPIO_PUPDR_UP);
+#else
+	// PA12, CD, input
+	GPIO_MODER(GPIO, 12, 0b00);
+	GPIO_PUPDR(GPIO, 12, GPIO_PUPDR_UP);
 #endif
 	// PC8, D0, alternative function
 	GPIO_MODER(GPIOC, 8, 0b10);
@@ -111,7 +125,7 @@ static inline void mmc_base_init()
 	// Wait for IO compensation cell
 	while (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY));
 
-	// DMA initialisation
+	// DMA initialisation (DMA2, Stream 3, Channel 4)
 	RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN_Msk;
 	// Disable stream
 	STREAM->CR = 0ul;
@@ -129,16 +143,18 @@ static inline void mmc_base_init()
 static DSTATUS mmc_cd()
 {
 	// Switch opens when card inserted
-#if HWVER == 0x0002
-	uint32_t cd_mask = 1ul << 12;
-#else
+#if HWVER >= 0x0100
+	uint32_t cd_mask = 1ul << 14;
+#elif HWVER == 0x0003
 	uint32_t cd_mask = 1ul << 15;
+#else
+	uint32_t cd_mask = 1ul << 12;
 #endif
 	// Debouncing
-	if ((GPIOA->IDR & cd_mask) && (stat & STA_NODISK))
+	if ((GPIO->IDR & cd_mask) && (stat & STA_NODISK))
 		systick_delay(10);
 
-	if (GPIOA->IDR & cd_mask) {
+	if (GPIO->IDR & cd_mask) {
 		if (stat & STA_NODISK)
 			mmc_reset(stat & ~STA_NODISK);
 		return stat;
@@ -671,7 +687,7 @@ static uint32_t scsi_read_start(void *p, uint32_t offset, uint32_t size)
 
 	if (mmc_read_prepare() != 0)
 		return 0;
-	if (mmc_data(scsi_buffer(0), size) != size)
+	if (mmc_data(buf, size) != size)
 		return 0;
 	if (mmc_read_start(offset, size) != size)
 		return 0;
