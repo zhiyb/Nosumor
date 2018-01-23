@@ -9,25 +9,33 @@
 #include <usb/hid/usb_hid.h>
 #include "keyboard.h"
 
-// KEY_12:	PA6(K1), PB2(K2)
-// KEY_345:	PC13(K3), PC14(K4), PC15(K5)
-
 // Debouncing time (SysTick counts)
 #define KEYBOARD_DEBOUNCING	5
 
+#if HWVER >= 0x0100
+// KEY_12:	K1(PB4), K2(PB2)
+// KEY_345:	K3(PC13), K4(PC14), K5(PC15)
+#define KEYBOARD_Msk	((1ul << 2) | (1ul << 4) | (1ul << 13) | (1ul << 14) | (1ul << 15))
+
+const uint32_t keyboard_masks[KEYBOARD_KEYS] = {
+	1ul << 4, 1ul << 2, 1ul << 13, 1ul << 14, 1ul << 15
+};
+#else
+// KEY_12:	K1(PA6), K2(PB2)
+// KEY_345:	K3(PC13), K4(PC14), K5(PC15)
 #define KEYBOARD_Msk	((1ul << 2) | (1ul << 6) | (1ul << 13) | (1ul << 14) | (1ul << 15))
 
 const uint32_t keyboard_masks[KEYBOARD_KEYS] = {
-	1ul << 2, 1ul << 6, 1ul << 13, 1ul << 14, 1ul << 15
+	1ul << 6, 1ul << 2, 1ul << 13, 1ul << 14, 1ul << 15
 };
+#endif
 
 uint8_t keycodes[KEYBOARD_KEYS] = {
-	// x,    z,    c,    ~,  ESC
-	0x1b, 0x1d, 0x06, 0x35, 0x29,
+	// z,    x,    c,    ~,  ESC
+	0x1d, 0x1b, 0x06, 0x35, 0x29,
 };
 
-usb_hid_if_t *hid = 0;
-
+static usb_hid_if_t *hid = 0;
 static volatile uint32_t status, debouncing, timeout[KEYBOARD_KEYS];
 
 static uint32_t keyboard_gpio_status();
@@ -38,10 +46,17 @@ void keyboard_init(usb_hid_if_t *hid_keyboard)
 	hid = hid_keyboard;
 
 	// Initialise GPIOs
+#if HWVER >= 0x0100
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN;
+	// PB4
+	GPIO_MODER(GPIOB, 4, 0b00);	// 00: Input mode
+	GPIO_PUPDR(GPIOB, 4, GPIO_PUPDR_UP);
+#else
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN;
 	// PA6
 	GPIO_MODER(GPIOA, 6, 0b00);	// 00: Input mode
 	GPIO_PUPDR(GPIOA, 6, GPIO_PUPDR_UP);
+#endif
 	// PB2
 	GPIO_MODER(GPIOB, 2, 0b00);
 	GPIO_PUPDR(GPIOB, 2, GPIO_PUPDR_UP);
@@ -55,7 +70,11 @@ void keyboard_init(usb_hid_if_t *hid_keyboard)
 
 	// Setup interrupts
 	RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN_Msk;
+#if HWVER >= 0x0100
+	exticr_exti(4, EXTICR_EXTI_PB);
+#else
 	exticr_exti(6, EXTICR_EXTI_PA);
+#endif
 	exticr_exti(2, EXTICR_EXTI_PB);
 	exticr_exti(13, EXTICR_EXTI_PC);
 	exticr_exti(14, EXTICR_EXTI_PC);
@@ -74,12 +93,18 @@ void keyboard_init(usb_hid_if_t *hid_keyboard)
 	uint32_t pg = NVIC_GetPriorityGrouping();
 	NVIC_SetPriority(EXTI2_IRQn,
 			 NVIC_EncodePriority(pg, NVIC_PRIORITY_KEYBOARD, 0));
+	NVIC_EnableIRQ(EXTI2_IRQn);
+#if HWVER >= 0x0100
+	NVIC_SetPriority(EXTI4_IRQn,
+			 NVIC_EncodePriority(pg, NVIC_PRIORITY_KEYBOARD, 1));
+	NVIC_EnableIRQ(EXTI4_IRQn);
+#else
 	NVIC_SetPriority(EXTI9_5_IRQn,
 			 NVIC_EncodePriority(pg, NVIC_PRIORITY_KEYBOARD, 1));
+	NVIC_EnableIRQ(EXTI9_5_IRQn);
+#endif
 	NVIC_SetPriority(EXTI15_10_IRQn,
 			 NVIC_EncodePriority(pg, NVIC_PRIORITY_KEYBOARD, 2));
-	NVIC_EnableIRQ(EXTI2_IRQn);
-	NVIC_EnableIRQ(EXTI9_5_IRQn);
 	NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 	// Register debouncing tick
@@ -89,7 +114,11 @@ void keyboard_init(usb_hid_if_t *hid_keyboard)
 static uint32_t keyboard_gpio_status()
 {
 	uint32_t stat = ~KEYBOARD_Msk;
+#if HWVER >= 0x0100
+	stat |= GPIOB->IDR & GPIO_IDR_IDR_4;
+#else
 	stat |= GPIOA->IDR & GPIO_IDR_IDR_6;
+#endif
 	stat |= GPIOB->IDR & GPIO_IDR_IDR_2;
 	stat |= GPIOC->IDR & GPIO_IDR_IDR_13;
 	stat |= GPIOC->IDR & GPIO_IDR_IDR_14;
@@ -119,17 +148,9 @@ void keyboard_update(uint32_t status)
 
 static void keyboard_irq()
 {
-	// Mutual exclusion interrupt
-	__disable_irq();
 	uint32_t irq = EXTI->PR & KEYBOARD_Msk;
-	if (!irq) {
-		__enable_irq();
+	if (!irq)
 		return;
-	}
-	NVIC_DisableIRQ(EXTI2_IRQn);
-	NVIC_DisableIRQ(EXTI9_5_IRQn);
-	NVIC_DisableIRQ(EXTI15_10_IRQn);
-	__enable_irq();
 	// Disable interrupt triggers for debouncing
 	EXTI->RTSR &= ~irq;
 	EXTI->FTSR &= ~irq;
@@ -138,10 +159,6 @@ static void keyboard_irq()
 	// IRQ should be different from here even if reentrant
 	status ^= irq;
 	keyboard_update(status);
-	// Critical section end
-	NVIC_EnableIRQ(EXTI2_IRQn);
-	NVIC_EnableIRQ(EXTI9_5_IRQn);
-	NVIC_EnableIRQ(EXTI15_10_IRQn);
 	// Debouncing setup
 	debouncing |= irq;
 	// Timeout value for debouncing
@@ -153,7 +170,11 @@ static void keyboard_irq()
 }
 
 void EXTI2_IRQHandler() __attribute__((alias("keyboard_irq")));
+#if HWVER >= 0x0100
+void EXTI4_IRQHandler() __attribute__((alias("keyboard_irq")));
+#else
 void EXTI9_5_IRQHandler() __attribute__((alias("keyboard_irq")));
+#endif
 void EXTI15_10_IRQHandler() __attribute__((alias("keyboard_irq")));
 
 static void keyboard_tick(uint32_t tick)
