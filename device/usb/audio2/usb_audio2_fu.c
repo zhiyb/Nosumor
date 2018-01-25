@@ -75,6 +75,7 @@ int usb_audio2_fu_set(usb_audio_t *audio, usb_audio_entity_t *entity, setup_t pk
 		default:
 			dbgbkpt();
 		}
+		break;
 	case FU_VOLUME_CONTROL:
 		// Layout 2 parameter block
 		if (cn > data->channels) {

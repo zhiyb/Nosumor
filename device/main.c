@@ -83,9 +83,7 @@ static inline void usart6_init()
 
 static inline void init()
 {
-#ifndef BOOTLOADER
 	bootloader_check();
-#endif
 	SCB_EnableICache();
 	SCB_EnableDCache();
 	rcc_init();
@@ -93,9 +91,7 @@ static inline void init()
 	__enable_irq();
 	systick_init(1000);
 	usart6_init();
-#ifndef BOOTLOADER
 	pvd_init();
-#endif
 
 	puts(ESC_BOOT VARIANT " build @ " __DATE__ " " __TIME__);
 	printf(ESC_INFO "Core clock: " ESC_DATA "%lu\n", clkAHB());
@@ -110,11 +106,9 @@ static inline void init()
 	while (usb_mode(&usb) != 0);
 	usb_init_device(&usb);
 
-#ifndef BOOTLOADER
 	puts(ESC_INIT "Initialising audio...");
 	usb_audio_t *audio = usb_audio2_init(&usb);
 	audio_init(&usb, audio);
-#endif
 
 	puts(ESC_INIT "Initialising USB HID interface...");
 	usb_hid_t *hid = usb_hid_init(&usb);
@@ -323,7 +317,7 @@ loop:	;
 		prev.tick = tick;
 	}
 #endif
-#ifndef DEBUG
+#if 0
 	__WFI();
 #endif
 	goto loop;

@@ -6,7 +6,7 @@ Project {
 
     property string device: "STM32F722"
     property bool cmsis_dsp: false
-    property int hwver: 0x0003
+    property int hwver: 0x0100
 
     references: ["CMSIS"]
 

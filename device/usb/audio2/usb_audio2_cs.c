@@ -76,6 +76,7 @@ int usb_audio2_cs_set(usb_audio_t *audio, usb_audio_entity_t *entity, setup_t pk
 		default:
 			dbgbkpt();
 		}
+		break;
 	default:
 		dbgbkpt();
 	}
