@@ -12,23 +12,17 @@
 // Debouncing time (SysTick counts)
 #define KEYBOARD_DEBOUNCING	5
 
-#if HWVER >= 0x0100
-// KEY_12:	K1(PB4), K2(PB2)
-// KEY_345:	K3(PC13), K4(PC14), K5(PC15)
-#define KEYBOARD_Msk	((1ul << 2) | (1ul << 4) | (1ul << 13) | (1ul << 14) | (1ul << 15))
-
-const uint32_t keyboard_masks[KEYBOARD_KEYS] = {
-	1ul << 4, 1ul << 2, 1ul << 13, 1ul << 14, 1ul << 15
-};
-#else
-// KEY_12:	K1(PA6), K2(PB2)
-// KEY_345:	K3(PC13), K4(PC14), K5(PC15)
-#define KEYBOARD_Msk	((1ul << 2) | (1ul << 6) | (1ul << 13) | (1ul << 14) | (1ul << 15))
-
-const uint32_t keyboard_masks[KEYBOARD_KEYS] = {
-	1ul << 6, 1ul << 2, 1ul << 13, 1ul << 14, 1ul << 15
-};
+#if KEYBOARD_KEYS != 5
+#error Unsupported keyboard key count
 #endif
+
+#define KEYBOARD_Msk	(KEYBOARD_MASK_1 | KEYBOARD_MASK_2 | \
+	KEYBOARD_MASK_3 | KEYBOARD_MASK_4 | KEYBOARD_MASK_5)
+
+const uint32_t keyboard_masks[KEYBOARD_KEYS] = {
+	KEYBOARD_MASK_1, KEYBOARD_MASK_2, KEYBOARD_MASK_3,
+	KEYBOARD_MASK_4, KEYBOARD_MASK_5,
+};
 
 uint8_t keycodes[KEYBOARD_KEYS] = {
 	// z,    x,    c,    ~,  ESC
