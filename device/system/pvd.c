@@ -9,8 +9,8 @@ extern usb_t usb;
 void pvd_init()
 {
 	RCC->APB1ENR |= RCC_APB1ENR_PWREN_Msk;
-	// PVD level: 2.9V
-	PWR->CR1 = (PWR->CR1 & ~(PWR_CR1_PLS_Msk)) | (0b111 << PWR_CR1_PLS_Pos);
+	// PVD level: 2.8V
+	PWR->CR1 = (PWR->CR1 & ~(PWR_CR1_PLS_Msk)) | (0b110 << PWR_CR1_PLS_Pos);
 	// Enable programmable voltage detector
 	PWR->CR1 |= PWR_CR1_PVDE_Msk;
 	// Setup interrupts

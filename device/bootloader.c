@@ -113,7 +113,7 @@ static inline void init()
 	puts(ESC_INIT "Initialising FatFs for flash...");
 	if (flash_fatfs_init(FLASH_CONF, 0))
 		dbgbkpt();
-	if (flash_fatfs_init(FLASH_APP, 1))
+	if (flash_fatfs_init(FLASH_APP, 0))
 		dbgbkpt();
 
 	puts(ESC_INIT "Initialising USB mass storage...");
@@ -130,9 +130,7 @@ int main()
 {
 	init();
 
-loop:	;
-	uint32_t s = keyboard_status();
-
+loop:
 	// Process time consuming tasks
 	usb_process(&usb);
 	usb_msc_process(&usb, usb_msc);

@@ -1,5 +1,5 @@
-#ifndef RGB_H
-#define RGB_H
+#ifndef LED_H
+#define LED_H
 
 #include <stdint.h>
 
@@ -12,4 +12,4 @@ const void *led_info(uint8_t *num);
 void led_set(uint32_t i, uint32_t size, const uint16_t *c);
 void led_get(uint32_t i, uint32_t size, uint16_t *c);
 
-#endif // RGB_H
+#endif // LED_H
