@@ -241,6 +241,8 @@ Project {
         Group {
             name: "Logic modules"
             files: [
+                "logic/led_trigger.c",
+                "logic/led_trigger.h",
                 "vendor_defs.h",
                 "logic/vendor.h",
                 "logic/syscalls.c",

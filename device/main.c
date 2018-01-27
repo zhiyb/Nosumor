@@ -33,6 +33,7 @@
 #include "fatfs/ff.h"
 // Processing functions
 #include "logic/vendor.h"
+#include "logic/led_trigger.h"
 
 #define BOOTLOADER_BASE	0x00260000
 #define BOOTLOADER_FUNC	((void (*)())*(uint32_t *)(BOOTLOADER_BASE + 4u))
@@ -188,14 +189,11 @@ static inline void fatfs_test()
 int main()
 {
 	init();
-#ifndef BOOTLOADER
 #ifdef DEBUG
 	fatfs_test();
 #endif
-#endif
 
 #ifdef DEBUG
-	uint32_t mask = keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4];
 	struct {
 		uint32_t tick, audio, data, feedback, blocks, heap, usbram;
 	} cur, diff, prev = {
@@ -204,55 +202,17 @@ int main()
 		mmc_statistics(), 0, 0,
 	};
 #endif
-loop:	;
-	uint32_t s = keyboard_status();
-#if 0
-	int up = s & (keyboard_masks[0] | keyboard_masks[1]);
-	if (up)
-		GPIOA->ODR |= GPIO_ODR_ODR_10 | GPIO_ODR_ODR_11;
-	else
-		GPIOA->ODR &= ~(GPIO_ODR_ODR_10 | GPIO_ODR_ODR_11);
-	if (s & keyboard_masks[0])
-		GPIOB->ODR &= ~GPIO_ODR_ODR_15;
-	else
-		GPIOB->ODR |= GPIO_ODR_ODR_15;
-	if (s & keyboard_masks[1])
-		GPIOB->ODR &= ~GPIO_ODR_ODR_14;
-	else
-		GPIOB->ODR |= GPIO_ODR_ODR_14;
-	int down = s & (keyboard_masks[2] | keyboard_masks[3] | keyboard_masks[4]);
-	if (up && !down) {
-		GPIOA->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_2 | GPIO_ODR_ODR_1);
-	} else {
-		if (s & keyboard_masks[2])
-			GPIOA->ODR &= ~GPIO_ODR_ODR_0;
-		else
-			GPIOA->ODR |= GPIO_ODR_ODR_0;
-		if (s & keyboard_masks[3])
-			GPIOA->ODR &= ~GPIO_ODR_ODR_2;
-		else
-			GPIOA->ODR |= GPIO_ODR_ODR_2;
-		if (s & keyboard_masks[4])
-			GPIOA->ODR &= ~GPIO_ODR_ODR_1;
-		else
-			GPIOA->ODR |= GPIO_ODR_ODR_1;
-	}
-#endif
 
+loop:
 	// Process time consuming tasks
 	usb_process(&usb);
 	usb_msc_process(&usb, usb_msc);
 	usb_hid_vendor_process(usb_hid_vendor, &vendor_process);
 	audio_process();
+	led_trigger_process();
 	fflush(stdout);
 
 #ifdef DEBUG
-	if ((s & mask) == mask) {
-		usb_connect(&usb, 0);
-		while (keyboard_status());
-		usb_connect(&usb, 1);
-	}
-
 	// Every 1024 systick ticks
 	cur.tick = systick_cnt();
 	if ((cur.tick - prev.tick) & ~(1023ul)) {
@@ -318,7 +278,7 @@ loop:	;
 	}
 #endif
 #if 0
-	__WFI();
+	__WFE();
 #endif
 	goto loop;
 	return 0;
