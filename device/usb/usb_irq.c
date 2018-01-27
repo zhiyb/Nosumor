@@ -110,6 +110,7 @@ void OTG_HS_IRQHandler()
 	i &= base->GINTMSK;
 	if (!i)
 		return;
+	usb->active++;
 	if (i & (USB_OTG_GINTSTS_OEPINT_Msk | USB_OTG_GINTSTS_IEPINT_Msk)) {
 		usb_endpoint_irq(usb);
 		bk = 0;

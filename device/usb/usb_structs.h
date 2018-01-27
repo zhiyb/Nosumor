@@ -59,6 +59,8 @@ typedef struct usb_t {
 	USB_OTG_GlobalTypeDef *base;
 	usb_speed_t speed;
 	usb_status_t status;
+	volatile uint32_t active;
+	uint32_t act;
 	// USB RAM & FIFO allocation
 	struct {
 		uint32_t top, max;

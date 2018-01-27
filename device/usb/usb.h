@@ -14,6 +14,7 @@ int usb_mode(usb_t *usb);	// 0: Device; 1: Host
 void usb_init_device(usb_t *usb);
 void usb_connect(usb_t *usb, int e);
 void usb_process(usb_t *usb);
+uint32_t usb_active(usb_t *usb);
 
 #ifdef __cplusplus
 }

@@ -170,3 +170,11 @@ void usb_process(usb_t *usb)
 {
 	usb_ep0_process(usb);
 }
+
+uint32_t usb_active(usb_t *usb)
+{
+	uint32_t active = usb->active;
+	uint32_t act = active != usb->act;
+	usb->act = active;
+	return act;
+}
