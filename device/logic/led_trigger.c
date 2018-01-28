@@ -8,7 +8,10 @@
 #include <peripheral/led.h>
 #include "led_trigger.h"
 
+#define CHANNELS	4
+
 #define NUM_TRIGGERS	(sizeof(triggers) / sizeof(triggers[0]))
+#define NUM_CHANNELS	(sizeof(nodes[0].config) / sizeof(nodes[0].config[0]))
 #define NUM_NODES	(sizeof(nodes) / sizeof(nodes[0]))
 
 struct node_t;
@@ -21,17 +24,17 @@ struct trigger_t {
 	void *data;
 	uint8_t channels;
 	const uint16_t *(*value)(const struct trigger_t *tp,
-				 const struct node_t *np);
+				 const struct node_t *np, int ch);
 };
 
 static const uint16_t *trigger_constant(const struct trigger_t *tp,
-					const struct node_t *np);
+					const struct node_t *np, int ch);
 static const uint16_t *trigger_keyboard(const struct trigger_t *tp,
-					const struct node_t *np);
+					const struct node_t *np, int ch);
 static const uint16_t *trigger_breath(const struct trigger_t *tp,
-				     const struct node_t *np);
+				     const struct node_t *np, int ch);
 static const uint16_t *trigger_usb(const struct trigger_t *tp,
-				   const struct node_t *np);
+				   const struct node_t *np, int ch);
 
 enum {TGConstant, TGKL, TGKR, TGK1, TGK2, TGK3, TGUSB, TGBreath};
 static const struct trigger_t triggers[] = {
@@ -50,12 +53,12 @@ static const struct trigger_t triggers[] = {
 
 /* Slave node definitions */
 
-enum config_t {Not = 0x80, Or = 0x40, And = 0x00, Trigger = 0x3f};
+enum config_t {Inv = 0x80, Max = 0x00, Min = 0x40, Trigger = 0x3f};
 
 struct node_t {
 	void *data;
 	uint8_t channels;
-	uint8_t config[NUM_TRIGGERS];
+	uint8_t config[CHANNELS][NUM_TRIGGERS];
 	void (*set)(struct node_t *p, uint16_t *v);
 };
 
@@ -65,44 +68,49 @@ static struct node_t nodes[] = {
 #if LED_NUM != 4
 #error Unsupported LED count
 #endif
-	{(void *)1, 3, {And | TGKL, Or | TGUSB, 0}, node_led_set},
-	{(void *)2, 3, {And | TGKR, Or | TGUSB, 0}, node_led_set},
-	{(void *)0, 3, {And | TGBreath, Or | TGK1, Or | TGK2, 0}, node_led_set},
-	{(void *)3, 3, {And | TGBreath, Or | TGK3, Or | TGK2, 0}, node_led_set},
+	{(void *)1, 3, {{Max | TGKL, Min | 0}, {0}}, node_led_set},
+	{(void *)2, 3, {{Max | TGKR, Min | 0}, {0}}, node_led_set},
+	{(void *)0, 3, {{Max | TGBreath, Max | TGK1, Max | TGK2, Min | 0},
+			{Max | TGUSB, Min | 0}, {0}}, node_led_set},
+	{(void *)3, 3, {{Max | TGBreath, Max | TGK3, Max | TGK2, Min | 0},
+			{Max | TGUSB, Min | 0}, {0}}, node_led_set},
 };
 
 /* Common functions */
 
-static void trigger_calc(struct node_t *np, uint16_t *v)
+static uint16_t mix(uint16_t a, uint16_t b, uint8_t c)
 {
-	// Initial value: All 1s
-	uint16_t *p = v;
-	uint32_t i = np->channels;
-	while (i--)
-		*p++ = 0xffff;
+	b ^= (c & Inv) ? 0xffff : 0x0000;
+	return (((c & (Min | Max)) == Max) ^ (b < a)) ? b : a;
+}
 
-	uint8_t *cp = np->config;
+static void calc(struct node_t *np, int ch, uint16_t *v)
+{
+	// Initial values
+	uint16_t *p = v;
+	uint8_t *cp = np->config[ch];
+	uint32_t i = np->channels;
+	if ((*cp & (Min | Max)) == Max)
+		for (; i--; *p++ = 0x0000);
+	else
+		for (; i--; *p++ = 0xffff);
+
 	for (i = NUM_TRIGGERS; i--; cp++) {
 		uint8_t c = *cp;
-		uint16_t mask = (c & Not) ? 0xffff : 0x0000;;
-		uint32_t min = (c & (And | Or)) == And;
 		const struct trigger_t *tp = &triggers[c & Trigger];
-		const uint16_t *vp = tp->value(tp, np);
+		const uint16_t *vp = tp->value(tp, np, ch);
 		p = v;
 		if (tp->channels == 0) {
-			uint16_t v = mask ^ (vp ? 0xffff : 0x0000);
+			uint16_t v = vp ? 0xffff : 0x0000;
 			for (i = np->channels; i--; p++)
-				*p = (!min ^ !(*p < v)) ? v : *p;
+				*p = mix(*p, v, c);
 		} else if (tp->channels < np->channels) {
 			// Only take the first channel
-			uint16_t v = mask ^ *vp;
 			for (i = np->channels; i--; p++)
-				*p = (!min ^ !(*p < v)) ? v : *p;
+				*p = mix(*p, *vp, c);
 		} else {
-			for (i = np->channels; i--; p++) {
-				uint16_t v = mask ^ *vp++;
-				*p = (!min ^ !(*p < v)) ? v : *p;
-			}
+			for (i = np->channels; i--; p++)
+				*p = mix(*p, *vp++, c);
 		}
 		// Finish if reached trigger 0 (constants)
 		if ((c & Trigger) == 0)
@@ -116,7 +124,17 @@ void led_trigger_process()
 	while (n--) {
 		struct node_t *np = &nodes[n];
 		uint16_t v[np->channels];
-		trigger_calc(np, v);
+		calc(np, 0, v);
+		uint32_t ch;
+		for (ch = 1; ch != NUM_CHANNELS; ch++) {
+			uint16_t vt[np->channels];
+			calc(np, ch, vt);
+			uint16_t *vp = v, *vtp = vt;
+			uint8_t c = np->config[ch][0] & ~Inv;
+			uint32_t i;
+			for (i = np->channels; i--; vp++, vtp++)
+				*vp = mix(*vp, *vtp, c);
+		}
 		np->set(np, v);
 	}
 	frame++;
@@ -124,26 +142,25 @@ void led_trigger_process()
 
 /* Trigger functions */
 
+static uint16_t trigger_constant_data[NUM_CHANNELS][NUM_NODES][3] = {
+	{{0x3ff, 0, 0}, {0, 0x3ff, 0}, {0, 0, 0x3ff}, {0x3ff, 0x3ff, 0}},
+	{{0, 0, 0x3ff}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0x3ff}},
+};
+
 static const uint16_t *trigger_constant(const struct trigger_t *tp,
-					const struct node_t *np)
+					const struct node_t *np, int ch)
 {
-	static uint16_t trigger_constant_data[NUM_NODES][3] = {
-		{0x3ff, 0, 0},
-		{0, 0x3ff, 0},
-		{0, 0, 0x3ff},
-		{0x3ff, 0x3ff, 0},
-	};
-	return trigger_constant_data[(uint32_t)np->data];
+	return trigger_constant_data[ch][(uint32_t)np->data];
 }
 
 static const uint16_t *trigger_keyboard(const struct trigger_t *tp,
-					const struct node_t *np)
+					const struct node_t *np, int ch)
 {
 	return (void *)(keyboard_status() & keyboard_masks[(uint32_t)tp->data]);
 }
 
 static const uint16_t *trigger_breath(const struct trigger_t *tp,
-				     const struct node_t *np)
+				     const struct node_t *np, int ch)
 {
 	// http://sean.voisen.org/blog/2011/10/breathing-led-with-arduino/
 	static uint32_t tick = 0, fn = -1;
@@ -162,7 +179,7 @@ static const uint16_t *trigger_breath(const struct trigger_t *tp,
 }
 
 static const uint16_t *trigger_usb(const struct trigger_t *tp,
-				   const struct node_t *np)
+				   const struct node_t *np, int ch)
 {
 	static uint32_t tick = 0, fn = -1, active = 0;
 	extern usb_t usb;
