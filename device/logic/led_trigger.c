@@ -1,6 +1,7 @@
 #include <stm32f7xx.h>
 #include <stdint.h>
 #include <string.h>
+#include <math.h>
 #include <debug.h>
 #include <system/systick.h>
 #include <peripheral/keyboard.h>
@@ -27,10 +28,12 @@ static const uint16_t *trigger_constant(const struct trigger_t *tp,
 					const struct node_t *np);
 static const uint16_t *trigger_keyboard(const struct trigger_t *tp,
 					const struct node_t *np);
+static const uint16_t *trigger_breath(const struct trigger_t *tp,
+				     const struct node_t *np);
 static const uint16_t *trigger_usb(const struct trigger_t *tp,
 				   const struct node_t *np);
 
-enum {TGConstant, TGKL, TGKR, TGK1, TGK2, TGK3, TGUSB};
+enum {TGConstant, TGKL, TGKR, TGK1, TGK2, TGK3, TGUSB, TGBreath};
 static const struct trigger_t triggers[] = {
 #if KEYBOARD_KEYS != 5
 #error Unsupported keyboard key count
@@ -42,6 +45,7 @@ static const struct trigger_t triggers[] = {
 	{(void *)3, 0, trigger_keyboard},
 	{(void *)4, 0, trigger_keyboard},
 	{(void *)0, 0, trigger_usb},
+	{(void *)0, 1, trigger_breath},
 };
 
 /* Slave node definitions */
@@ -61,10 +65,10 @@ static struct node_t nodes[] = {
 #if LED_NUM != 4
 #error Unsupported LED count
 #endif
-	{(void *)1, 3, {And | TGKL, 0}, node_led_set},
-	{(void *)2, 3, {And | TGKR, 0}, node_led_set},
-	{(void *)0, 3, {And | TGK1, Or | TGK2, Or | TGUSB, 0}, node_led_set},
-	{(void *)3, 3, {And | TGK3, Or | TGK2, Or | TGUSB, 0}, node_led_set},
+	{(void *)1, 3, {And | TGKL, Or | TGUSB, 0}, node_led_set},
+	{(void *)2, 3, {And | TGKR, Or | TGUSB, 0}, node_led_set},
+	{(void *)0, 3, {And | TGBreath, Or | TGK1, Or | TGK2, 0}, node_led_set},
+	{(void *)3, 3, {And | TGBreath, Or | TGK3, Or | TGK2, 0}, node_led_set},
 };
 
 /* Common functions */
@@ -136,6 +140,25 @@ static const uint16_t *trigger_keyboard(const struct trigger_t *tp,
 					const struct node_t *np)
 {
 	return (void *)(keyboard_status() & keyboard_masks[(uint32_t)tp->data]);
+}
+
+static const uint16_t *trigger_breath(const struct trigger_t *tp,
+				     const struct node_t *np)
+{
+	// http://sean.voisen.org/blog/2011/10/breathing-led-with-arduino/
+	static uint32_t tick = 0, fn = -1;
+	static uint16_t level = 0;
+	// Update on frame updates
+	if (fn != frame) {
+		fn = frame;
+		// Update every 1 ms
+		if (tick != systick_cnt()) {
+			// (e^(sin(x)+1)-1)/(e^2-1)
+			level = (exp(sin((float)systick_cnt() * M_PI / 2000.0)
+				     + 1.0) - 1.0) / (exp(2.0) - 1.0) * 1023;
+		}
+	}
+	return &level;
 }
 
 static const uint16_t *trigger_usb(const struct trigger_t *tp,
