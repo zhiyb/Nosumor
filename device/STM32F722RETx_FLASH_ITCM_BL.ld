@@ -1,52 +1,27 @@
-/*
-*****************************************************************************
-**
-
-**  File        : LinkerScript.ld
-**
-**  Abstract    : Linker script for STM32F722ZETx Device with
-**                512KByte FLASH, 256KByte RAM
-**
-**                Set heap size, stack size and stack location according
-**                to application requirements.
-**
-**                Set memory bank area and size if external memory is used.
-**
-**  Target      : STMicroelectronics STM32
-**
-**
-**  Distribution: The file is distributed as is, without any warranty
-**                of any kind.
-**
-**  (c)Copyright Ac6.
-**  You may use this file as-is or modify it according to the needs of your
-**  project. Distribution of this file (unmodified or modified) is not
-**  permitted. Ac6 permit registered System Workbench for MCU users the
-**  rights to distribute the assembled, compiled & linked contents of this
-**  file as part of an application binary file, provided that it is built
-**  using the System Workbench for MCU toolchain.
-**
-*****************************************************************************
-*/
-
 /* Entry Point */
 ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
-_estack = 0x20040000;       /* end of RAM */
-__heap_end__ = 0x20010000;  /* end of DTCM */
-/* Generate a link error if heap and stack don't fit into RAM */
-_Min_Heap_Size = 0x400;      /* required amount of heap  */
-_Min_Stack_Size = 0x1000; /* required amount of stack */
+_estack = ORIGIN(RAM) + LENGTH(RAM);       /* end of RAM */
+__heap_end__ = ORIGIN(DTCM) + LENGTH(DTCM);  /* end of DTCM */
+
+/* Flash disk regions */
+__app_start__	= ORIGIN(APP);
+__app_end__	= ORIGIN(APP) + LENGTH(APP);
+__conf_start__	= ORIGIN(CONF);
+__conf_end__	= ORIGIN(CONF) + LENGTH(CONF);
 
 /* Specify the memory areas */
 MEMORY
 {
-    IRAM (xrw)      : ORIGIN = 0x00000000, LENGTH = 16k
-    DTCM (xrw)      : ORIGIN = 0x20000000, LENGTH = 64k
-    RAM (xrw)       : ORIGIN = 0x20010000, LENGTH = 192k
-    FLASH (rx)      : ORIGIN = 0x00200000, LENGTH = 512k
-    BL_FLASH (rx)   : ORIGIN = 0x00260000, LENGTH = 128k
+    IRAM (xrw)  : ORIGIN = 0x00000000, LENGTH = 16k
+    DTCM (xrw)  : ORIGIN = 0x20000000, LENGTH = 64k
+    RAM (xrw)   : ORIGIN = 0x20010000, LENGTH = 192k
+
+    BOOT (xr)	: ORIGIN = 0x00200000, LENGTH = 16k
+    CONF (rw)	: ORIGIN = 0x00204000, LENGTH = 48k
+    LOADER (xr)	: ORIGIN = 0x00210000, LENGTH = 64k
+    APP (xr)	: ORIGIN = 0x00220000, LENGTH = 384k
 }
 
 /* Define output sections */
@@ -58,7 +33,7 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
-  } >BL_FLASH
+  } >BOOT
 
   /* The program code and other data goes into FLASH */
   .text :
@@ -75,7 +50,7 @@ SECTIONS
 
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
-  } >BL_FLASH
+  } >LOADER
 
   /* Constant data goes into FLASH */
   .rodata :
@@ -84,35 +59,35 @@ SECTIONS
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);
-  } >BL_FLASH
+  } >LOADER
 
-  .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >FLASH
+  .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >LOADER
   .ARM : {
     __exidx_start = .;
     *(.ARM.exidx*)
     __exidx_end = .;
-  } >BL_FLASH
+  } >LOADER
 
   .preinit_array     :
   {
     PROVIDE_HIDDEN (__preinit_array_start = .);
     KEEP (*(.preinit_array*))
     PROVIDE_HIDDEN (__preinit_array_end = .);
-  } >BL_FLASH
+  } >LOADER
   .init_array :
   {
     PROVIDE_HIDDEN (__init_array_start = .);
     KEEP (*(SORT(.init_array.*)))
     KEEP (*(.init_array*))
     PROVIDE_HIDDEN (__init_array_end = .);
-  } >BL_FLASH
+  } >LOADER
   .fini_array :
   {
     PROVIDE_HIDDEN (__fini_array_start = .);
     KEEP (*(SORT(.fini_array.*)))
     KEEP (*(.fini_array*))
     PROVIDE_HIDDEN (__fini_array_end = .);
-  } >BL_FLASH
+  } >LOADER
 
   /* Code segments in ITCM RAM */
   _siiram = LOADADDR(.iram);
@@ -125,10 +100,10 @@ SECTIONS
 
     . = ALIGN(4);
     _eiram = .;
-  } >IRAM AT >BL_FLASH
+  } >IRAM AT >LOADER
 
   /* Special RAM sections */
-  .dtcm :
+  .dtcm (NOLOAD) :
   {
     . = ALIGN(4);
     *(.dtcm)
@@ -154,7 +129,7 @@ SECTIONS
 
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
-  } >RAM AT >BL_FLASH
+  } >RAM AT >LOADER
 
 
   /* Uninitialized data section */
@@ -173,26 +148,6 @@ SECTIONS
     __bss_end__ = _ebss;
   } >RAM
 
-  /* User_stack section, used to check that there is enough RAM left */
-  ._user_stack :
-  {
-    . = ALIGN(8);
-    PROVIDE ( end = . );
-    PROVIDE ( _end = . );
-    . = . + _Min_Stack_Size;
-    . = ALIGN(8);
-  } >RAM
-
-  /* User_heap section, used to check that there is enough RAM left */
-  ._user_heap :
-  {
-    . = ALIGN(8);
-    PROVIDE ( end = . );
-    PROVIDE ( _end = . );
-    . = . + _Min_Heap_Size;
-    . = ALIGN(8);
-  } >DTCM
-
   /* Remove information from the standard libraries */
   /DISCARD/ :
   {
@@ -203,5 +158,3 @@ SECTIONS
 
   .ARM.attributes 0 : { *(.ARM.attributes) }
 }
-
-

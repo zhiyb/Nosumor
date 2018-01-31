@@ -1,34 +1,3 @@
-/*
-*****************************************************************************
-**
-
-**  File        : LinkerScript.ld
-**
-**  Abstract    : Linker script for STM32F722ZETx Device with
-**                512KByte FLASH, 256KByte RAM
-**
-**                Set heap size, stack size and stack location according
-**                to application requirements.
-**
-**                Set memory bank area and size if external memory is used.
-**
-**  Target      : STMicroelectronics STM32
-**
-**
-**  Distribution: The file is distributed as is, without any warranty
-**                of any kind.
-**
-**  (c)Copyright Ac6.
-**  You may use this file as-is or modify it according to the needs of your
-**  project. Distribution of this file (unmodified or modified) is not
-**  permitted. Ac6 permit registered System Workbench for MCU users the
-**  rights to distribute the assembled, compiled & linked contents of this
-**  file as part of an application binary file, provided that it is built
-**  using the System Workbench for MCU toolchain.
-**
-*****************************************************************************
-*/
-
 /* Entry Point */
 ENTRY(Reset_Handler)
 
@@ -39,27 +8,37 @@ __heap_end__ = 0x20010000;  /* end of DTCM */
 _Min_Heap_Size = 0x400;      /* required amount of heap  */
 _Min_Stack_Size = 0x1000; /* required amount of stack */
 
+/* Flash disk regions */
+__app_start__	= ORIGIN(APP);
+__app_end__	= ORIGIN(APP) + LENGTH(APP);
+__conf_start__	= ORIGIN(CONF);
+__conf_end__	= ORIGIN(CONF) + LENGTH(CONF);
+
 /* Specify the memory areas */
 MEMORY
 {
     IRAM (xrw)  : ORIGIN = 0x00000000, LENGTH = 16k
     DTCM (xrw)  : ORIGIN = 0x20000000, LENGTH = 64k
     RAM (xrw)   : ORIGIN = 0x20010000, LENGTH = 192k
-    FLASH (rx)  : ORIGIN = 0x00200000, LENGTH = 512k
+
+    BOOT (xr)	: ORIGIN = 0x00200000, LENGTH = 16k
+    CONF (rw)	: ORIGIN = 0x00204000, LENGTH = 48k
+    LOADER (xr)	: ORIGIN = 0x00210000, LENGTH = 64k
+    APP (xr)	: ORIGIN = 0x00220000, LENGTH = 384k
 }
 
 /* Define output sections */
 SECTIONS
 {
-  /* The startup code goes first into FLASH */
+  /* The startup code goes first into APP */
   .isr_vector :
   {
     . = ALIGN(4);
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
-  } >FLASH
+  } >APP
 
-  /* The program code and other data goes into FLASH */
+  /* The program code and other data goes into APP */
   .text :
   {
     . = ALIGN(4);
@@ -74,44 +53,44 @@ SECTIONS
 
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
-  } >FLASH
+  } >APP
 
-  /* Constant data goes into FLASH */
+  /* Constant data goes into APP */
   .rodata :
   {
     . = ALIGN(4);
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);
-  } >FLASH
+  } >APP
 
-  .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >FLASH
+  .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >APP
   .ARM : {
     __exidx_start = .;
     *(.ARM.exidx*)
     __exidx_end = .;
-  } >FLASH
+  } >APP
 
   .preinit_array     :
   {
     PROVIDE_HIDDEN (__preinit_array_start = .);
     KEEP (*(.preinit_array*))
     PROVIDE_HIDDEN (__preinit_array_end = .);
-  } >FLASH
+  } >APP
   .init_array :
   {
     PROVIDE_HIDDEN (__init_array_start = .);
     KEEP (*(SORT(.init_array.*)))
     KEEP (*(.init_array*))
     PROVIDE_HIDDEN (__init_array_end = .);
-  } >FLASH
+  } >APP
   .fini_array :
   {
     PROVIDE_HIDDEN (__fini_array_start = .);
     KEEP (*(SORT(.fini_array.*)))
     KEEP (*(.fini_array*))
     PROVIDE_HIDDEN (__fini_array_end = .);
-  } >FLASH
+  } >APP
 
   /* Code segments in ITCM RAM */
   _siiram = LOADADDR(.iram);
@@ -124,7 +103,7 @@ SECTIONS
 
     . = ALIGN(4);
     _eiram = .;
-  } >IRAM AT >FLASH
+  } >IRAM AT >APP
 
   /* Special RAM sections */
   .dtcm :
@@ -153,7 +132,7 @@ SECTIONS
 
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
-  } >RAM AT >FLASH
+  } >RAM AT >APP
 
 
   /* Uninitialized data section */
@@ -202,5 +181,3 @@ SECTIONS
 
   .ARM.attributes 0 : { *(.ARM.attributes) }
 }
-
-
