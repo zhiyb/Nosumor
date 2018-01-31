@@ -11,6 +11,8 @@
 #define FLASH_APP	1
 
 uint32_t flash_fatfs_init(uint32_t idx, uint32_t erase);
+uint32_t flash_stat_write(uint32_t idx);
+uint32_t flash_stat_read(uint32_t idx);
 
 // FatFs interface functions
 DSTATUS flash_disk_status(uint32_t idx);

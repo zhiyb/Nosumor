@@ -27,12 +27,12 @@ typedef struct flash_t {
 	const uint32_t sector, ssize;
 	status_t status;
 	void *read, *write;
-	uint32_t length;
+	uint32_t length, rdsize, wrsize;
 } flash_t;
 
 static flash_t flash[2] = {
-	{&__conf_start__, &__conf_end__, 1, 16ul * 1024ul, Good, 0, 0, 0},
-	{&__app_start__, &__app_end__, 5, 128ul * 1024ul, Good, 0, 0, 0},
+	{&__conf_start__, &__conf_end__, 1, 16ul * 1024ul, Good, 0, 0, 0, 0, 0},
+	{&__app_start__, &__app_end__, 5, 128ul * 1024ul, Good, 0, 0, 0, 0, 0},
 };
 
 SECTION(.iram) STATIC_INLINE void flash_wait()
@@ -109,12 +109,6 @@ static status_t flash_program(void *dst, const void *src, uint32_t size)
 		}
 	}
 	return Good;
-}
-
-static status_t flash_program_region(uint32_t idx, uint32_t offset,
-				     const void *src, uint32_t size)
-{
-	return flash_program(flash[idx].start + offset, src, size);
 }
 
 static status_t flash_erase_sector(uint32_t sec)
@@ -360,6 +354,7 @@ static void *scsi_read_data(void *p, uint32_t *length)
 {
 	uint32_t idx = (uint32_t)p;
 	void *ptr = flash[idx].read;
+	flash[idx].rdsize += *length;
 	flash[idx].read += *length;
 	flash[idx].length -= *length;
 	return ptr;
@@ -420,9 +415,7 @@ static uint32_t scsi_write_data(void *p, uint32_t length, const void *data)
 		       flash[idx].write, data, length);
 
 		memcpy(flash[idx].write, data, length);
-		flash[idx].write += length;
-		flash[idx].length -= length;
-		return length;
+		goto stat;
 	}
 #endif
 
@@ -431,6 +424,7 @@ static uint32_t scsi_write_data(void *p, uint32_t length, const void *data)
 		return 0;
 
 	// Update status
+stat:	flash[idx].wrsize += length;
 	flash[idx].write += length;
 	flash[idx].length -= length;
 	return length;
@@ -634,4 +628,14 @@ erase:	// Erase entire flash as initialisation
 		       ESC_DATA "%u\n", idx, res);
 
 	return FR_OK;
+}
+
+uint32_t flash_stat_write(uint32_t idx)
+{
+	return flash[idx].wrsize;
+}
+
+uint32_t flash_stat_read(uint32_t idx)
+{
+	return flash[idx].rdsize;
 }
