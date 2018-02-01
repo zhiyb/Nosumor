@@ -9,6 +9,7 @@ _Min_Heap_Size = 0x400;      /* required amount of heap  */
 _Min_Stack_Size = 0x1000; /* required amount of stack */
 
 /* Flash disk regions */
+__appi_start__	= ORIGIN(APPI);
 __app_start__	= ORIGIN(APP);
 __app_end__	= ORIGIN(APP) + LENGTH(APP);
 __conf_start__	= ORIGIN(CONF);
@@ -24,6 +25,7 @@ MEMORY
     BOOT (xr)	: ORIGIN = 0x08000000, LENGTH = 16k
     CONF (rw)	: ORIGIN = 0x08004000, LENGTH = 48k
     LOADER (xr)	: ORIGIN = 0x08010000, LENGTH = 64k
+    APPI (xr)	: ORIGIN = 0x00220000, LENGTH = 384k
     APP (xr)	: ORIGIN = 0x08020000, LENGTH = 384k
 }
 

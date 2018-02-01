@@ -34,6 +34,7 @@ static flash_t flash[2] = {
 	{&__conf_start__, &__conf_end__, 1, 16ul * 1024ul, Good, 0, 0, 0, 0, 0},
 	{&__app_start__, &__app_end__, 5, 128ul * 1024ul, Good, 0, 0, 0, 0, 0},
 };
+static uint32_t active = 0;
 
 STATIC_INLINE void flash_wait()
 {
@@ -72,6 +73,8 @@ static status_t flash_program(void *dst, const void *src, uint32_t size)
 
 	printf(ESC_WRITE "[FLASH] Program: "
 	       ESC_DATA "@%p <= @%p+%lu\n", dst, src, size);
+	SCB_CleanInvalidateDCache_by_Addr(dst, size);
+	active = 1;
 
 	// Align to 4-byte boundary
 	size >>= 2u;
@@ -87,7 +90,6 @@ static status_t flash_program(void *dst, const void *src, uint32_t size)
 	FLASH->CR = (0b10 << FLASH_CR_PSIZE_Pos) | FLASH_CR_PG_Msk;
 
 	// Program flash
-	SCB_DisableDCache();
 	for (; size; size--, fp++, bp++) {
 		if (*fp == *bp)
 			continue;
@@ -109,13 +111,13 @@ static status_t flash_program(void *dst, const void *src, uint32_t size)
 			return ProgramError;
 		}
 	}
-	SCB_EnableDCache();
 	return Good;
 }
 
 static status_t flash_erase_sector(uint32_t sec)
 {
 	printf(ESC_WRITE "[FLASH] Erase sector " ESC_DATA "%lu\n", sec);
+	active = 1;
 
 	// Unlock flash
 	status_t status = flash_unlock();
@@ -645,5 +647,7 @@ uint32_t flash_stat_read(uint32_t idx)
 
 uint32_t flash_busy()
 {
-	return FLASH->CR != 0;
+	uint32_t act = active;
+	active = 0;
+	return act;
 }

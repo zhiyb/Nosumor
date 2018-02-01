@@ -65,7 +65,6 @@ static inline void usart6_init()
 
 static inline void init()
 {
-	bootloader_check();
 	SCB_EnableICache();
 	SCB_EnableDCache();
 	rcc_init();

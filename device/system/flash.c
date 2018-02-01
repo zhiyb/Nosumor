@@ -12,7 +12,7 @@
 #include <fatfs/ff.h>
 #include "flash.h"
 
-extern char __app_start__;
+extern uint32_t __app_start__, __appi_start__;
 
 enum FlashInterface {AXI, ICTM};
 
@@ -39,6 +39,7 @@ typedef struct hex_t {
 
 static hex_t *hex = 0, **hex_last = &hex;
 static int hex_invalid = 0;
+static uint32_t seg, saddr;
 
 /* Flash access functions */
 
@@ -115,7 +116,7 @@ SECTION(.iram) STATIC_INLINE void flash_write(uint32_t addr, uint32_t size, uint
 SECTION(.iram) extern void flash_hex()
 {
 	__disable_irq();
-	SCB_DisableDCache();
+	SCB_CleanInvalidateDCache();
 	// Unlock flash
 	if (!flash_unlock()) {
 		dbgbkpt();
@@ -147,9 +148,6 @@ SECTION(.iram) extern void flash_hex()
 			addr.u8[2] = hp->ihex.payload[1];
 			addr.u8[1] = hp->ihex.payload[2];
 			addr.u8[0] = hp->ihex.payload[3];
-			// Set reset vector
-			SCB->VTOR = RAMDTCM_BASE;
-			*(((uint32_t *)RAMDTCM_BASE) + 1u) = addr.u32;
 			break;
 		default:
 			__BKPT(0);
@@ -164,14 +162,15 @@ reset:
 			(SCB->AIRCR & SCB_AIRCR_PRIGROUP_Msk) |
 			SCB_AIRCR_SYSRESETREQ_Msk;
 	__DSB();
-	for (;;);
+	for (;;)
+		__NOP();
 }
 
 // Use extern to force gcc place the code in RAM
 SECTION(.iram) extern void flash_hex_segments(hex_seg_t *seg)
 {
 	__disable_irq();
-	SCB_DisableDCache();
+	SCB_CleanInvalidateDCache();
 	// Unlock flash
 	if (!flash_unlock()) {
 		dbgbkpt();
@@ -182,9 +181,13 @@ SECTION(.iram) extern void flash_hex_segments(hex_seg_t *seg)
 		flash_write(seg->addr, seg->cnt, seg->payload);
 		seg = (void *)(seg->payload + seg->cnt);
 	}
-	// Set reset vector
-	SCB->VTOR = (uint32_t)&__app_start__;
 	// Done
+	if (saddr >= (uint32_t)&__appi_start__) {
+		flash_wait();
+		// Program size x32
+		FLASH->CR = (0b10 << FLASH_CR_PSIZE_Pos) | FLASH_CR_PG_Msk;
+		__app_start__ = 0;
+	}
 reset:	flash_wait();
 	FLASH->CR = FLASH_CR_LOCK_Msk;
 	// Soft reset
@@ -315,7 +318,6 @@ static uint32_t toUnsigned(char *s, uint8_t b)
 
 static int fatfs_hex_parse(FIL *fp, uint8_t *buf, uint32_t *addr)
 {
-	static uint32_t seg;
 	FRESULT res;
 	UINT s;
 	uint32_t i;
@@ -390,6 +392,8 @@ static int fatfs_hex_parse(FIL *fp, uint8_t *buf, uint32_t *addr)
 	case ISLAddr:
 		if (ihex.cnt != 4u)
 			break;
+		memcpy((void *)&saddr, buf - 4, 4);
+		saddr = __REV(saddr);
 		return 0;
 	}
 	dbgprintf(ESC_ERROR "[HEX] Invalid record type\n");

@@ -40,7 +40,7 @@ extern size_t heap_usage();
 extern size_t heap_size();
 #endif
 
-extern char __appi_start__;
+extern uint32_t __appi_start__;
 
 usb_t usb;	// Shared with PVD
 static usb_msc_t *usb_msc = 0;
@@ -48,6 +48,9 @@ static usb_hid_if_t *usb_hid_vendor = 0;
 
 void bootloader_check()
 {
+	// Check app region status
+	if (__appi_start__ != 0)
+		return;
 	// Initialise GPIOs
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
 	// PC13, PC14, PC15
@@ -180,9 +183,9 @@ int main()
 loop:
 	// Wait until more than 100kB has been written to app flash
 	if (!flash_busy() && wrsize >= 100 * 1024) {
-		if ((int)(systick_cnt() - tick) >= 0) {
-			// Check flash statistics every 3 seconds
-			tick = systick_cnt() + 3 * 1000;
+		// Check flash statistics every 3 seconds
+		if ((int)(systick_cnt() - tick) >= 3 * 1000) {
+			tick = systick_cnt();
 			uint32_t diff = flash_stat_write(FLASH_APP) - wrsize;
 			if (!diff) {
 #ifdef DEBUG

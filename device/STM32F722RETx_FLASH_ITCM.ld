@@ -9,6 +9,7 @@ _Min_Heap_Size = 0x400;      /* required amount of heap  */
 _Min_Stack_Size = 0x1000; /* required amount of stack */
 
 /* Flash disk regions */
+__appi_start__	= ORIGIN(APP);
 __app_start__	= ORIGIN(APP);
 __app_end__	= ORIGIN(APP) + LENGTH(APP);
 __conf_start__	= ORIGIN(CONF);
