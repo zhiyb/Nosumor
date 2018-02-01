@@ -7,11 +7,12 @@ Project {
     property string device: "STM32F722"
     property bool cmsis_dsp: false
     property int hwver: 0x0100
+    property string hwver_str: ("0000" + hwver.toString(16)).slice(-4)
 
     references: ["CMSIS"]
 
     CppApplication {
-        name: "Nosumor"
+        name: "Nosumor_" + project.hwver_str
         type: ["application", "hex", "size"]
         Depends {name: "core"}
         Depends {name: "gcc-none"}
@@ -50,7 +51,7 @@ Project {
     }
 
     CppApplication {
-        name: "Bootloader"
+        name: "Bootloader_" + project.hwver_str
         type: ["application", "hex", "size"]
         Depends {name: "core"}
         Depends {name: "gcc-none"}
