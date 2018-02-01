@@ -24,7 +24,8 @@ Project {
 
         Group {
             name: "FatFS"
-            cpp.commonCompilerFlags: outer.concat(["-Wno-comment"])
+            cpp.commonCompilerFlags: outer.concat(["-Wno-comment",
+                                                   "-Wno-implicit-fallthrough"])
             files: [
                 "fatfs/*",
             ]
@@ -65,7 +66,8 @@ Project {
 
         Group {
             name: "FatFS"
-            cpp.commonCompilerFlags: outer.concat(["-Wno-comment"])
+            cpp.commonCompilerFlags: outer.concat(["-Wno-comment",
+                                                   "-Wno-implicit-fallthrough"])
             files: [
                 "fatfs/*",
             ]

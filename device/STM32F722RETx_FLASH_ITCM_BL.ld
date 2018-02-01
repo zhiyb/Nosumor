@@ -7,6 +7,7 @@ __heap_end__ = ORIGIN(DTCM) + LENGTH(DTCM);  /* end of DTCM */
 
 /* Flash disk regions */
 __app_start__	= ORIGIN(APP);
+__appi_start__	= ORIGIN(APPI);
 __app_end__	= ORIGIN(APP) + LENGTH(APP);
 __conf_start__	= ORIGIN(CONF);
 __conf_end__	= ORIGIN(CONF) + LENGTH(CONF);
@@ -19,9 +20,11 @@ MEMORY
     RAM (xrw)   : ORIGIN = 0x20010000, LENGTH = 192k
 
     BOOT (xr)	: ORIGIN = 0x00200000, LENGTH = 16k
-    CONF (rw)	: ORIGIN = 0x00204000, LENGTH = 48k
+    CONFI (rw)	: ORIGIN = 0x00204000, LENGTH = 48k
+    CONF (rw)	: ORIGIN = 0x08004000, LENGTH = 48k
     LOADER (xr)	: ORIGIN = 0x00210000, LENGTH = 64k
-    APP (xr)	: ORIGIN = 0x00220000, LENGTH = 384k
+    APPI (xr)	: ORIGIN = 0x00220000, LENGTH = 384k
+    APP (xr)	: ORIGIN = 0x08020000, LENGTH = 384k
 }
 
 /* Define output sections */

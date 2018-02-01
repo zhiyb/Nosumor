@@ -59,6 +59,7 @@ static void flash_check(usb_hid_if_t *hid)
 		puts(ESC_ERROR "Invalid HEX content received");
 }
 
+#ifndef BOOTLOADER
 // OUT; Format: Num(8), Info[N](16)
 static void vendor_led_info(usb_hid_if_t *hid)
 {
@@ -121,6 +122,7 @@ static void vendor_i2c(usb_hid_if_t *hid, uint8_t size, void *payload)
 	}
 	usb_hid_vendor_send(hid, &report);
 }
+#endif
 
 void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp)
 {
@@ -156,6 +158,7 @@ void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp)
 			break;
 		keyboard_keycode_set(rp->payload[0], rp->payload[1]);
 		break;
+#ifndef BOOTLOADER
 	case LEDInfo:
 		vendor_led_info(hid);
 		break;
@@ -165,6 +168,7 @@ void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp)
 	case I2CData:
 		vendor_i2c(hid, size, rp->payload);
 		break;
+#endif
 	}
 }
 

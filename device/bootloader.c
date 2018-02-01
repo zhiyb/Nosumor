@@ -40,7 +40,7 @@ extern size_t heap_usage();
 extern size_t heap_size();
 #endif
 
-extern char __app_start__;
+extern char __appi_start__;
 
 usb_t usb;	// Shared with PVD
 static usb_msc_t *usb_msc = 0;
@@ -60,8 +60,8 @@ void bootloader_check()
 	// Jump to app if no button pressed
 	if (GPIOC->IDR & (0b111ul << 13u)) {
 		// Set reset vector
-		SCB->VTOR = (uint32_t)&__app_start__;
-		RESET_ENTRY(&__app_start__)();
+		SCB->VTOR = (uint32_t)&__appi_start__;
+		RESET_ENTRY(&__appi_start__)();
 	}
 }
 

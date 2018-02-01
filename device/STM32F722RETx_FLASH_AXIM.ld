@@ -106,7 +106,7 @@ SECTIONS
   } >IRAM AT >APP
 
   /* Special RAM sections */
-  .dtcm :
+  .dtcm (NOLOAD) :
   {
     . = ALIGN(4);
     *(.dtcm)

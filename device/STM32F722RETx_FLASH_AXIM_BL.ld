@@ -7,6 +7,7 @@ __heap_end__ = ORIGIN(DTCM) + LENGTH(DTCM);  /* end of DTCM */
 
 /* Flash disk regions */
 __app_start__	= ORIGIN(APP);
+__appi_start__	= ORIGIN(APP);
 __app_end__	= ORIGIN(APP) + LENGTH(APP);
 __conf_start__	= ORIGIN(CONF);
 __conf_end__	= ORIGIN(CONF) + LENGTH(CONF);
