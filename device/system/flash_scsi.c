@@ -35,7 +35,7 @@ static flash_t flash[2] = {
 	{&__app_start__, &__app_end__, 5, 128ul * 1024ul, Good, 0, 0, 0, 0, 0},
 };
 
-SECTION(.iram) STATIC_INLINE void flash_wait()
+STATIC_INLINE void flash_wait()
 {
 	__DSB();
 	while (FLASH->SR & FLASH_SR_BSY_Msk);
@@ -43,10 +43,10 @@ SECTION(.iram) STATIC_INLINE void flash_wait()
 
 static status_t flash_unlock()
 {
+	flash_wait();
 	if (FLASH->CR & FLASH_CR_LOCK_Msk) {
 		FLASH->KEYR = 0x45670123;
 		FLASH->KEYR = 0xcdef89ab;
-
 		flash_wait();
 		if (FLASH->CR & FLASH_CR_LOCK_Msk) {
 			printf(ESC_ERROR "[FLASH] Unlock failed\n");
@@ -87,6 +87,7 @@ static status_t flash_program(void *dst, const void *src, uint32_t size)
 	FLASH->CR = (0b10 << FLASH_CR_PSIZE_Pos) | FLASH_CR_PG_Msk;
 
 	// Program flash
+	SCB_DisableDCache();
 	for (; size; size--, fp++, bp++) {
 		if (*fp == *bp)
 			continue;
@@ -108,6 +109,7 @@ static status_t flash_program(void *dst, const void *src, uint32_t size)
 			return ProgramError;
 		}
 	}
+	SCB_EnableDCache();
 	return Good;
 }
 
@@ -237,6 +239,7 @@ static status_t flash_erase_region(uint32_t idx, uint32_t offset, uint32_t size)
 	status_t status = flash_erase_sector(flash[idx].sector + fs);
 	if (status != Good)
 		return status;
+	SCB_CleanDCache_by_Addr((void *)start, flash[idx].ssize);
 
 	// If no recovery needed, finish
 	if (tmp == full)
@@ -333,13 +336,12 @@ static uint32_t scsi_read_start(void *p, uint32_t offset, uint32_t size)
 		return 0;
 	}
 
+	flash_wait();
 	flash[idx].length = size * LBSZ;
 	flash[idx].read = flash[idx].start + offset * LBSZ;
 #ifdef SHADOW_CONF
-	if (idx == FLASH_CONF) {
+	if (idx == FLASH_CONF)
 		flash[idx].read = conf_shadow + offset * LBSZ;
-		SCB_CleanDCache_by_Addr(flash[idx].read, flash[idx].length);
-	}
 #endif
 	return size;
 }
@@ -368,6 +370,7 @@ static uint32_t scsi_read_stop(void *p)
 }
 
 /* Write operations */
+
 static uint32_t scsi_write_start(void *p, uint32_t offset, uint32_t size)
 {
 	uint32_t idx = (uint32_t)p;
@@ -565,8 +568,8 @@ uint32_t flash_fatfs_init(uint32_t idx, uint32_t erase)
 {
 	static const char *vols[] = {"CONF:", "APP:"};
 	static const char *labels[] = {"CONF:Configure", "APP:Firmware"};
-	static FATFS fs SECTION(.dtcm);
 	FRESULT res;
+	FATFS fs;
 	memset(&fs, 0, sizeof(fs));
 
 #ifdef SHADOW_CONF
@@ -638,4 +641,9 @@ uint32_t flash_stat_write(uint32_t idx)
 uint32_t flash_stat_read(uint32_t idx)
 {
 	return flash[idx].rdsize;
+}
+
+uint32_t flash_busy()
+{
+	return FLASH->CR != 0;
 }

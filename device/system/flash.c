@@ -115,6 +115,7 @@ SECTION(.iram) STATIC_INLINE void flash_write(uint32_t addr, uint32_t size, uint
 SECTION(.iram) extern void flash_hex()
 {
 	__disable_irq();
+	SCB_DisableDCache();
 	// Unlock flash
 	if (!flash_unlock()) {
 		dbgbkpt();
@@ -170,6 +171,7 @@ reset:
 SECTION(.iram) extern void flash_hex_segments(hex_seg_t *seg)
 {
 	__disable_irq();
+	SCB_DisableDCache();
 	// Unlock flash
 	if (!flash_unlock()) {
 		dbgbkpt();

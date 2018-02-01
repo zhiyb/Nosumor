@@ -136,26 +136,23 @@ static inline void init()
 
 static inline void flash()
 {
-	static FATFS fs SECTION(.dtcm);
 	FRESULT res;
+	FATFS fs;
 	memset(&fs, 0, sizeof(fs));
 
 	// Mount volume
 	if ((res = f_mount(&fs, "APP:", 1)) != FR_OK) {
-		dbgprintf(ESC_ERROR "[BL] Mount failed: "
-			  ESC_DATA "%u\n", res);
-		fflush(stdout);
-		NVIC_SystemReset();
+		printf(ESC_ERROR "[BL] Mount failed: " ESC_DATA "%u\n", res);
+		return;
 	}
 
 	// Find firmware
 	DIR dir;
 	FILINFO fno;
 	if ((res = f_findfirst(&dir, &fno, "APP:", "*.hex")) != FR_OK) {
-		dbgprintf(ESC_ERROR "[BL] Failure finding firmware: "
-			  ESC_DATA "%u\n", res);
-		fflush(stdout);
-		NVIC_SystemReset();
+		printf(ESC_ERROR "[BL] Failure finding firmware: "
+		       ESC_DATA "%u\n", res);
+		return;
 	}
 
 	if (!fno.fname[0]) {
@@ -164,17 +161,14 @@ static inline void flash()
 		return;
 	}
 
-#if defined(BOOTLOADER) && defined(DEBUG)
 	printf(ESC_INFO "[BL] Firmware " ESC_DATA "%s"
-	       ESC_INFO ", size " ESC_DATA "%lu\n", fno.fname, fno.fsize);
-#else
-	printf(ESC_INFO "[BL] Firmware " ESC_DATA "%s"
-	       ESC_INFO ", size " ESC_DATA "%llu\n", fno.fname, fno.fsize);
-#endif
+	       ESC_INFO ", size " ESC_DATA "%lu\n",
+	       fno.fname, (uint32_t)fno.fsize);
 
 	char path[5 + strlen(fno.fname)];
 	memcpy(path, "APP:", 4);
 	strcpy(path + 4u, fno.fname);
+	fflush(stdout);
 	flash_fatfs_hex_program(path);
 }
 
@@ -185,7 +179,7 @@ int main()
 	uint32_t tick = 0, wrsize = 0;
 loop:
 	// Wait until more than 100kB has been written to app flash
-	if (wrsize >= 100 * 1024) {
+	if (!flash_busy() && wrsize >= 100 * 1024) {
 		if ((int)(systick_cnt() - tick) >= 0) {
 			// Check flash statistics every 3 seconds
 			tick = systick_cnt() + 3 * 1000;
