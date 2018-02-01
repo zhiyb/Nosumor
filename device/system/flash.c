@@ -1,4 +1,5 @@
 #include <stm32f7xx.h>
+#include <ctype.h>
 #include <malloc.h>
 #include <string.h>
 #include <stdio.h>
@@ -6,7 +7,11 @@
 #include <debug.h>
 #include <escape.h>
 #include <system/pvd.h>
+#include <logic/scsi.h>
+#include <fatfs/ff.h>
 #include "flash.h"
+
+extern char __app_start__;
 
 enum FlashInterface {AXI, ICTM};
 
@@ -19,6 +24,12 @@ typedef struct PACKED ihex_t {
 } ihex_t;
 
 enum IHEXTypes {IData = 0, IEOF, IESAddr, ISSAddr, IELAddr, ISLAddr};
+
+typedef struct PACKED hex_seg_t {
+	uint32_t cnt;
+	uint32_t addr;
+	uint8_t payload[];
+} hex_seg_t;
 
 typedef struct hex_t {
 	struct hex_t *next;
@@ -73,7 +84,7 @@ SECTION(.iram) extern void flash_erase(uint32_t addr)
 	sector = sec;
 }
 
-SECTION(.iram) STATIC_INLINE void flash_write(uint32_t addr, uint8_t size, uint8_t *data)
+SECTION(.iram) STATIC_INLINE void flash_write(uint32_t addr, uint32_t size, uint8_t *data)
 {
 	// Only AXI interface has write access
 	uint32_t fsize = 1024ul * FLASH_SIZE;
@@ -154,11 +165,39 @@ reset:
 	for (;;);
 }
 
+// Use extern to force gcc place the code in RAM
+SECTION(.iram) extern void flash_hex_segments(hex_seg_t *seg)
+{
+	__disable_irq();
+	// Unlock flash
+	if (!flash_unlock()) {
+		dbgbkpt();
+		goto reset;
+	}
+	// Flash segments
+	while (seg->cnt) {
+		flash_write(seg->addr, seg->cnt, seg->payload);
+		seg = (void *)(seg->payload + seg->cnt);
+	}
+	// Set reset vector
+	SCB->VTOR = (uint32_t)&__app_start__;
+	// Done
+reset:	flash_wait();
+	FLASH->CR = FLASH_CR_LOCK_Msk;
+	// Soft reset
+	__DSB();
+	SCB->AIRCR = (0x5FAUL << SCB_AIRCR_VECTKEY_Pos) |
+			(SCB->AIRCR & SCB_AIRCR_PRIGROUP_Msk) |
+			SCB_AIRCR_SYSRESETREQ_Msk;
+	__DSB();
+	for (;;);
+}
+
 /* Intel HEX format handling functions */
 
 void flash_hex_free()
 {
-	dbgprintf(ESC_DEBUG "Resetting flash buffer...\n");
+	dbgprintf(ESC_DEBUG "[HEX] Resetting flash buffer...\n");
 	hex_t *next;
 	for (hex_t *hp = hex; hp; hp = next) {
 		next = hp->next;
@@ -172,7 +211,7 @@ void flash_hex_free()
 static int hex_verify(uint8_t size, ihex_t *ip)
 {
 	if (size < 5u) {
-		dbgprintf(ESC_ERROR "Data too short\n");
+		dbgprintf(ESC_ERROR "[HEX] Data too short\n");
 		return 0;
 	}
 	if (ip->cnt != size - 5u)
@@ -187,13 +226,13 @@ static int hex_verify(uint8_t size, ihex_t *ip)
 	case IESAddr:
 		if (ip->cnt != 2u)
 			goto bcerr;
-		__BKPT(0);
-		break;
+		dbgbkpt();
+		return 0;
 	case ISSAddr:
 		if (ip->cnt != 4u)
 			goto bcerr;
-		__BKPT(0);
-		break;
+		dbgbkpt();
+		return 0;
 	case IELAddr:
 		if (ip->cnt != 2u)
 			goto bcerr;
@@ -203,25 +242,25 @@ static int hex_verify(uint8_t size, ihex_t *ip)
 			goto bcerr;
 		break;
 	default:
-		dbgprintf(ESC_ERROR "Invalid record type\n");
+		dbgprintf(ESC_ERROR "[HEX] Invalid record type\n");
 		return 0;
 	}
 	uint8_t cksum = 0;
 	for (uint8_t *p = (uint8_t *)ip; size--; cksum += *p++);
 	if (cksum != 0u) {
-		dbgprintf(ESC_ERROR "Checksum failed\n");
+		dbgprintf(ESC_ERROR "[HEX] Checksum failed\n");
 		return 0;
 	}
 	return 1;
 bcerr:
-	dbgprintf(ESC_ERROR "Invalid byte count\n");
+	dbgprintf(ESC_ERROR "[HEX] Invalid byte count\n");
 	return 0;
 }
 
 void flash_hex_data(uint8_t size, void *payload)
 {
 	if (!hex)
-		dbgprintf(ESC_DEBUG "Receiving HEX content...\n");
+		dbgprintf(ESC_DEBUG "[HEX] Receiving HEX content...\n");
 	ihex_t *ip = payload;
 	hex_invalid = hex_invalid ?: !hex_verify(size, ip);
 	if (hex_invalid)
@@ -250,7 +289,184 @@ void flash_hex_program()
 	uint32_t size = 0;
 	for (hex_t **hp = &hex; *hp; hp = &(*hp)->next)
 		size += (*hp)->ihex.cnt;
-	printf(ESC_WRITE "Flashing %lu bytes...\n", size);
+	printf(ESC_WRITE "[HEX] Flashing %lu bytes...\n", size);
 	pvd_disable_all();
 	flash_hex();
+}
+
+static uint32_t toUnsigned(char *s, uint8_t b)
+{
+	uint32_t v = 0;
+	while (b--) {
+		unsigned int i;
+		char c = tolower(*s++);
+		if (c >= '0' && c <= '9')
+			i = c - '0';
+		else
+			i = c - 'a' + 0x0a;
+		v <<= 4;
+		v |= i;
+	}
+	return v;
+}
+
+static int fatfs_hex_parse(FIL *fp, uint8_t *buf, uint32_t *addr)
+{
+	static uint32_t seg;
+	FRESULT res;
+	UINT s;
+	uint32_t i;
+	uint8_t ck = 0;
+	char cbuf[8];
+	// Read line header
+	if ((res = f_read(fp, cbuf, 8, &s)) != FR_OK) {
+		dbgprintf(ESC_ERROR "[HEX] Failure reading file: "
+			  ESC_DATA "%u\n", res);
+		return -1;
+	}
+	if (s != 8) {
+		dbgprintf(ESC_ERROR "[HEX] Unexpected end of file\n");
+		return -1;
+	}
+
+	// Parse line header
+	uint8_t *up;
+	ihex_t ihex;
+	ihex.cnt = toUnsigned(&cbuf[0], 2);
+	ihex.addr = toUnsigned(&cbuf[2], 4);
+	ihex.type = toUnsigned(&cbuf[6], 2);
+	for (up = (void *)&ihex, i = 4; i--; ck += *up++);
+
+	// Parse data
+	i = ((uint32_t)ihex.cnt << 1) + 2;
+	char dbuf[i], *cp = dbuf;
+	if ((res = f_read(fp, dbuf, i, &s)) != FR_OK) {
+		dbgprintf(ESC_ERROR "[HEX] Failure reading file: "
+			  ESC_DATA "%u\n", res);
+		return -1;
+	}
+	if (s != i) {
+		dbgprintf(ESC_ERROR "[HEX] Unexpected end of file\n");
+		return -1;
+	}
+	for (cp = dbuf, i = ihex.cnt; i--; cp += 2)
+		ck += *buf++ = toUnsigned(cp, 2);
+
+	// Parse checksum
+	ck += toUnsigned(cp, 2);
+	if (ck != 0) {
+		dbgprintf(ESC_ERROR "[HEX] Checksum failed\n");
+		return -1;
+	}
+
+	switch (ihex.type) {
+	case IData:
+		*addr = seg | (uint32_t)ihex.addr;
+		return ihex.cnt;
+	case IEOF:
+		if (ihex.cnt != 0u)
+			break;
+		return 0;
+	case IESAddr:
+		if (ihex.cnt != 2u)
+			break;
+		dbgbkpt();
+		break;
+	case ISSAddr:
+		if (ihex.cnt != 4u)
+			break;
+		dbgbkpt();
+		break;
+	case IELAddr:
+		if (ihex.cnt != 2u)
+			break;
+		seg = 0;
+		memcpy((void *)&seg + 2, buf - 2, 2);
+		seg = __REV16(seg);
+		return 0;
+	case ISLAddr:
+		if (ihex.cnt != 4u)
+			break;
+		return 0;
+	}
+	dbgprintf(ESC_ERROR "[HEX] Invalid record type\n");
+	return -1;
+}
+
+void flash_fatfs_hex_program(const char *path)
+{
+	FIL fil;
+	FRESULT res;
+	if ((res = f_open(&fil, path, FA_READ)) != FR_OK) {
+		dbgprintf(ESC_ERROR "[HEX] Failure opening file: "
+			  ESC_DATA "%u\n", res);
+		return;
+	}
+
+	// Borrow buffer space
+	uint64_t *buf = scsi_buffer(0);
+	hex_seg_t *seg = (void *)buf;
+	uint8_t *p = seg->payload;
+	seg->cnt = 0;
+
+	// Parse intel HEX data
+	uint32_t addr = 0;
+	UINT s;
+	int i;
+	char c;
+	// Read start code / line terminators
+start:	if ((res = f_read(&fil, &c, 1, &s)) != FR_OK) {
+		dbgprintf(ESC_ERROR "[HEX] Failure reading file: "
+			  ESC_DATA "%u\n", res);
+		return;
+	}
+
+	if (s != 1)
+		goto flash;
+
+	switch (c) {
+	case ':':
+		i = fatfs_hex_parse(&fil, p, &addr);
+		if (i < 0)
+			return;
+		if (seg->cnt == 0) {
+			seg->addr = addr;
+			seg->cnt = i;
+			p = seg->payload + i;
+		} else if (seg->addr + seg->cnt != addr && i != 0) {
+			// Begin new segment
+			seg = (void *)(seg->payload + seg->cnt);
+			memmove(seg->payload, seg, i);
+			seg->addr = addr;
+			seg->cnt = i;
+			p = seg->payload + i;
+		} else {
+			seg->cnt += i;
+			p += i;
+		}
+	case '\r':
+	case '\n':
+		goto start;
+	default:
+		dbgprintf(ESC_ERROR "[HEX] Invalid file format\n");
+		return;
+	}
+
+	// Start flashing
+flash:	// Ending segment
+	seg = (void *)(seg->payload + seg->cnt);
+	seg->cnt = 0;
+
+#ifdef DEBUG
+	seg = (void *)buf;
+	while (seg->cnt) {
+		printf(ESC_INFO "[HEX] Segment " ESC_DATA "0x%08lx"
+		       ESC_INFO " has " ESC_DATA "%lu" ESC_INFO " bytes\n",
+		       seg->addr, seg->cnt);
+		seg = (void *)(seg->payload + seg->cnt);
+	}
+#endif
+
+	pvd_disable_all();
+	flash_hex_segments((void *)buf);
 }

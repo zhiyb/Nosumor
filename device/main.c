@@ -35,9 +35,6 @@
 #include "logic/vendor.h"
 #include "logic/led_trigger.h"
 
-#define BOOTLOADER_BASE	0x00260000
-#define BOOTLOADER_FUNC	((void (*)())*(uint32_t *)(BOOTLOADER_BASE + 4u))
-
 #ifdef DEBUG
 extern size_t heap_usage();
 extern size_t heap_size();
@@ -47,23 +44,7 @@ usb_t usb;	// Shared with PVD
 static usb_msc_t *usb_msc = 0;
 static usb_hid_if_t *usb_hid_vendor = 0;
 
-static inline void bootloader_check()
-{
-	// Initialise GPIOs
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
-	// PC13, PC14, PC15
-	GPIO_MODER(GPIOC, 13, 0b00);
-	GPIO_MODER(GPIOC, 14, 0b00);
-	GPIO_MODER(GPIOC, 15, 0b00);
-	GPIO_PUPDR(GPIOC, 13, GPIO_PUPDR_UP);
-	GPIO_PUPDR(GPIOC, 14, GPIO_PUPDR_UP);
-	GPIO_PUPDR(GPIOC, 15, GPIO_PUPDR_UP);
-	if (!(GPIOC->IDR & (0b111ul << 13u))) {
-		// Set reset vector
-		SCB->VTOR = BOOTLOADER_BASE;
-		BOOTLOADER_FUNC();
-	}
-}
+void bootloader_check() {}
 
 static inline void usart6_init()
 {

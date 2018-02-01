@@ -13,6 +13,7 @@
 #include "system/clocks.h"
 #include "system/pvd.h"
 #include "system/systick.h"
+#include "system/flash.h"
 #include "system/flash_scsi.h"
 #include "irq.h"
 // Peripherals
@@ -32,19 +33,20 @@
 // Processing functions
 #include "logic/vendor.h"
 
-#define BOOTLOADER_BASE	0x00260000
-#define BOOTLOADER_FUNC	((void (*)())*(uint32_t *)(BOOTLOADER_BASE + 4u))
+#define RESET_ENTRY(b)	((void (*)())*(uint32_t *)((uint32_t)(b) + 4u))
 
 #ifdef DEBUG
 extern size_t heap_usage();
 extern size_t heap_size();
 #endif
 
+extern char __app_start__;
+
 usb_t usb;	// Shared with PVD
 static usb_msc_t *usb_msc = 0;
 static usb_hid_if_t *usb_hid_vendor = 0;
 
-static inline void bootloader_check()
+void bootloader_check()
 {
 	// Initialise GPIOs
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
@@ -55,10 +57,11 @@ static inline void bootloader_check()
 	GPIO_PUPDR(GPIOC, 13, GPIO_PUPDR_UP);
 	GPIO_PUPDR(GPIOC, 14, GPIO_PUPDR_UP);
 	GPIO_PUPDR(GPIOC, 15, GPIO_PUPDR_UP);
-	if (!(GPIOC->IDR & (0b111ul << 13u))) {
+	// Jump to app if no button pressed
+	if (GPIOC->IDR & (0b111ul << 13u)) {
 		// Set reset vector
-		SCB->VTOR = BOOTLOADER_BASE;
-		BOOTLOADER_FUNC();
+		SCB->VTOR = (uint32_t)&__app_start__;
+		RESET_ENTRY(&__app_start__)();
 	}
 }
 
@@ -113,7 +116,7 @@ static inline void init()
 	puts(ESC_INIT "Initialising FatFs for flash...");
 	if (flash_fatfs_init(FLASH_CONF, 0))
 		dbgbkpt();
-	if (flash_fatfs_init(FLASH_APP, 0))
+	if (flash_fatfs_init(FLASH_APP, 1))
 		dbgbkpt();
 
 	puts(ESC_INIT "Initialising USB mass storage...");
@@ -126,11 +129,83 @@ static inline void init()
 	usb_connect(&usb, 1);
 }
 
+static inline void flash()
+{
+	static FATFS fs SECTION(.dtcm);
+	FRESULT res;
+	memset(&fs, 0, sizeof(fs));
+
+	// Mount volume
+	if ((res = f_mount(&fs, "APP:", 1)) != FR_OK) {
+		dbgprintf(ESC_ERROR "[BL] Mount failed: "
+			  ESC_DATA "%u\n", res);
+		fflush(stdout);
+		NVIC_SystemReset();
+	}
+
+	// Find firmware
+	DIR dir;
+	FILINFO fno;
+	if ((res = f_findfirst(&dir, &fno, "APP:", "*.hex")) != FR_OK) {
+		dbgprintf(ESC_ERROR "[BL] Failure finding firmware: "
+			  ESC_DATA "%u\n", res);
+		fflush(stdout);
+		NVIC_SystemReset();
+	}
+
+	if (!fno.fname[0]) {
+		dbgprintf(ESC_ERROR "[BL] Firmware not found: "
+			  ESC_DATA "%u\n", res);
+		return;
+	}
+
+#if defined(BOOTLOADER) && defined(DEBUG)
+	printf(ESC_INFO "[BL] Firmware " ESC_DATA "%s"
+	       ESC_INFO ", size " ESC_DATA "%lu\n", fno.fname, fno.fsize);
+#else
+	printf(ESC_INFO "[BL] Firmware " ESC_DATA "%s"
+	       ESC_INFO ", size " ESC_DATA "%llu\n", fno.fname, fno.fsize);
+#endif
+
+	char path[5 + strlen(fno.fname)];
+	memcpy(path, "APP:", 4);
+	strcpy(path + 4u, fno.fname);
+	flash_fatfs_hex_program(path);
+}
+
 int main()
 {
 	init();
 
+	uint32_t tick = 0, wrsize = 0;
 loop:
+	// Wait until more than 100kB has been written to app flash
+	if (wrsize >= 100 * 1024) {
+		if ((int)(systick_cnt() - tick) >= 0) {
+			// Check flash statistics every 3 seconds
+			tick = systick_cnt() + 3 * 1000;
+			uint32_t diff = flash_stat_write(FLASH_APP) - wrsize;
+			if (!diff) {
+#ifdef DEBUG
+				printf(ESC_INFO "[FLASH APP] Read: "
+				       ESC_DATA "%lu" ESC_INFO " bytes\n",
+				       flash_stat_read(FLASH_APP));
+				printf(ESC_INFO "[FLASH APP] Write: "
+				       ESC_DATA "%lu" ESC_INFO " bytes\n",
+				       flash_stat_write(FLASH_APP));
+				fflush(stdout);
+#endif
+				// Start flashing
+				flash();
+			} else {
+				wrsize = flash_stat_write(FLASH_APP);
+			}
+		}
+	} else {
+		tick = systick_cnt();
+		wrsize = flash_stat_write(FLASH_APP);
+	}
+
 	// Process time consuming tasks
 	usb_process(&usb);
 	usb_msc_process(&usb, usb_msc);

@@ -14,6 +14,7 @@ void flash_hex_free();
 void flash_hex_data(uint8_t size, void *payload);
 int flash_hex_check();
 void flash_hex_program();
+void flash_fatfs_hex_program(const char *path);
 
 #ifdef __cplusplus
 }
