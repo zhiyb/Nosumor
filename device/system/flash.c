@@ -7,6 +7,7 @@
 #include <debug.h>
 #include <escape.h>
 #include <system/pvd.h>
+#include <peripheral/led.h>
 #include <logic/scsi.h>
 #include <fatfs/ff.h>
 #include "flash.h"
@@ -456,6 +457,9 @@ start:	if ((res = f_read(&fil, &c, 1, &s)) != FR_OK) {
 flash:	// Ending segment
 	seg = (void *)(seg->payload + seg->cnt);
 	seg->cnt = 0;
+
+	for (uint8_t i = LED_NUM; i--;)
+		led_set(i, 3, (const uint16_t[3]){0, 0x03ff, 0});
 
 #ifdef DEBUG
 	seg = (void *)buf;

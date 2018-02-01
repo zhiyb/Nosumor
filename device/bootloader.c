@@ -97,6 +97,8 @@ static inline void init()
 
 	puts(ESC_INIT "Initialising LEDs...");
 	led_init();
+	for (uint8_t i = LED_NUM; i--;)
+		led_set(i, 3, (const uint16_t[3]){0x03ff, 0, 0});
 
 	puts(ESC_INIT "Initialising USB HS...");
 	usb_init(&usb, USB_OTG_HS);
@@ -127,6 +129,9 @@ static inline void init()
 
 	puts(ESC_GOOD "Initialisation done");
 	usb_connect(&usb, 1);
+
+	for (uint8_t i = LED_NUM; i--;)
+		led_set(i, 3, (const uint16_t[3]){0, 0, 0x03ff});
 }
 
 static inline void flash()
