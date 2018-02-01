@@ -183,14 +183,18 @@ int main()
 	};
 #endif
 
-loop:
-	// Process time consuming tasks
+	uint32_t tick = 0;
+loop:	// Process time consuming tasks
 	usb_process(&usb);
 	usb_msc_process(&usb, usb_msc);
-	usb_hid_vendor_process(usb_hid_vendor, &vendor_process);
 	audio_process();
-	led_trigger_process();
-	fflush(stdout);
+	// Update less significant tasks every 1 ms
+	if (tick != systick_cnt()) {
+		tick = systick_cnt();
+		led_trigger_process();
+		usb_hid_vendor_process(usb_hid_vendor, &vendor_process);
+		fflush(stdout);
+	}
 
 #ifdef DEBUG
 	// Every 1024 systick ticks

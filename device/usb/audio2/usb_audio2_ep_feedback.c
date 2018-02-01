@@ -12,7 +12,7 @@
 // Frequency calculation update interval
 #define INTERVAL	1024u
 // Endpoint update repeats
-#define EP_UPDATES	2u
+#define EP_UPDATES	4u
 
 uint32_t cnt = 0;
 
@@ -76,7 +76,7 @@ static void epin_xfr_cplt(usb_t *usb, uint32_t n)
 	usb_isoc_check(usb, n | EP_DIR_IN, 0);
 	// Enable endpoint
 	data->pending = 0;
-	if (!data->cnt)
+	if (data->cnt)
 		epin_update(usb, n);
 }
 

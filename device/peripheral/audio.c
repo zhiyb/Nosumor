@@ -338,12 +338,17 @@ static inline uint32_t *next_frame(uint32_t nbytes)
 void audio_play(void *p, uint32_t size)
 {
 	uint32_t nbytes = AUDIO_TRANSFER_BYTES(STREAM_TX->NDTR);
-	uint32_t *mem = data.ptr ?: next_frame(nbytes), *ptr = (uint32_t *)p;
-	// Fill buffer
+#if HWVER >= 0x0100
+	uint64_t *mem = data.ptr ?: next_frame(nbytes);
+	uint64_t *mptr = mem, *ptr = (uint64_t *)p;
+	uint32_t slots = size >> 3u;
+#else
+	uint32_t *mem = data.ptr ?: next_frame(nbytes);
+	uint32_t *mptr = mem, *ptr = (uint32_t *)p;
 	uint32_t slots = size >> 2u;
 	if (slots & 1u)
 		dbgbkpt();
-	uint32_t *mptr = mem;
+#endif
 	while (slots--) {
 #if HWVER >= 0x0100
 		*mptr++ = *ptr++;
