@@ -7,7 +7,7 @@ AIC_RX	SAI2_B	DMA2_Stream7(0)
 
 RGB	TM1_CH1	DMA2_Stream6(0)
 
-#else
+#elif HWVER == 0x0003
 
 SDMMC	SDMMC1	DMA2_Stream3(4)
 
@@ -15,5 +15,16 @@ I2S_TX	SPI1_TX	DMA2_Stream5(3)
 I2S_RX	SPI2_RX	DMA1_Stream3(0)
 
 RGB	TM5_CH4	DMA1_Stream1(6)
+
+#elif HWVER == 0x0002
+
+SDMMC	SDMMC1	DMA2_Stream3(4)
+
+I2S_TX	SPI1_TX	DMA2_Stream5(3)
+I2S_RX	SPI2_RX	DMA1_Stream3(0)
+
+RGB2	TM5_CH4	DMA1_Stream1(6)
+RGB1	TM1_CH1	DMA1_Stream6(3)
+RGB1	TM1_CH1	DMA2_Stream6(0)
 
 #endif

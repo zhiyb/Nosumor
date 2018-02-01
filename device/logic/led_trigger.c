@@ -65,15 +65,19 @@ struct node_t {
 static void node_led_set(struct node_t *np, float *v);
 
 static struct node_t nodes[] = {
-#if LED_NUM != 4
-#error Unsupported LED count
-#endif
 	{(void *)1, 3, {{TGKL, Min | 0}, {TGBreath, Min | 0}}, node_led_set},
 	{(void *)2, 3, {{TGKR, Min | 0}, {TGBreath, Min | 0}}, node_led_set},
+#if LED_NUM == 3
+	{(void *)0, 3, {{TGK1, TGK2, TGK3, Min | 0},
+			{TGBreath, Min | 0}, {TGUSB, Min | 0}}, node_led_set},
+#elif LED_NUM == 4
 	{(void *)0, 3, {{TGK1, TGK2, Min | 0},
 			{TGBreath, Min | 0}, {TGUSB, Min | 0}}, node_led_set},
 	{(void *)3, 3, {{TGK3, TGK2, Min | 0},
 			{TGBreath, Min | 0}, {TGUSB, Min | 0}}, node_led_set},
+#else
+#error Unsupported LED count
+#endif
 };
 
 /* Common functions */
@@ -142,9 +146,15 @@ void led_trigger_process()
 /* Trigger functions */
 
 static float trigger_constant_data[NUM_CHANNELS][NUM_NODES][3] = {
+#if LED_NUM == 3
+	{{1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}},
+	{{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}},
+	{{0.0, 0.0, 0.1}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}},
+#elif LED_NUM == 4
 	{{1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}},
 	{{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}, {1.0, 1.0, 0.0}},
 	{{0.0, 0.0, 0.1}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.1}},
+#endif
 };
 
 static const float *trigger_constant(const struct trigger_t *tp,

@@ -3,7 +3,11 @@
 
 #include <stdint.h>
 
+#if HWVER == 0x0002
+#define LED_NUM	3
+#else
 #define LED_NUM	4
+#endif
 
 void led_init();
 // Format: Position(8), Elements(4), Bits(4)
