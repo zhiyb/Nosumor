@@ -1,12 +1,12 @@
 import qbs
 
 Project {
-    name: "Nosumor_" + hwver_str
+    name: "Bootloader_" + hwver_str
     minimumQbsVersion: "1.7.1"
 
     property string device: "STM32F722"
     property bool cmsis_dsp: false
-    property bool bootloader: false
+    property bool bootloader: true
     property int hwver: 0x0100
     property string hwver_str: ("0000" + hwver.toString(16)).slice(-4)
 
@@ -22,19 +22,19 @@ Project {
         Depends {name: "gcc-none"}
 
         files: [
-            "main.c",
+            "bootloader.c",
         ]
 
         Group {
-            name: "Linker script for AXI"
+            name: "Linker script for AXI BL"
             condition: qbs.buildVariant === "debug"
-            files: "STM32F722RETx_FLASH_AXIM.ld"
+            files: "STM32F722RETx_FLASH_AXIM_BL.ld"
         }
 
         Group {
-            name: "Linker script for ITCM"
+            name: "Linker script for ITCM BL"
             condition: qbs.buildVariant === "release"
-            files: "STM32F722RETx_FLASH_ITCM.ld"
+            files: "STM32F722RETx_FLASH_ITCM_BL.ld"
         }
 
         Group {     // Properties for the produced executable
