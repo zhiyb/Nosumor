@@ -16,6 +16,8 @@
 static void usbif_ac_config(usb_t *usb, void *pdata)
 {
 	usb_audio_t *audio = (usb_audio_t *)pdata;
+	if (!audio->entities)
+		return;
 	if (!desc_ac.wTotalLength) {
 		desc_ac.wTotalLength = desc_ac.bLength;
 		for (usb_audio_entity_t **p = &audio->entities; *p; p = &(*p)->next)
@@ -70,6 +72,8 @@ static void usbif_ac_setup_class(usb_t *usb, void *data, uint32_t ep, setup_t pk
 static void usbif_as_config(usb_t *usb, void *pdata)
 {
 	usb_audio_t *data = (usb_audio_t *)pdata;
+	if (!data->entities)
+		return;
 
 	// Register endpoints
 	data->ep_data = usb_audio2_ep_data_register(usb);

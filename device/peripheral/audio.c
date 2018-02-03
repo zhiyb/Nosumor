@@ -40,10 +40,8 @@ static void audio_tick(uint32_t tick);
 
 void audio_init(void *i2c, usb_t *usb, usb_audio_t *audio)
 {
-	if (!i2c_check(i2c, AUDIO_I2C_ADDR)) {
-		dbgbkpt();
+	if (!i2c_check(i2c, AUDIO_I2C_ADDR))
 		return;
-	}
 
 	// Software reset
 	audio_init_reset(i2c);
