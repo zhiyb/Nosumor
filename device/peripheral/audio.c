@@ -11,9 +11,6 @@
 #include "i2c.h"
 #include "audio.h"
 
-#define I2C		AUDIO_I2C
-#define I2C_ADDR	AUDIO_I2C_ADDR
-
 #if HWVER >= 0x0100
 #define STREAM_TX	DMA2_Stream1
 #define STREAM_RX	DMA2_Stream7
@@ -33,7 +30,7 @@ static struct {
 	int32_t offset;
 } data SECTION(.dtcm);
 
-void audio_init_reset();
+void audio_init_reset(void *i2c);
 void audio_init_config();
 void audio_usb_config(usb_t *usb, usb_audio_t *audio);
 void audio_config_update();
@@ -41,33 +38,15 @@ void audio_config_enable(int enable);
 
 static void audio_tick(uint32_t tick);
 
-void audio_init(usb_t *usb, usb_audio_t *audio)
+void audio_init(void *i2c, usb_t *usb, usb_audio_t *audio)
 {
-	// Initialise I2C GPIOs
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN_Msk;
-	GPIO_MODER(GPIOB, 8, 0b10);	// 10: Alternative function mode
-	GPIO_OTYPER_OD(GPIOB, 8);
-	GPIO_OSPEEDR(GPIOB, 8, 0b00);	// Low speed (4MHz)
-	GPIO_PUPDR(GPIOB, 8, GPIO_PUPDR_UP);
-	GPIO_AFRH(GPIOB, 8, 4);		// AF4: I2C1
-
-	GPIO_MODER(GPIOB, 9, 0b10);
-	GPIO_OTYPER_OD(GPIOB, 9);
-	GPIO_OSPEEDR(GPIOB, 9, 0b00);
-	GPIO_PUPDR(GPIOB, 9, GPIO_PUPDR_UP);
-	GPIO_AFRH(GPIOB, 9, 4);
-
-	// Initialise I2C module
-	RCC->APB1ENR |= RCC_APB1ENR_I2C1EN_Msk;
-	i2c_init(I2C);
-
-	if (!i2c_check(I2C, I2C_ADDR)) {
+	if (!i2c_check(i2c, AUDIO_I2C_ADDR)) {
 		dbgbkpt();
 		return;
 	}
 
 	// Software reset
-	audio_init_reset();
+	audio_init_reset(i2c);
 	// Reset audio buffer
 	memset(&data, 0, sizeof(data));
 

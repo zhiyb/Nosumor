@@ -5,7 +5,7 @@
 #include "audio.h"
 #include "i2c.h"
 
-#define I2C		AUDIO_I2C
+static void *base;
 #define I2C_ADDR	AUDIO_I2C_ADDR
 
 #define SETCLR(src, bit, v)	if (v) (src) |= (bit); else (src) &= ~(bit)
@@ -43,13 +43,14 @@ typedef struct {
 
 volatile cfg_t cfg;
 
-void audio_init_reset()
+void audio_init_reset(void *i2c)
 {
+	base = i2c;
 	// Reset audio configurations
-	i2c_write_reg(I2C, I2C_ADDR, 0x00, 0x00);
-	i2c_write_reg(I2C, I2C_ADDR, 0x01, 0x01);
+	i2c_write_reg(base, I2C_ADDR, 0x00, 0x00);
+	i2c_write_reg(base, I2C_ADDR, 0x01, 0x01);
 	// Wait for audio reset
-	while (i2c_read_reg(I2C, I2C_ADDR, 0x01) & 0x01);
+	while (i2c_read_reg(base, I2C_ADDR, 0x01) & 0x01);
 }
 
 // Initial configuration
@@ -130,7 +131,7 @@ void audio_init_config()
 
 	// Write configration sequence
 	for (uint32_t i = 0; i != sizeof(cmd) / sizeof(cmd[0]) / 2; i++) {
-		i2c_write(I2C, I2C_ADDR, p, 2);
+		i2c_write(base, I2C_ADDR, p, 2);
 		p += 2;
 	}
 }
@@ -169,7 +170,7 @@ void audio_config_update()
 
 	// Write configration sequence
 	for (uint32_t i = 0; i != sizeof(cmd) / sizeof(cmd[0]) / 2; i++) {
-		i2c_write(I2C, I2C_ADDR, p, 2);
+		i2c_write(base, I2C_ADDR, p, 2);
 		p += 2;
 	}
 }

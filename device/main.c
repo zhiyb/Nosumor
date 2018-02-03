@@ -21,6 +21,7 @@
 #include "peripheral/audio.h"
 #include "peripheral/mmc.h"
 #include "peripheral/led.h"
+#include "peripheral/i2c.h"
 // USB interfaces
 #include "usb/usb.h"
 #include "usb/usb_ram.h"
@@ -63,6 +64,27 @@ static inline void usart6_init()
 	fio_setup(uart_putc, uart_getc, USART6);
 }
 
+static inline void i2c1_init()
+{
+	// Initialise I2C GPIOs
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN_Msk;
+	GPIO_MODER(GPIOB, 8, 0b10);	// 10: Alternative function mode
+	GPIO_OTYPER_OD(GPIOB, 8);
+	GPIO_OSPEEDR(GPIOB, 8, 0b00);	// Low speed (4MHz)
+	GPIO_PUPDR(GPIOB, 8, GPIO_PUPDR_UP);
+	GPIO_AFRH(GPIOB, 8, 4);		// AF4: I2C1
+
+	GPIO_MODER(GPIOB, 9, 0b10);
+	GPIO_OTYPER_OD(GPIOB, 9);
+	GPIO_OSPEEDR(GPIOB, 9, 0b00);
+	GPIO_PUPDR(GPIOB, 9, GPIO_PUPDR_UP);
+	GPIO_AFRH(GPIOB, 9, 4);
+
+	// Initialise I2C module
+	RCC->APB1ENR |= RCC_APB1ENR_I2C1EN_Msk;
+	i2c_init(I2C1);
+}
+
 static inline void init()
 {
 	SCB_EnableICache();
@@ -87,9 +109,12 @@ static inline void init()
 	while (usb_mode(&usb) != 0);
 	usb_init_device(&usb);
 
+	puts(ESC_INIT "Initialising I2C...");
+	i2c1_init();
+
 	puts(ESC_INIT "Initialising audio...");
 	usb_audio_t *audio = usb_audio2_init(&usb);
-	audio_init(&usb, audio);
+	audio_init(I2C1, &usb, audio);
 
 	puts(ESC_INIT "Initialising USB HID interface...");
 	usb_hid_t *hid = usb_hid_init(&usb);

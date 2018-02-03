@@ -106,17 +106,17 @@ static void vendor_i2c(usb_hid_if_t *hid, uint8_t size, void *payload)
 	report.size = VENDOR_REPORT_BASE_SIZE + 2u;
 	report.payload[0] = addr;
 	if (addr & 1u)
-		report.payload[1] = i2c_read_reg(AUDIO_I2C, addr >> 1u, *p);
+		report.payload[1] = i2c_read_reg(I2C1, addr >> 1u, *p);
 	else {
 		addr >>= 1u;
 		uint8_t ack = 0x81;
 		uint8_t *p = payload;
 		if (size == 0)
-			ack &= i2c_check(AUDIO_I2C, addr);
+			ack &= i2c_check(I2C1, addr);
 		// Align to 2-byte register-value pairs
 		for (size &= ~0x01; size; size -= 2u) {
 			uint8_t reg = *p++;
-			ack &= i2c_write_reg(AUDIO_I2C, addr, reg, *p++);
+			ack &= i2c_write_reg(I2C1, addr, reg, *p++);
 		}
 		report.payload[1] = ack;
 	}
