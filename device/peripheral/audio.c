@@ -38,10 +38,10 @@ void audio_config_enable(int enable);
 
 static void audio_tick(uint32_t tick);
 
-void audio_init(void *i2c, usb_t *usb, usb_audio_t *audio)
+uint32_t audio_init(void *i2c, usb_t *usb, usb_audio_t *audio)
 {
 	if (!i2c_check(i2c, AUDIO_I2C_ADDR))
-		return;
+		return 1;
 
 	// Software reset
 	audio_init_reset(i2c);
@@ -248,6 +248,7 @@ void audio_init(void *i2c, usb_t *usb, usb_audio_t *audio)
 	//systick_register_handler(audio_tick);
 	audio_usb_config(usb, audio);
 	audio_process();
+	return 0;
 }
 
 static void audio_tick(uint32_t tick)

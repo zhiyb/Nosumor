@@ -28,7 +28,7 @@ extern "C" {
 typedef struct usb_t usb_t;
 typedef struct usb_audio_t usb_audio_t;
 
-void audio_init(void *i2c, usb_t *usb, usb_audio_t *audio);
+uint32_t audio_init(void *i2c, usb_t *usb, usb_audio_t *audio);
 void audio_out_enable(int enable);
 void audio_play(void *p, uint32_t size);
 void audio_process();

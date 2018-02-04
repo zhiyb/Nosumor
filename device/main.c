@@ -19,6 +19,7 @@
 #include "peripheral/uart.h"
 #include "peripheral/keyboard.h"
 #include "peripheral/audio.h"
+#include "peripheral/mpu.h"
 #include "peripheral/mmc.h"
 #include "peripheral/led.h"
 #include "peripheral/i2c.h"
@@ -114,7 +115,14 @@ static inline void init()
 
 	puts(ESC_INIT "Initialising audio...");
 	usb_audio_t *audio = usb_audio2_init(&usb);
-	audio_init(I2C1, &usb, audio);
+	if (audio_init(I2C1, &usb, audio) != 0)
+		puts(ESC_ERROR "Error initialising audio");
+
+#ifdef DEBUG
+	puts(ESC_INIT "Initialising MPU...");
+	if (mpu_init(I2C1) != 0)
+		puts(ESC_ERROR "Error initialising MPU");
+#endif
 
 	puts(ESC_INIT "Initialising USB HID interface...");
 	usb_hid_t *hid = usb_hid_init(&usb);
@@ -144,59 +152,9 @@ static inline void init()
 	usb_connect(&usb, 1);
 }
 
-static inline void fatfs_test()
-{
-	static FATFS fs SECTION(.dtcm);
-	memset(&fs, 0, sizeof(fs));
-	puts(ESC_INIT "Testing FatFS...");
-
-	// Mount volume
-	FRESULT res;
-	if ((res = f_mount(&fs, "MMC:", 1)) != FR_OK) {
-		printf(ESC_ERROR "f_mount: %d\n", res);
-		return;
-	}
-
-	// Open root directory for listing
-	DIR dir;
-	if ((res = f_opendir(&dir, "MMC:/")) != FR_OK) {
-		printf(ESC_ERROR "f_opendir: %d\n", res);
-		return;
-	}
-	// Iterate through directory
-	FILINFO info;
-	for (;;) {
-		if ((res = f_readdir(&dir, &info)) != FR_OK) {
-			printf(ESC_ERROR "f_readdir: %d\n", res);
-			return;
-		}
-		if (info.fname[0] == 0)
-			break;
-		printf(ESC_INFO ESC_DATA "%s" ESC_INFO " type " ESC_DATA "0x%x"
-		       ESC_INFO " size " ESC_DATA "%"PRIu64
-		       "\n", info.fname, info.fattrib, info.fsize);
-	}
-	// Close directory
-	if ((res = f_closedir(&dir)) != FR_OK) {
-		printf(ESC_ERROR "f_closedir: %d\n", res);
-		return;
-	}
-
-	// Unmount volume
-	if ((res = f_mount(NULL, "MMC:", 0)) != FR_OK) {
-		printf(ESC_ERROR "f_unmount: %d\n", res);
-		return;
-	}
-
-	puts(ESC_GOOD "FatFS tests completed");
-}
-
 int main()
 {
 	init();
-#ifdef DEBUG
-	fatfs_test();
-#endif
 
 #ifdef DEBUG
 	struct {
@@ -208,16 +166,31 @@ int main()
 	};
 #endif
 
-	uint32_t tick = 0;
+	uint32_t tick = 0, tick128 = 0;
 loop:	// Process time consuming tasks
 	usb_process(&usb);
 	usb_msc_process(&usb, usb_msc);
 	audio_process();
-	// Update less significant tasks every 1 ms
+#ifdef DEBUG
+	mpu_process();
+#endif
+	// Update tasks every 1 ms
 	if (tick != systick_cnt()) {
 		tick = systick_cnt();
 		led_trigger_process();
 		usb_hid_vendor_process(usb_hid_vendor, &vendor_process);
+	}
+	// Update tasks every 128 ms
+	if (systick_cnt() - tick128 >= 128u) {
+		tick128 = systick_cnt();
+#ifdef DEBUG
+		int16_t *accel = mpu_accel();
+		int16_t *gyro = mpu_gyro();
+		dbgprintf(ESC_DEBUG "[MPU] "
+			  ESC_DATA "(%6d, %6d, %6d)\t(%6d, %6d, %6d)\n",
+			  accel[0], accel[1], accel[2],
+			  gyro[0], gyro[1], gyro[2]);
+#endif
 		fflush(stdout);
 	}
 
