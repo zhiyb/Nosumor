@@ -83,7 +83,7 @@ void mpu_process()
 		return;
 	}
 	cnt = cnt - cnt % 12u;
-	uint8_t buf[cnt];
+	static uint8_t buf[512] SECTION(.dtcm);
 	i2c_read(base, I2C_ADDR, FIFO_R_W, buf, cnt);
 	// Correct endianness
 	uint32_t *u32p = (void *)buf;
