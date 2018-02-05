@@ -13,6 +13,7 @@
 #include "vendor.h"
 
 #define UID	((uint32_t *)UID_BASE)
+#define OTP	((otp_t *)FLASH_OTP_BASE)
 
 typedef struct PACKED {
 	union PACKED {
@@ -24,7 +25,7 @@ typedef struct PACKED {
 	uint8_t lock[16];
 } otp_t;
 
-#define OTP	((otp_t *)FLASH_OTP_BASE)
+extern void *i2c;
 
 static vendor_report_t report SECTION(.dtcm);
 
@@ -106,17 +107,17 @@ static void vendor_i2c(usb_hid_if_t *hid, uint8_t size, void *payload)
 	report.size = VENDOR_REPORT_BASE_SIZE + 2u;
 	report.payload[0] = addr;
 	if (addr & 1u)
-		report.payload[1] = i2c_read_reg(I2C1, addr >> 1u, *p);
+		report.payload[1] = i2c_read_reg(i2c, addr >> 1u, *p);
 	else {
 		addr >>= 1u;
 		uint8_t ack = 0x81;
 		uint8_t *p = payload;
 		if (size == 0)
-			ack &= i2c_check(I2C1, addr);
+			ack &= i2c_check(i2c, addr);
 		// Align to 2-byte register-value pairs
 		for (size &= ~0x01; size; size -= 2u) {
 			uint8_t reg = *p++;
-			ack &= i2c_write_reg(I2C1, addr, reg, *p++);
+			ack &= i2c_write_reg(i2c, addr, reg, *p++);
 		}
 		report.payload[1] = ack;
 	}

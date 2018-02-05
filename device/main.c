@@ -42,6 +42,7 @@ extern size_t heap_usage();
 extern size_t heap_size();
 #endif
 
+void *i2c;	// Shared with vendor.c
 usb_t usb;	// Shared with PVD
 static usb_msc_t *usb_msc = 0;
 static usb_hid_if_t *usb_hid_vendor = 0;
@@ -65,7 +66,7 @@ static inline void usart6_init()
 	fio_setup(uart_putc, uart_getc, USART6);
 }
 
-static inline void i2c1_init()
+static inline void *i2c1_init()
 {
 	// Initialise I2C GPIOs
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN_Msk;
@@ -81,9 +82,23 @@ static inline void i2c1_init()
 	GPIO_PUPDR(GPIOB, 9, GPIO_PUPDR_UP);
 	GPIO_AFRH(GPIOB, 9, 4);
 
-	// Initialise I2C module
+	static const struct i2c_config_t config = {
+		.base = I2C1,
+		.rx = DMA1_Stream0, .tx = DMA1_Stream7, .rxch = 1, .txch = 1,
+		.rxr = &DMA1->LIFCR, .txr = &DMA1->HIFCR,
+		.rxm = DMA_LIFCR_CTCIF0_Msk | DMA_LIFCR_CHTIF0_Msk |
+		DMA_LIFCR_CTEIF0_Msk | DMA_LIFCR_CDMEIF0_Msk |
+		DMA_LIFCR_CFEIF0_Msk,
+		.txm = DMA_HIFCR_CTCIF7_Msk | DMA_HIFCR_CHTIF7_Msk |
+		DMA_HIFCR_CTEIF7_Msk | DMA_HIFCR_CDMEIF7_Msk |
+		DMA_HIFCR_CFEIF7_Msk,
+	};
+
+	// Enable I2C module
 	RCC->APB1ENR |= RCC_APB1ENR_I2C1EN_Msk;
-	i2c_init(I2C1);
+	// Enable I2C DMAs
+	RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN_Msk;
+	return i2c_init(&config);
 }
 
 static inline void init()
@@ -111,16 +126,16 @@ static inline void init()
 	usb_init_device(&usb);
 
 	puts(ESC_INIT "Initialising I2C...");
-	i2c1_init();
+	i2c = i2c1_init();
 
 	puts(ESC_INIT "Initialising audio...");
 	usb_audio_t *audio = usb_audio2_init(&usb);
-	if (audio_init(I2C1, &usb, audio) != 0)
+	if (audio_init(i2c, &usb, audio) != 0)
 		puts(ESC_ERROR "Error initialising audio");
 
 #ifdef DEBUG
 	puts(ESC_INIT "Initialising MPU...");
-	if (mpu_init(I2C1) != 0)
+	if (mpu_init(i2c) != 0)
 		puts(ESC_ERROR "Error initialising MPU");
 #endif
 

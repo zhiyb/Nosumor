@@ -8,13 +8,28 @@
 extern "C" {
 #endif
 
-void i2c_init(I2C_TypeDef *i2c);
-int i2c_check(I2C_TypeDef *i2c, uint8_t addr);
-int i2c_write(I2C_TypeDef *i2c, uint8_t addr, const uint8_t *p, uint32_t cnt);
-int i2c_write_reg(I2C_TypeDef *i2c, uint8_t addr, uint8_t reg, uint8_t val);
-int i2c_read(I2C_TypeDef *i2c, uint8_t addr, uint8_t reg,
+struct i2c_t;
+
+struct i2c_config_t {
+	// I2C base address
+	I2C_TypeDef *base;
+	// DMA streams
+	DMA_Stream_TypeDef *rx, *tx;
+	// DMA channels
+	uint16_t rxch, txch;
+	// Flag clear registers
+	volatile uint32_t *rxr, *txr;
+	// Flag clear masks
+	uint32_t rxm, txm;
+};
+
+struct i2c_t *i2c_init(const struct i2c_config_t *conf);
+int i2c_check(struct i2c_t *i2c, uint8_t addr);
+int i2c_write(struct i2c_t *i2c, uint8_t addr, const uint8_t *p, uint32_t cnt);
+int i2c_write_reg(struct i2c_t *i2c, uint8_t addr, uint8_t reg, uint8_t val);
+int i2c_read(struct i2c_t *i2c, uint8_t addr, uint8_t reg,
 	     uint8_t *p, uint32_t cnt);
-int i2c_read_reg(I2C_TypeDef *i2c, uint8_t addr, uint8_t reg);
+int i2c_read_reg(struct i2c_t *i2c, uint8_t addr, uint8_t reg);
 
 #ifdef __cplusplus
 }
