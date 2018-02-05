@@ -13,11 +13,11 @@ Keycode::Keycode(hid_device *dev, QWidget *parent) : PluginWidget(parent)
 	auto bg = new QButtonGroup(this);
 
 	auto pb = new QPushButton(QObject::tr("Update K&L"), this);
-	bg->addButton(pb, 1);
+	bg->addButton(pb, 0);
 	layout->addWidget(pb);
 
 	pb = new QPushButton(QObject::tr("Update K&R"), this);
-	bg->addButton(pb, 0);
+	bg->addButton(pb, 1);
 	layout->addWidget(pb);
 
 	pb = new QPushButton(QObject::tr("Update K&1"), this);
