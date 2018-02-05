@@ -8,7 +8,7 @@
 
 uint32_t mpu_init(void *i2c);
 void mpu_process();
-int16_t *mpu_accel();
-int16_t *mpu_gyro();
+volatile int16_t *mpu_accel();
+volatile int16_t *mpu_gyro();
 
 #endif // MPU_H

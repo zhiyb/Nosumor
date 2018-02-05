@@ -10,7 +10,7 @@
 
 static void *base;
 static struct {
-	int16_t gyro[3], accel[3];
+	volatile int16_t gyro[3], accel[3];
 } data;
 
 static void mpu_tick(uint32_t tick);
@@ -69,6 +69,25 @@ uint32_t mpu_init(void *i2c)
 	return 0;
 }
 
+void data_callback(const struct i2c_op_t *op)
+{
+	// Correct endianness
+	uint32_t *u32p = (void *)op->p;
+	for (uint32_t i = op->size >> 2u; i--; u32p++)
+		*u32p = __REV16(*u32p);
+	// Data processing
+	int16_t *u16p = (void *)op->p;
+	volatile int16_t *p;
+	for (uint32_t i = op->size / 12u; i--;) {
+		p = data.accel;
+		for (uint32_t j = 3u; j--;)
+			*p++ = *u16p++;
+		p = data.gyro;
+		for (uint32_t j = 3u; j--;)
+			*p++ = *u16p++;
+	}
+}
+
 void mpu_process()
 {
 	uint16_t cnt;
@@ -83,30 +102,23 @@ void mpu_process()
 		return;
 	}
 	cnt = cnt - cnt % 12u;
+	if (!cnt)
+		return;
 	static uint8_t buf[512] SECTION(.dtcm);
-	i2c_read(base, I2C_ADDR, FIFO_R_W, buf, cnt);
-	// Correct endianness
-	uint32_t *u32p = (void *)buf;
-	for (uint32_t i = cnt >> 2u; i--; u32p++)
-		*u32p = __REV16(*u32p);
-	// Data processing
-	int16_t *u16p = (void *)buf, *p;
-	for (uint32_t i = cnt / 12u; i--;) {
-		p = data.accel;
-		for (uint32_t j = 3u; j--;)
-			*p++ = *u16p++;
-		p = data.gyro;
-		for (uint32_t j = 3u; j--;)
-			*p++ = *u16p++;
-	}
+	static struct i2c_op_t op = {
+		.op = I2CRead, .addr = I2C_ADDR, .reg = FIFO_R_W,
+		.p = buf, .size = 0, .cb = data_callback,
+	};
+	op.size = cnt;
+	i2c_read_op(base, &op);
 }
 
-int16_t *mpu_accel()
+volatile int16_t *mpu_accel()
 {
 	return data.accel;
 }
 
-int16_t *mpu_gyro()
+volatile int16_t *mpu_gyro()
 {
 	return data.gyro;
 }
