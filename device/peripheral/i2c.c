@@ -87,7 +87,8 @@ int i2c_write(struct i2c_t *i2c, uint8_t addr, const uint8_t *p, uint32_t cnt)
 	};
 	i2c->op_status = Write;
 	i2c_op(i2c, &i2c->op);
-	while (i2c->op_status != Idle);
+	while (i2c->op_status != Idle)
+		__WFE();
 	return 1;
 }
 
@@ -99,7 +100,8 @@ int i2c_write_reg(struct i2c_t *i2c, uint8_t addr, uint8_t reg, uint8_t val)
 	};
 	i2c->op_status = Write;
 	i2c_op(i2c, &i2c->op);
-	while (i2c->op_status != Idle);
+	while (i2c->op_status != Idle)
+		__WFE();
 	return 1;
 }
 
@@ -112,7 +114,8 @@ int i2c_read(struct i2c_t *i2c, uint8_t addr, uint8_t reg,
 	};
 	i2c->op_status = Read;
 	i2c_op(i2c, &i2c->op);
-	while (i2c->op_status != Idle);
+	while (i2c->op_status != Idle)
+		__WFE();
 	return 1;
 }
 
@@ -125,7 +128,8 @@ int i2c_read_reg(struct i2c_t *i2c, uint8_t addr, uint8_t reg)
 	};
 	i2c->op_status = Read;
 	i2c_op(i2c, &i2c->op);
-	while (i2c->op_status != Idle);
+	while (i2c->op_status != Idle)
+		__WFE();
 	return v;
 }
 
@@ -255,9 +259,9 @@ static void op_done(struct i2c_t *i2c, struct i2c_node_t **n)
 
 void i2c_op(struct i2c_t *i2c, const struct i2c_op_t *op)
 {
+	__disable_irq();
 	struct i2c_node_t *n = malloc(sizeof(struct i2c_node_t));
 	n->op = op;
-	__disable_irq();
 	n->next = i2c->node;
 	i2c->node = n;
 	__enable_irq();
