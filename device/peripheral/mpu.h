@@ -7,7 +7,6 @@
 #define AK8963_I2C_ADDR	0x0c
 
 uint32_t mpu_init(void *i2c);
-void mpu_process();
 volatile int16_t *mpu_accel();
 volatile int16_t *mpu_gyro();
 

@@ -24,9 +24,9 @@ struct i2c_config_t {
 	uint32_t rxm, txm;
 };
 
-typedef void (*i2c_callback_t)(const struct i2c_op_t *op);
+typedef void (*i2c_callback_t)(struct i2c_t *i2c, const struct i2c_op_t *op);
 
-enum I2COp {I2CRead = 0, I2CWrite, I2CError = 0x80};
+enum I2COp {I2CRead = 0, I2CWrite, I2CDMA = 0x08, I2CError = 0x80};
 
 struct i2c_op_t {
 	enum I2COp op;
@@ -42,7 +42,7 @@ int i2c_write(struct i2c_t *i2c, uint8_t addr, const uint8_t *p, uint32_t cnt);
 int i2c_write_reg(struct i2c_t *i2c, uint8_t addr, uint8_t reg, uint8_t val);
 int i2c_read(struct i2c_t *i2c, uint8_t addr, uint8_t reg,
 	     uint8_t *p, uint32_t cnt);
-void i2c_read_op(struct i2c_t *i2c, const struct i2c_op_t *op);
+void i2c_op(struct i2c_t *i2c, const struct i2c_op_t *op);
 int i2c_read_reg(struct i2c_t *i2c, uint8_t addr, uint8_t reg);
 
 #ifdef __cplusplus

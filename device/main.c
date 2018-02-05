@@ -186,9 +186,6 @@ loop:	// Process time consuming tasks
 	usb_process(&usb);
 	usb_msc_process(&usb, usb_msc);
 	audio_process();
-#ifdef DEBUG
-	mpu_process();
-#endif
 	// Update tasks every 1 ms
 	if (tick != systick_cnt()) {
 		tick = systick_cnt();

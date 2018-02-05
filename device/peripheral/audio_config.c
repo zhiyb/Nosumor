@@ -41,7 +41,7 @@ typedef struct {
 	} sp[2];
 } cfg_t;
 
-volatile cfg_t cfg;
+volatile cfg_t cfg SECTION(.dtcm);
 
 void audio_init_reset(void *i2c)
 {

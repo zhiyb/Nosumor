@@ -8,12 +8,11 @@
 
 #define I2C_ADDR	MPU_I2C_ADDR
 
-static void *base;
 static struct {
 	volatile int16_t gyro[3], accel[3];
 } data;
 
-static void mpu_tick(uint32_t tick);
+static void start(void *i2c);
 
 static void gpio_init()
 {
@@ -62,14 +61,14 @@ uint32_t mpu_init(void *i2c)
 {
 	if (!i2c_check(i2c, I2C_ADDR))
 		return 1;
-	base = i2c;
 	gpio_init();
 	reset(i2c);
 	config(i2c);
+	start(i2c);
 	return 0;
 }
 
-void data_callback(const struct i2c_op_t *op)
+static void data_callback(struct i2c_t *i2c, const struct i2c_op_t *op)
 {
 	// Correct endianness
 	uint32_t *u32p = (void *)op->p;
@@ -88,16 +87,11 @@ void data_callback(const struct i2c_op_t *op)
 	}
 }
 
-void mpu_process()
+static void fifo(struct i2c_t *i2c, uint16_t cnt)
 {
-	uint16_t cnt;
-	cnt = i2c_read_reg(base, I2C_ADDR, FIFO_COUNTH) << 8u;
-	cnt |= i2c_read_reg(base, I2C_ADDR, FIFO_COUNTL);
-	if (!cnt)
-		return;
 	if (cnt == 512u) {
 		// Enable FIFO operation, reset FIFO
-		i2c_write_reg(base, I2C_ADDR, USER_CTRL, 0x44);
+		i2c_write_reg(i2c, I2C_ADDR, USER_CTRL, 0x44);
 		dbgprintf(ESC_ERROR "[MPU] FIFO overflow\n");
 		return;
 	}
@@ -106,11 +100,32 @@ void mpu_process()
 		return;
 	static uint8_t buf[512] SECTION(.dtcm);
 	static struct i2c_op_t op = {
-		.op = I2CRead, .addr = I2C_ADDR, .reg = FIFO_R_W,
+		.op = I2CRead | I2CDMA, .addr = I2C_ADDR, .reg = FIFO_R_W,
 		.p = buf, .size = 0, .cb = data_callback,
 	};
 	op.size = cnt;
-	i2c_read_op(base, &op);
+	i2c_op(i2c, &op);
+}
+
+static void cnt_callback(struct i2c_t *i2c, const struct i2c_op_t *op)
+{
+	fifo(i2c, *(uint16_t *)op->p);
+	// Check FIFO level
+	start(i2c);
+}
+
+static void start(void *i2c)
+{
+	static uint16_t cnt SECTION(.dtcm);
+	static const struct i2c_op_t op_h = {
+		.op = I2CRead, .addr = I2C_ADDR, .reg = FIFO_COUNTH,
+		.p = (uint8_t *)&cnt + 1, .size = 1, .cb = 0,
+	}, op_l = {
+		.op = I2CRead, .addr = I2C_ADDR, .reg = FIFO_COUNTL,
+		.p = (uint8_t *)&cnt + 0, .size = 1, .cb = cnt_callback,
+	};
+	i2c_op(i2c, &op_h);
+	i2c_op(i2c, &op_l);
 }
 
 volatile int16_t *mpu_accel()
