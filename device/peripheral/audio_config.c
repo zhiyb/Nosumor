@@ -131,7 +131,7 @@ void audio_init_config()
 
 	// Write configration sequence
 	for (uint32_t i = 0; i != sizeof(cmd) / sizeof(cmd[0]) / 2; i++) {
-		i2c_write(base, I2C_ADDR, p, 2);
+		i2c_write_reg(base, I2C_ADDR, *p, *(p + 1));
 		p += 2;
 	}
 }
@@ -170,7 +170,7 @@ void audio_config_update()
 
 	// Write configration sequence
 	for (uint32_t i = 0; i != sizeof(cmd) / sizeof(cmd[0]) / 2; i++) {
-		i2c_write(base, I2C_ADDR, p, 2);
+		i2c_write_reg(base, I2C_ADDR, *p, *(p + 1));
 		p += 2;
 	}
 }

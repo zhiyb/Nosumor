@@ -52,7 +52,7 @@ static void config(void *i2c)
 
 	// Write configration sequence
 	for (uint32_t i = 0; i != sizeof(cmd) / sizeof(cmd[0]) / 2; i++) {
-		i2c_write(i2c, I2C_ADDR, p, 2);
+		i2c_write_reg(i2c, I2C_ADDR, *p, *(p + 1));
 		p += 2;
 	}
 }

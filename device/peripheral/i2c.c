@@ -79,11 +79,11 @@ int i2c_check(struct i2c_t *i2c, uint8_t addr)
 	return !(base->ISR & I2C_ISR_NACKF_Msk);
 }
 
-int i2c_write(struct i2c_t *i2c, uint8_t addr, const uint8_t *p, uint32_t cnt)
+int i2c_write(struct i2c_t *i2c, uint8_t addr, uint8_t reg, const uint8_t *p, uint32_t cnt)
 {
 	i2c->op = (struct i2c_op_t){
-			.op = I2CWrite, .addr = addr, .reg = *p,
-			.p = (uint8_t *)p + 1, .size = cnt - 1, .cb = callback,
+			.op = I2CWrite, .addr = addr, .reg = reg,
+			.p = (uint8_t *)p, .size = cnt, .cb = callback,
 	};
 	i2c->op_status = Write;
 	i2c_op(i2c, &i2c->op);
