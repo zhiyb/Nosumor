@@ -36,18 +36,7 @@ struct i2c_t *i2c_init(const struct i2c_config_t *conf)
 		NVIC_EnableIRQ(I2C1_EV_IRQn);
 	}
 
-	conf->base->CR1 = 0;	// Disable I2C, clear interrupts
-	conf->base->CR2 = 0;
-	// I2C at 400kHz (using 54MHz input clock)
-	// 100ns SU:DAT, 0us HD:DAT, 0.8us high period, 1.3us low period
-	conf->base->TIMINGR = (0u << I2C_TIMINGR_PRESC_Pos) |
-			(6u << I2C_TIMINGR_SCLDEL_Pos) | (0u << I2C_TIMINGR_SDADEL_Pos) |
-			(44u << I2C_TIMINGR_SCLH_Pos) | (71u << I2C_TIMINGR_SCLL_Pos);
-	// No timeouts
-	conf->base->TIMEOUTR = 0;
-	// Enable I2C
-	conf->base->CR1 = I2C_CR1_PE_Msk;
-
+	// Initialise RX DMA
 	// Peripheral to memory, 8bit -> 8bit, burst of 4 beats, low priority
 	conf->rx->CR = (conf->rxch << DMA_SxCR_CHSEL_Pos) | (0b00ul << DMA_SxCR_PL_Pos) |
 			(0b01ul << DMA_SxCR_MBURST_Pos) | (0b00ul << DMA_SxCR_PBURST_Pos) |
@@ -57,6 +46,20 @@ struct i2c_t *i2c_init(const struct i2c_config_t *conf)
 	conf->rx->PAR = (uint32_t)&conf->base->RXDR;
 	// FIFO control
 	conf->rx->FCR = DMA_SxFCR_DMDIS_Msk;
+
+	I2C_TypeDef *base = conf->base;
+	// Disable I2C, disable interrupts
+	base->CR1 = 0;
+	base->CR2 = 0;
+	// I2C at 400kHz (using 54MHz input clock)
+	// 100ns SU:DAT, 0us HD:DAT, 0.8us high period, 1.3us low period
+	base->TIMINGR = (0u << I2C_TIMINGR_PRESC_Pos) |
+			(6u << I2C_TIMINGR_SCLDEL_Pos) | (0u << I2C_TIMINGR_SDADEL_Pos) |
+			(44u << I2C_TIMINGR_SCLH_Pos) | (71u << I2C_TIMINGR_SCLL_Pos);
+	// No timeouts
+	base->TIMEOUTR = 0;
+	// Wait for transfer complete, enable I2C
+	base->CR1 = I2C_CR1_TCIE_Msk | I2C_CR1_STOPIE_Msk | I2C_CR1_PE_Msk;
 	return i2c;
 }
 
@@ -136,8 +139,6 @@ int i2c_read_reg(struct i2c_t *i2c, uint8_t addr, uint8_t reg)
 static void op_start(struct i2c_t *i2c, const struct i2c_op_t *op)
 {
 	I2C_TypeDef *base = i2c->c.base;
-	// Wait for transfer complete
-	base->CR1 |= I2C_CR1_TCIE_Msk | I2C_CR1_STOPIE_Msk;
 	if (op->op == (I2CRead | I2CDMA))
 		// Enable reception DMA
 		base->CR1 |= I2C_CR1_RXDMAEN_Msk;
@@ -165,15 +166,17 @@ static void op_write(struct i2c_t *i2c, const struct i2c_op_t *op)
 {
 	// Data transmit
 	I2C_TypeDef *base = i2c->c.base;
+	if (!(op->op & I2CDMA)) {
+		base->TXDR = *i2c->p++;
+		// Last transfer, disable TX register empty interrupt
+		if (!--i2c->cnt)
+			base->CR1 &= ~I2C_CR1_TXIE_Msk;
+		return;
+	}
 	DMA_Stream_TypeDef *tx = i2c->c.tx;
 	uint32_t n = i2c->cnt;
 	uint32_t mask = 0;
-	if (op->op & I2CDMA)
-		dbgbkpt();
-	base->TXDR = *i2c->p++;
-	// Last transfer, disable TX register empty interrupt
-	if (!--i2c->cnt)
-		base->CR1 &= ~I2C_CR1_TXIE_Msk;
+	dbgbkpt();
 }
 
 static void op_read(struct i2c_t *i2c, const struct i2c_op_t *op)
@@ -221,9 +224,6 @@ static void op_read(struct i2c_t *i2c, const struct i2c_op_t *op)
 	i2c->p += n;
 	i2c->cnt -= n;
 	i2c->status = Read;
-	mask = (mask & I2C_CR2_RELOAD_Msk) ?
-				I2C_CR1_TCIE_Msk : I2C_CR1_STOPIE_Msk;
-	base->CR1 = (base->CR1 & ~I2C_CR1_TCIE_Msk) | mask;
 }
 
 static void op_process(struct i2c_t *i2c)
