@@ -129,9 +129,12 @@ static inline void init()
 	i2c = i2c1_init();
 
 	puts(ESC_INIT "Initialising audio...");
-	usb_audio_t *audio = usb_audio2_init(&usb);
-	if (audio_init(i2c, &usb, audio) != 0)
+	if (audio_init(i2c) != 0) {
 		puts(ESC_ERROR "Error initialising audio");
+	} else {
+		usb_audio_t *audio = usb_audio2_init(&usb);
+		audio_usb_audio(&usb, audio);
+	}
 
 #ifdef DEBUG
 	puts(ESC_INIT "Initialising MPU...");
