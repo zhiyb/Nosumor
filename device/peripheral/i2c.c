@@ -1,4 +1,5 @@
 #include <malloc.h>
+#include <string.h>
 #include <stm32f7xx.h>
 #include <system/systick.h>
 #include <irq.h>
@@ -91,16 +92,15 @@ static void callback_nb(struct i2c_t *i2c,
 
 int i2c_check(struct i2c_t *i2c, uint8_t addr)
 {
-	return 1;
-	while (i2c->status != Idle);
-	I2C_TypeDef *base = i2c->c.base;
-	base->ICR = I2C_ICR_STOPCF_Msk | I2C_ICR_NACKCF_Msk;
-	base->CR2 = I2C_CR2_AUTOEND_Msk | I2C_CR2_START_Msk |
-			(0u << I2C_CR2_NBYTES_Pos) |
-			((addr << 1u) << I2C_CR2_SADD_Pos);
-	while (!(base->ISR & I2C_ISR_STOPF_Msk));
-	base->ICR = I2C_ICR_STOPCF_Msk;
-	return !(base->ISR & I2C_ISR_NACKF_Msk);
+	i2c->op = (struct i2c_op_t){
+			.op = I2CCheck, .addr = addr, .reg = 0,
+			.p = 0, .size = 0, .cb = callback,
+	};
+	i2c->op_status = Write;
+	i2c_op(i2c, &i2c->op);
+	while (i2c->op_status == Write)
+		__WFE();
+	return !(i2c->op_status & Error);
 }
 
 int i2c_write(struct i2c_t *i2c, uint8_t addr, uint8_t reg,
@@ -201,7 +201,12 @@ static void op_start(struct i2c_t *i2c, const struct i2c_op_t *op)
 	else
 		dbgbkpt();
 	// Start register address write transfer
-	if ((op->op & (I2CRead | I2CWrite)) == I2CRead) {
+	if (op->op == I2CCheck) {
+		base->CR2 = ((op->addr << 1u) << I2C_CR2_SADD_Pos) |
+				(0u << I2C_CR2_NBYTES_Pos) |
+				I2C_CR2_START_Msk | I2C_CR2_AUTOEND_Msk;
+		goto check;
+	} else if ((op->op & (I2CRead | I2CWrite)) == I2CRead) {
 		base->CR2 = ((op->addr << 1u) << I2C_CR2_SADD_Pos) |
 				I2C_CR2_START_Msk | (1u << I2C_CR2_NBYTES_Pos);
 	} else {
@@ -211,12 +216,12 @@ static void op_start(struct i2c_t *i2c, const struct i2c_op_t *op)
 		// Enable TX register empty interrupt
 		base->CR1 |= I2C_CR1_TXIE_Msk;
 	}
-	// Update I2C status
-	i2c->p = op->p;
-	i2c->cnt = op->size;
-	i2c->status = Write;
 	// Transmit register address
 	base->TXDR = op->reg;
+	// Update I2C status
+	i2c->p = op->p;
+check:	i2c->cnt = op->size;
+	i2c->status = Write;
 	// Critical section end
 	if (base == I2C1)
 		NVIC_EnableIRQ(I2C1_EV_IRQn);

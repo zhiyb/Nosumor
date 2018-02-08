@@ -27,7 +27,7 @@ struct i2c_config_t {
 typedef void (*i2c_callback_t)(struct i2c_t *i2c,
 			       const struct i2c_op_t *op, uint32_t nack);
 
-enum I2COp {I2CRead = 0, I2CWrite, I2CDMA = 0x08};
+enum I2COp {I2CRead = 0, I2CWrite, I2CCheck, I2CDMA = 0x08};
 
 struct i2c_op_t {
 	enum I2COp op;
