@@ -10,7 +10,7 @@ struct i2c_node_t {
 	const struct i2c_op_t *op;
 };
 
-enum I2CStatus {Idle = 0, Read, Write};
+enum I2CStatus {Idle = 0, Read, Write, Error = 0x80};
 
 struct i2c_t {
 	struct i2c_config_t c;
@@ -27,14 +27,16 @@ struct i2c_t *i2c_init(const struct i2c_config_t *conf)
 	i2c->c = *conf;
 	i2c->node = 0;
 	i2c->status = Idle;
-	if (conf->base == I2C1) {
+	I2C_TypeDef *base = conf->base;
+	if (base == I2C1) {
 		i2c_p[0] = i2c;
 		// Enable NVIC interrupts
 		uint32_t pg = NVIC_GetPriorityGrouping();
 		NVIC_SetPriority(I2C1_EV_IRQn,
 				 NVIC_EncodePriority(pg, NVIC_PRIORITY_I2C, 0));
 		NVIC_EnableIRQ(I2C1_EV_IRQn);
-	}
+	} else
+		dbgbkpt();
 
 	// Initialise RX DMA
 	// Peripheral to memory, 8bit -> 8bit, burst of 4 beats, low priority
@@ -43,11 +45,10 @@ struct i2c_t *i2c_init(const struct i2c_config_t *conf)
 			(0b00ul << DMA_SxCR_MSIZE_Pos) | (0b00ul << DMA_SxCR_PSIZE_Pos) |
 			(0b00ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk;
 	// Peripheral address
-	conf->rx->PAR = (uint32_t)&conf->base->RXDR;
+	conf->rx->PAR = (uint32_t)&base->RXDR;
 	// FIFO control
 	conf->rx->FCR = DMA_SxFCR_DMDIS_Msk;
 
-	I2C_TypeDef *base = conf->base;
 	// Disable I2C, disable interrupts
 	base->CR1 = 0;
 	base->CR2 = 0;
@@ -58,14 +59,17 @@ struct i2c_t *i2c_init(const struct i2c_config_t *conf)
 			(44u << I2C_TIMINGR_SCLH_Pos) | (71u << I2C_TIMINGR_SCLL_Pos);
 	// No timeouts
 	base->TIMEOUTR = 0;
-	// Wait for transfer complete, enable I2C
+	// Clear interrupt flags
+	base->ICR = I2C_ICR_STOPCF_Msk | I2C_ICR_NACKCF_Msk;
+	// Enable transfer complete interrupt, enable I2C
 	base->CR1 = I2C_CR1_TCIE_Msk | I2C_CR1_STOPIE_Msk | I2C_CR1_PE_Msk;
 	return i2c;
 }
 
-static void callback(struct i2c_t *i2c, const struct i2c_op_t *op)
+static void callback(struct i2c_t *i2c,
+		     const struct i2c_op_t *op, uint32_t nack)
 {
-	i2c->op_status = Idle;
+	i2c->op_status = nack ? Error : Idle;
 }
 
 int i2c_check(struct i2c_t *i2c, uint8_t addr)
@@ -82,7 +86,8 @@ int i2c_check(struct i2c_t *i2c, uint8_t addr)
 	return !(base->ISR & I2C_ISR_NACKF_Msk);
 }
 
-int i2c_write(struct i2c_t *i2c, uint8_t addr, uint8_t reg, const uint8_t *p, uint32_t cnt)
+int i2c_write(struct i2c_t *i2c, uint8_t addr, uint8_t reg,
+	      const uint8_t *p, uint32_t cnt)
 {
 	i2c->op = (struct i2c_op_t){
 			.op = I2CWrite, .addr = addr, .reg = reg,
@@ -90,9 +95,9 @@ int i2c_write(struct i2c_t *i2c, uint8_t addr, uint8_t reg, const uint8_t *p, ui
 	};
 	i2c->op_status = Write;
 	i2c_op(i2c, &i2c->op);
-	while (i2c->op_status != Idle)
+	while (i2c->op_status == Write)
 		__WFE();
-	return 1;
+	return !(i2c->op_status & Error);
 }
 
 int i2c_write_reg(struct i2c_t *i2c, uint8_t addr, uint8_t reg, uint8_t val)
@@ -103,9 +108,9 @@ int i2c_write_reg(struct i2c_t *i2c, uint8_t addr, uint8_t reg, uint8_t val)
 	};
 	i2c->op_status = Write;
 	i2c_op(i2c, &i2c->op);
-	while (i2c->op_status != Idle)
+	while (i2c->op_status == Write)
 		__WFE();
-	return 1;
+	return !(i2c->op_status & Error);
 }
 
 int i2c_read(struct i2c_t *i2c, uint8_t addr, uint8_t reg,
@@ -117,9 +122,9 @@ int i2c_read(struct i2c_t *i2c, uint8_t addr, uint8_t reg,
 	};
 	i2c->op_status = Read;
 	i2c_op(i2c, &i2c->op);
-	while (i2c->op_status != Idle)
+	while (i2c->op_status == Read)
 		__WFE();
-	return 1;
+	return !(i2c->op_status & Error);
 }
 
 int i2c_read_reg(struct i2c_t *i2c, uint8_t addr, uint8_t reg)
@@ -131,7 +136,7 @@ int i2c_read_reg(struct i2c_t *i2c, uint8_t addr, uint8_t reg)
 	};
 	i2c->op_status = Read;
 	i2c_op(i2c, &i2c->op);
-	while (i2c->op_status != Idle)
+	while (i2c->op_status == Read)
 		__WFE();
 	return v;
 }
@@ -145,6 +150,11 @@ static void op_start(struct i2c_t *i2c, const struct i2c_op_t *op)
 	else
 		// Enable RX register not empty interrupt
 		base->CR1 |= I2C_CR1_RXIE_Msk;
+	// Critical section, op_done should not be invoked
+	if (base == I2C1)
+		NVIC_DisableIRQ(I2C1_EV_IRQn);
+	else
+		dbgbkpt();
 	// Start register address write transfer
 	if ((op->op & (I2CRead | I2CWrite)) == I2CRead) {
 		base->CR2 = ((op->addr << 1u) << I2C_CR2_SADD_Pos) |
@@ -156,10 +166,17 @@ static void op_start(struct i2c_t *i2c, const struct i2c_op_t *op)
 		// Enable TX register empty interrupt
 		base->CR1 |= I2C_CR1_TXIE_Msk;
 	}
+	// Update I2C status
 	i2c->p = op->p;
 	i2c->cnt = op->size;
 	i2c->status = Write;
+	// Transmit register address
 	base->TXDR = op->reg;
+	// Critical section end
+	if (base == I2C1)
+		NVIC_EnableIRQ(I2C1_EV_IRQn);
+	else
+		dbgbkpt();
 }
 
 static void op_write(struct i2c_t *i2c, const struct i2c_op_t *op)
@@ -240,7 +257,7 @@ static void op_process(struct i2c_t *i2c)
 	op_start(i2c, op);
 }
 
-static void op_done(struct i2c_t *i2c, struct i2c_node_t **n)
+static void op_done(struct i2c_t *i2c, struct i2c_node_t **n, uint32_t nack)
 {
 	// Detach node
 	struct i2c_node_t *node = *n;
@@ -248,12 +265,14 @@ static void op_done(struct i2c_t *i2c, struct i2c_node_t **n)
 	// Disable DMAs, disable interrupts
 	i2c->c.base->CR1 &= ~(I2C_CR1_TXDMAEN_Msk | I2C_CR1_RXDMAEN_Msk |
 			      I2C_CR1_TXIE_Msk | I2C_CR1_RXIE_Msk);
+	// Flush transmit data register
+	i2c->c.base->ISR = I2C_ISR_TXE_Msk;
 	// Start new operation
 	i2c->status = Idle;
 	op_process(i2c);
 	// Callback
 	if (node->op->cb)
-		node->op->cb(i2c, node->op);
+		node->op->cb(i2c, node->op, nack);
 	free(node);
 }
 
@@ -294,7 +313,7 @@ void I2C1_EV_IRQHandler()
 		// Register address wrote
 		op_read(i2c, op);
 	} else if (i & I2C_ISR_STOPF_Msk) {
-		i2c->c.base->ICR = I2C_ICR_STOPCF_Msk;
-		op_done(i2c, n);
+		i2c->c.base->ICR = I2C_ICR_STOPCF_Msk | I2C_ICR_NACKCF_Msk;
+		op_done(i2c, n, i & I2C_ISR_NACKF_Msk);
 	}
 }

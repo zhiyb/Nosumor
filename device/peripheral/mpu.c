@@ -68,7 +68,8 @@ uint32_t mpu_init(void *i2c)
 	return 0;
 }
 
-static void data_callback(struct i2c_t *i2c, const struct i2c_op_t *op)
+static void data_callback(struct i2c_t *i2c,
+			  const struct i2c_op_t *op, uint32_t nack)
 {
 	// Correct endianness
 	uint32_t *u32p = (void *)op->p;
@@ -107,7 +108,8 @@ static void fifo(struct i2c_t *i2c, uint16_t cnt)
 	i2c_op(i2c, &op);
 }
 
-static void cnt_callback(struct i2c_t *i2c, const struct i2c_op_t *op)
+static void cnt_callback(struct i2c_t *i2c,
+			 const struct i2c_op_t *op, uint32_t nack)
 {
 	fifo(i2c, *(uint16_t *)op->p);
 	// Check FIFO level
