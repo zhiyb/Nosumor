@@ -49,6 +49,17 @@ struct i2c_t *i2c_init(const struct i2c_config_t *conf)
 	// FIFO control
 	conf->rx->FCR = DMA_SxFCR_DMDIS_Msk;
 
+	// Initialise TX DMA
+	// Memory to peripheral, 8bit -> 8bit, burst of 4 beats, low priority
+	conf->tx->CR = (conf->txch << DMA_SxCR_CHSEL_Pos) | (0b00ul << DMA_SxCR_PL_Pos) |
+			(0b01ul << DMA_SxCR_MBURST_Pos) | (0b00ul << DMA_SxCR_PBURST_Pos) |
+			(0b00ul << DMA_SxCR_MSIZE_Pos) | (0b00ul << DMA_SxCR_PSIZE_Pos) |
+			(0b01ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk;
+	// Peripheral address
+	conf->tx->PAR = (uint32_t)&base->TXDR;
+	// FIFO control
+	conf->tx->FCR = DMA_SxFCR_DMDIS_Msk;
+
 	// Disable I2C, disable interrupts
 	base->CR1 = 0;
 	base->CR2 = 0;
@@ -70,6 +81,12 @@ static void callback(struct i2c_t *i2c,
 		     const struct i2c_op_t *op, uint32_t nack)
 {
 	i2c->op_status = nack ? Error : Idle;
+}
+
+static void callback_nb(struct i2c_t *i2c,
+			const struct i2c_op_t *op, uint32_t nack)
+{
+	free((void *)op);
 }
 
 int i2c_check(struct i2c_t *i2c, uint8_t addr)
@@ -100,6 +117,20 @@ int i2c_write(struct i2c_t *i2c, uint8_t addr, uint8_t reg,
 	return !(i2c->op_status & Error);
 }
 
+void i2c_write_nb(struct i2c_t *i2c, uint8_t addr, uint8_t reg,
+		 const uint8_t *p, uint32_t cnt, uint32_t dma)
+{
+	__disable_irq();
+	struct i2c_op_t *op = malloc(sizeof(struct i2c_op_t));
+	__enable_irq();
+	memcpy(op, &(const struct i2c_op_t){
+		       .op = I2CWrite | (dma ? I2CDMA : 0),
+		       .addr = addr, .reg = reg,
+		       .p = (uint8_t *)p, .size = cnt, .cb = callback_nb,
+	}, sizeof(struct i2c_op_t));
+	i2c_op(i2c, op);
+}
+
 int i2c_write_reg(struct i2c_t *i2c, uint8_t addr, uint8_t reg, uint8_t val)
 {
 	i2c->op = (struct i2c_op_t){
@@ -111,6 +142,20 @@ int i2c_write_reg(struct i2c_t *i2c, uint8_t addr, uint8_t reg, uint8_t val)
 	while (i2c->op_status == Write)
 		__WFE();
 	return !(i2c->op_status & Error);
+}
+
+void i2c_write_reg_nb(struct i2c_t *i2c, uint8_t addr, uint8_t reg, uint8_t val)
+{
+	__disable_irq();
+	struct i2c_op_t *op = malloc(sizeof(struct i2c_op_t) + 1);
+	__enable_irq();
+	uint8_t *vp = (uint8_t *)op + sizeof(struct i2c_op_t);
+	*vp = val;
+	memcpy(op, &(const struct i2c_op_t){
+		       .op = I2CWrite, .addr = addr, .reg = reg,
+		       .p = vp, .size = 1, .cb = callback_nb,
+	}, sizeof(struct i2c_op_t));
+	i2c_op(i2c, op);
 }
 
 int i2c_read(struct i2c_t *i2c, uint8_t addr, uint8_t reg,
@@ -193,7 +238,27 @@ static void op_write(struct i2c_t *i2c, const struct i2c_op_t *op)
 	DMA_Stream_TypeDef *tx = i2c->c.tx;
 	uint32_t n = i2c->cnt;
 	uint32_t mask = 0;
-	dbgbkpt();
+	// The I2C peripheral can only transfer 255 bytes maximum
+	if (n > 255u) {
+		n = 255u;
+		mask |= I2C_CR2_RELOAD_Msk;
+	}
+	// Enable TX DMA
+	base->CR1 |= I2C_CR1_TXDMAEN_Msk;
+	// Clear DMA flags
+	*i2c->c.txr = i2c->c.txm;
+	// Setup DMA
+	tx->M0AR = (uint32_t)i2c->p;
+	tx->NDTR = n;
+	// Enable DMA
+	tx->CR |= DMA_SxCR_EN_Msk;
+	// Start I2C transfer
+	base->CR2 = ((op->addr << 1u) << I2C_CR2_SADD_Pos) | mask |
+			(n << I2C_CR2_NBYTES_Pos) | I2C_CR2_AUTOEND_Msk;
+	// Update status
+	i2c->p += n;
+	i2c->cnt -= n;
+	i2c->status = Write;
 }
 
 static void op_read(struct i2c_t *i2c, const struct i2c_op_t *op)

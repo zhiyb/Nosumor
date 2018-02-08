@@ -41,7 +41,10 @@ struct i2c_t *i2c_init(const struct i2c_config_t *conf);
 int i2c_check(struct i2c_t *i2c, uint8_t addr);
 int i2c_write(struct i2c_t *i2c, uint8_t addr, uint8_t reg,
 	      const uint8_t *p, uint32_t cnt);
+void i2c_write_nb(struct i2c_t *i2c, uint8_t addr, uint8_t reg,
+		 const uint8_t *p, uint32_t cnt, uint32_t dma);
 int i2c_write_reg(struct i2c_t *i2c, uint8_t addr, uint8_t reg, uint8_t val);
+void i2c_write_reg_nb(struct i2c_t *i2c, uint8_t addr, uint8_t reg, uint8_t val);
 int i2c_read(struct i2c_t *i2c, uint8_t addr, uint8_t reg,
 	     uint8_t *p, uint32_t cnt);
 int i2c_read_reg(struct i2c_t *i2c, uint8_t addr, uint8_t reg);

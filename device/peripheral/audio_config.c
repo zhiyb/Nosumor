@@ -148,19 +148,20 @@ void audio_config_update()
 	__enable_irq();
 
 	// Page 0
-	i2c_write_reg(base, I2C_ADDR, 0x00, 0x00);
+	i2c_write_reg_nb(base, I2C_ADDR, 0x00, 0x00);
 	// Starting from register 0x40
-	const uint8_t cmd40[] = {
+	const uint8_t cmd40[] ALIGN(32) = {
 		c.dac,		// DAC configuration
 		c.ch.vol[0],	// DAC left volume
 		c.ch.vol[1],	// DAC right volume
 	};
-	i2c_write(base, I2C_ADDR, 0x40, cmd40, sizeof(cmd40));
+	SCB_CleanDCache_by_Addr((void *)cmd40, sizeof(cmd40));
+	i2c_write_nb(base, I2C_ADDR, 0x40, cmd40, sizeof(cmd40), 1);
 
 	// Page 1
-	i2c_write_reg(base, I2C_ADDR, 0x00, 0x01);
+	i2c_write_reg_nb(base, I2C_ADDR, 0x00, 0x01);
 	// Starting from register 0x24
-	const uint8_t cmd24[] = {
+	const uint8_t cmd24[] ALIGN(32) = {
 		// HPL analog volume
 		(c.hp.atten[0] & 0x80) ? c.hp.atten[0] : 0x7f,
 		// HPR analog volume
@@ -174,7 +175,8 @@ void audio_config_update()
 		c.sp.gain[0],	// SPL driver
 		c.sp.gain[1],	// SPR driver
 	};
-	i2c_write(base, I2C_ADDR, 0x24, cmd24, sizeof(cmd24));
+	SCB_CleanDCache_by_Addr((void *)cmd24, sizeof(cmd24));
+	i2c_write_nb(base, I2C_ADDR, 0x24, cmd24, sizeof(cmd24), 1);
 }
 
 // Enable/disable codec
