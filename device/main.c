@@ -30,6 +30,7 @@
 #include "usb/msc/usb_msc.h"
 #include "usb/hid/usb_hid.h"
 #include "usb/hid/keyboard/usb_hid_keyboard.h"
+#include "usb/hid/joystick/usb_hid_joystick.h"
 #include "usb/hid/vendor/usb_hid_vendor.h"
 // 3rd party libraries
 #include "fatfs/ff.h"
@@ -136,12 +137,6 @@ static inline void init()
 		audio_usb_audio(&usb, audio);
 	}
 
-#ifdef DEBUG
-	puts(ESC_INIT "Initialising MPU...");
-	if (mpu_init(i2c) != 0)
-		puts(ESC_ERROR "Error initialising MPU");
-#endif
-
 	puts(ESC_INIT "Initialising USB HID interface...");
 	usb_hid_t *hid = usb_hid_init(&usb);
 	usb_hid_if_t *hid_keyboard = usb_hid_keyboard_init(hid);
@@ -149,6 +144,16 @@ static inline void init()
 
 	puts(ESC_INIT "Initialising keyboard...");
 	keyboard_init(hid_keyboard);
+
+#ifdef DEBUG
+	puts(ESC_INIT "Initialising MPU...");
+	if (mpu_init(i2c) != 0) {
+		puts(ESC_ERROR "Error initialising MPU");
+	} else {
+		puts(ESC_INIT "Initialising joystick...");
+		usb_hid_if_t *hid_joystick = usb_hid_joystick_init(hid);
+	}
+#endif
 
 	puts(ESC_INIT "Initialising SD/MMC card...");
 	mmc_disk_init();

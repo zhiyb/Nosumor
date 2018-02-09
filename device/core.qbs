@@ -117,6 +117,8 @@ StaticLibrary {
             "usb/hid/keyboard/usb_hid_keyboard.h",
             "usb/hid/vendor/usb_hid_vendor.c",
             "usb/hid/vendor/usb_hid_vendor.h",
+            "usb/hid/joystick/usb_hid_joystick.c",
+            "usb/hid/joystick/usb_hid_joystick.h",
         ]
     }
 
