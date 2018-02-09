@@ -29,15 +29,18 @@ uint8_t keycodes[KEYBOARD_KEYS] = {
 	0x1d, 0x1b, 0x06, 0x35, 0x29,
 };
 
-static usb_hid_if_t *hid = 0;
+static struct {
+	usb_hid_if_t *keyboard, *joystick;
+} hid;
 static volatile uint32_t status, debouncing, timeout[KEYBOARD_KEYS];
 
 static uint32_t keyboard_gpio_status();
 static void keyboard_tick(uint32_t tick);
 
-void keyboard_init(usb_hid_if_t *hid_keyboard)
+void keyboard_init(usb_hid_if_t *hid_keyboard, usb_hid_if_t *hid_joystick)
 {
-	hid = hid_keyboard;
+	hid.keyboard = hid_keyboard;
+	hid.joystick = hid_joystick;
 
 	// Initialise GPIOs
 #if HWVER >= 0x0100
@@ -128,16 +131,24 @@ uint32_t keyboard_status()
 void keyboard_update(uint32_t status)
 {
 	// Clear keyboard status
-	memset(hid->report.payload, 0, hid->size - 1u);
+	memset(hid.keyboard->report.payload, 0, hid.keyboard->size - 1u);
 	// Modifier keys (0), reserved (1), keycodes (2*)
-	uint8_t *p = &hid->report.payload[2];
+	uint8_t *p = &hid.keyboard->report.payload[2];
 	// Update report
 	const uint32_t *pm = keyboard_masks;
-	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++)
-		if (status & *pm++)
+	uint8_t mask = 0;
+	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++) {
+		mask >>= 1;
+		if (status & *pm++) {
 			*p++ = keycodes[i];
+			mask |= 0x80;
+		}
+	}
 	// Send report
-	usb_hid_update(hid);
+	usb_hid_update(hid.keyboard);
+	// Update joystick report
+	hid.joystick->report.payload[12] = mask >> 3;
+	usb_hid_update(hid.joystick);
 }
 
 static void keyboard_irq()
