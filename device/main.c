@@ -145,15 +145,14 @@ static inline void init()
 	puts(ESC_INIT "Initialising keyboard...");
 	keyboard_init(hid_keyboard);
 
-#ifdef DEBUG
 	puts(ESC_INIT "Initialising MPU...");
 	if (mpu_init(i2c) != 0) {
 		puts(ESC_ERROR "Error initialising MPU");
 	} else {
 		puts(ESC_INIT "Initialising joystick...");
 		usb_hid_if_t *hid_joystick = usb_hid_joystick_init(hid);
+		mpu_usb_hid(hid_joystick);
 	}
-#endif
 
 	puts(ESC_INIT "Initialising SD/MMC card...");
 	mmc_disk_init();

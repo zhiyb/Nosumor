@@ -3,6 +3,7 @@
 #include <debug.h>
 #include <system/systick.h>
 #include <peripheral/i2c.h>
+#include <usb/hid/usb_hid.h>
 #include "mpu.h"
 #include "mpu_defs.h"
 
@@ -10,6 +11,7 @@
 
 static struct {
 	volatile int16_t gyro[3], accel[3];
+	usb_hid_if_t *hid;
 } data;
 
 static void start(void *i2c);
@@ -61,11 +63,17 @@ uint32_t mpu_init(void *i2c)
 {
 	if (!i2c_check(i2c, I2C_ADDR))
 		return 1;
+	data.hid = 0;
 	gpio_init();
 	reset(i2c);
 	config(i2c);
 	start(i2c);
 	return 0;
+}
+
+void mpu_usb_hid(usb_hid_if_t *hid)
+{
+	data.hid = hid;
 }
 
 static void data_callback(struct i2c_t *i2c,
@@ -86,6 +94,20 @@ static void data_callback(struct i2c_t *i2c,
 		for (uint32_t j = 3u; j--;)
 			*p++ = *u16p++;
 	}
+	// Update USB HID report
+	if (!data.hid)
+		return;
+	struct PACKED {
+		uint16_t x, y, z;
+		uint16_t rx, ry, rz;
+	} *rp = (void *)data.hid->report.payload;
+	rp->x = data.accel[1];
+	rp->y = data.accel[0];
+	rp->z = data.accel[2];
+	rp->rx = data.gyro[1];
+	rp->ry = data.gyro[0];
+	rp->rz = data.gyro[2];
+	usb_hid_update(data.hid);
 }
 
 static void fifo(struct i2c_t *i2c, uint16_t cnt)
