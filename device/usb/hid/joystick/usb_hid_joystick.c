@@ -35,10 +35,25 @@ static const uint8_t desc_report[] = {
 	0x75, 0x10,		//     Report size (16)
 	0x81, 0x02,		//     Input (Data, Var, Abs)
 	0xc0,			//   End collection
+	// Buttons
+	0x05, 0x09,		//   Usage page (Button)
+	0x19, 0x01,		//   Usage minimum (Button 1)
+	0x29, 0x05,		//   Usage maximum (Button 5)
+	0x15, 0x00,		//   Logical minimum (0)
+	0x25, 0x01,		//   Logical maximum (1)
+	0x35, 0x00,		//   Physical minimum (0)
+	0x45, 0x01,		//   Physical maximum (1)
+	0x95, 0x05,		//   Report count (5)
+	0x75, 0x01,		//   Report size (1)
+	0x81, 0x02,		//   Input (Data, Var, Abs)
+	// Reserved
+	0x95, 0x01,		//   Report count (1)
+	0x75, 0x03,		//   Report size (3)
+	0x81, 0x01,		//   Input (Cnst)
 	0xc0,			// End collection
 };
 
-#define JOYSTICK_REPORT_SIZE	13u
+#define JOYSTICK_REPORT_SIZE	14u
 
 usb_hid_if_t *usb_hid_joystick_init(usb_hid_t *p)
 {
