@@ -15,6 +15,8 @@ uint32_t mpu_init(void *i2c);
 void mpu_usb_hid(usb_hid_if_t *hid);
 volatile int16_t *mpu_accel();
 volatile int16_t *mpu_gyro();
+volatile int16_t *mpu_accel_avg();
+volatile int16_t *mpu_gyro_avg();
 
 #ifdef __cplusplus
 }

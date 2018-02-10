@@ -7,10 +7,19 @@
 #include "mpu.h"
 #include "mpu_defs.h"
 
+#define AVG_N	6
+#define AVG_NUM	(1u << AVG_N)
+
 #define I2C_ADDR	MPU_I2C_ADDR
 
 static struct {
-	int16_t gyro[3], accel[3];
+	struct PACKED {
+		int16_t gyro[3], accel[3];
+	} log[AVG_NUM], avg;
+	struct PACKED {
+		int32_t gyro[3], accel[3];
+	} sum;
+	volatile uint16_t idx;
 	usb_hid_if_t *hid;
 } data;
 
@@ -64,6 +73,7 @@ uint32_t mpu_init(void *i2c)
 	if (!i2c_check(i2c, I2C_ADDR))
 		return 1;
 	data.hid = 0;
+	data.idx = 0;
 	gpio_init();
 	reset(i2c);
 	config(i2c);
@@ -84,16 +94,32 @@ static void data_callback(struct i2c_t *i2c,
 	for (uint32_t i = op->size >> 2u; i--; u32p++)
 		*u32p = __REV16(*u32p);
 	// Data processing
-	int16_t *u16p = (void *)op->p;
-	volatile int16_t *p;
+	int32_t *i32p;
+	int16_t *i16p = (void *)op->p, *p;
+	uint16_t idx = (data.idx + 1u) & (AVG_NUM - 1u);
+	data.idx = idx;
 	for (uint32_t i = op->size / 12u; i--;) {
-		p = data.accel;
-		for (uint32_t j = 3u; j--;)
-			*p++ = *u16p++;
-		p = data.gyro;
-		for (uint32_t j = 3u; j--;)
-			*p++ = *u16p++;
+		// Update sums, update logged values
+		i32p = data.sum.accel;
+		p = data.log[idx].accel;
+		for (uint32_t j = 3u; j--;) {
+			*i32p++ += *i16p - *p;
+			*p++ = *i16p++;
+		}
+		i32p = data.sum.gyro;
+		p = data.log[idx].gyro;
+		for (uint32_t j = 3u; j--;) {
+			*i32p++ += *i16p - *p;
+			*p++ = *i16p++;
+		}
 	}
+	// Update average values
+	data.avg.accel[0] = data.sum.accel[0] >> AVG_N;
+	data.avg.accel[1] = data.sum.accel[1] >> AVG_N;
+	data.avg.accel[2] = data.sum.accel[2] >> AVG_N;
+	data.avg.gyro[0] = data.sum.gyro[0] >> AVG_N;
+	data.avg.gyro[1] = data.sum.gyro[1] >> AVG_N;
+	data.avg.gyro[2] = data.sum.gyro[2] >> AVG_N;
 	// Update USB HID report
 	if (!data.hid)
 		return;
@@ -101,12 +127,12 @@ static void data_callback(struct i2c_t *i2c,
 		int16_t x, y, z;
 		int16_t rx, ry, rz;
 	} *rp = (void *)data.hid->report.payload;
-	rp->x = data.accel[1];
-	rp->y = data.accel[0];
-	rp->z = data.accel[2];
-	rp->rx = data.gyro[1];
-	rp->ry = data.gyro[0];
-	rp->rz = data.gyro[2];
+	rp->x = data.avg.accel[1];
+	rp->y = data.avg.accel[0];
+	rp->z = data.avg.accel[2];
+	rp->rx = data.avg.gyro[1];
+	rp->ry = data.avg.gyro[0];
+	rp->rz = data.avg.gyro[2];
 	usb_hid_update(data.hid);
 }
 
@@ -154,10 +180,20 @@ static void start(void *i2c)
 
 volatile int16_t *mpu_accel()
 {
-	return data.accel;
+	return data.log[data.idx].accel;
 }
 
 volatile int16_t *mpu_gyro()
 {
-	return data.gyro;
+	return data.log[data.idx].gyro;
+}
+
+volatile int16_t *mpu_accel_avg()
+{
+	return data.avg.accel;
+}
+
+volatile int16_t *mpu_gyro_avg()
+{
+	return data.avg.gyro;
 }

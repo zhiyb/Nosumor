@@ -202,8 +202,8 @@ loop:	// Process time consuming tasks
 		tick256 = systick_cnt();
 #ifdef DEBUG
 #if HWVER >= 0x0100
-		volatile int16_t *accel = mpu_accel();
-		volatile int16_t *gyro = mpu_gyro();
+		volatile int16_t *accel = mpu_accel_avg();
+		volatile int16_t *gyro = mpu_gyro_avg();
 		dbgprintf(ESC_DEBUG "[MPU] "
 			  ESC_DATA "(%6d, %6d, %6d)\t(%6d, %6d, %6d)\n",
 			  accel[0], accel[1], accel[2],
