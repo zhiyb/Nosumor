@@ -10,7 +10,7 @@
 #define I2C_ADDR	MPU_I2C_ADDR
 
 static struct {
-	volatile int16_t gyro[3], accel[3];
+	int16_t gyro[3], accel[3];
 	usb_hid_if_t *hid;
 } data;
 
@@ -98,8 +98,8 @@ static void data_callback(struct i2c_t *i2c,
 	if (!data.hid)
 		return;
 	struct PACKED {
-		uint16_t x, y, z;
-		uint16_t rx, ry, rz;
+		int16_t x, y, z;
+		int16_t rx, ry, rz;
 	} *rp = (void *)data.hid->report.payload;
 	rp->x = data.accel[1];
 	rp->y = data.accel[0];

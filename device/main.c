@@ -186,7 +186,7 @@ int main()
 	};
 #endif
 
-	uint32_t tick = 0, tick128 = 0;
+	uint32_t tick = 0, tick256 = 0;
 loop:	// Process time consuming tasks
 	usb_process(&usb);
 	usb_msc_process(&usb, usb_msc);
@@ -197,16 +197,18 @@ loop:	// Process time consuming tasks
 		led_trigger_process();
 		usb_hid_vendor_process(usb_hid_vendor, &vendor_process);
 	}
-	// Update tasks every 128 ms
-	if (systick_cnt() - tick128 >= 128u) {
-		tick128 = systick_cnt();
+	// Update tasks every 256 ms
+	if (systick_cnt() - tick256 >= 256u) {
+		tick256 = systick_cnt();
 #ifdef DEBUG
+#if HWVER >= 0x0100
 		volatile int16_t *accel = mpu_accel();
 		volatile int16_t *gyro = mpu_gyro();
 		dbgprintf(ESC_DEBUG "[MPU] "
 			  ESC_DATA "(%6d, %6d, %6d)\t(%6d, %6d, %6d)\n",
 			  accel[0], accel[1], accel[2],
 			  gyro[0], gyro[1], gyro[2]);
+#endif
 #endif
 		fflush(stdout);
 	}
