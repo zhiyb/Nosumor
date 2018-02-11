@@ -20,6 +20,7 @@ static struct {
 		int32_t gyro[3], accel[3];
 	} sum;
 	volatile uint16_t idx;
+	volatile uint32_t cnt;
 	usb_hid_if_t *hid;
 } data;
 
@@ -47,8 +48,8 @@ static void config(void *i2c)
 		PWR_MGMT_2, 0x00,
 		// Data output rate divider
 		SMPLRT_DIV, 0x00,
-		// FIFO overrite, FSYNC disabled, DLPH 1
-		CONFIG, 0x01,
+		// Disable FIFO overwrite, FSYNC disabled, DLPH 1
+		CONFIG, 0x41,
 		// Scale +250dps, Fchoice 0b11 (1kHz)
 		GYRO_CONFIG, 0x00,
 		// Scale ±2g
@@ -74,6 +75,7 @@ uint32_t mpu_init(void *i2c)
 		return 1;
 	data.hid = 0;
 	data.idx = 0;
+	data.cnt = 0;
 	gpio_init();
 	reset(i2c);
 	config(i2c);
@@ -97,8 +99,10 @@ static void data_callback(struct i2c_t *i2c,
 	int32_t *i32p;
 	int16_t *i16p = (void *)op->p, *p;
 	uint16_t idx = (data.idx + 1u) & (AVG_NUM - 1u);
+	uint16_t cnt = op->size / 12u;
 	data.idx = idx;
-	for (uint32_t i = op->size / 12u; i--;) {
+	data.cnt += cnt;
+	for (uint32_t i = cnt; i--;) {
 		// Update sums, update logged values
 		i32p = data.sum.accel;
 		p = data.log[idx].accel;
@@ -139,9 +143,9 @@ static void data_callback(struct i2c_t *i2c,
 static void fifo(struct i2c_t *i2c, uint16_t cnt)
 {
 	if (cnt == 512u) {
-		// Enable FIFO operation, reset FIFO
-		i2c_write_reg(i2c, I2C_ADDR, USER_CTRL, 0x44);
 		dbgprintf(ESC_ERROR "[MPU] FIFO overflow\n");
+		// Enable FIFO operation, reset FIFO
+		i2c_write_reg_nb(i2c, I2C_ADDR, USER_CTRL, 0x44);
 		return;
 	}
 	cnt = cnt - cnt % 12u;
@@ -196,4 +200,9 @@ volatile int16_t *mpu_accel_avg()
 volatile int16_t *mpu_gyro_avg()
 {
 	return data.avg.gyro;
+}
+
+uint32_t mpu_cnt()
+{
+	return data.cnt;
 }

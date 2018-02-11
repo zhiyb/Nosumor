@@ -178,11 +178,11 @@ int main()
 
 #ifdef DEBUG
 	struct {
-		uint32_t tick, audio, data, feedback, blocks, heap, usbram;
+		uint32_t tick, audio, data, feedback, blocks, mpu, heap, usbram;
 	} cur, diff, prev = {
 		systick_cnt(), audio_transfer_cnt(),
 		audio_data_cnt(), usb_audio2_feedback_cnt(),
-		mmc_statistics(), 0, 0,
+		mmc_statistics(), mpu_cnt(), 0, 0,
 	};
 #endif
 
@@ -222,6 +222,7 @@ loop:	// Process time consuming tasks
 		cur.data = audio_data_cnt();
 		cur.feedback = usb_audio2_feedback_cnt();
 		cur.blocks = mmc_statistics();
+		cur.mpu = mpu_cnt();
 		cur.heap = heap_usage();
 		cur.usbram = usb_ram_usage(&usb);
 
@@ -230,6 +231,7 @@ loop:	// Process time consuming tasks
 		diff.data = (cur.data - prev.data) * 1000ul;
 		diff.feedback = (cur.feedback - prev.feedback) * 1000ul;
 		diff.blocks = cur.blocks - prev.blocks;
+		diff.mpu = cur.mpu - prev.mpu;
 		diff.heap = cur.heap - prev.heap;
 		diff.usbram = cur.usbram - prev.usbram;
 
@@ -271,6 +273,11 @@ loop:	// Process time consuming tasks
 		if (diff.blocks)
 			printf(ESC_INFO "[SDMMC] " ESC_DATA "%lu + %lu"
 			       ESC_INFO " blocks\n", prev.blocks, diff.blocks);
+
+		// MPU update frequency
+		if (diff.mpu)
+			printf(ESC_INFO "[MPU] " ESC_DATA "%lu"
+			       ESC_INFO " samples\n", diff.mpu);
 
 		// Update previous values
 		uint32_t tick = prev.tick + 1024ul;
