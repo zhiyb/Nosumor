@@ -75,6 +75,7 @@ struct i2c_t *i2c_init(const struct i2c_config_t *conf)
 	base->ICR = I2C_ICR_STOPCF_Msk | I2C_ICR_NACKCF_Msk;
 	// Enable transfer complete interrupt, enable I2C
 	base->CR1 = I2C_CR1_TCIE_Msk | I2C_CR1_STOPIE_Msk | I2C_CR1_PE_Msk;
+	systick_delay(2);
 	return i2c;
 }
 

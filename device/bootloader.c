@@ -116,7 +116,7 @@ static inline void init()
 	usb_hid_vendor = usb_hid_vendor_init(hid);
 
 	puts(ESC_INIT "Initialising keyboard...");
-	keyboard_init(hid_keyboard);
+	keyboard_init(hid_keyboard, 0);
 
 	puts(ESC_INIT "Initialising FatFs for flash...");
 	if (flash_fatfs_init(FLASH_CONF, 0))

@@ -147,6 +147,8 @@ void keyboard_update(uint32_t status)
 	// Send report
 	usb_hid_update(hid.keyboard);
 	// Update joystick report
+	if (!hid.joystick)
+		return;
 	hid.joystick->report.payload[12] = mask >> 3;
 	usb_hid_update(hid.joystick);
 }
