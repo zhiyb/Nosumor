@@ -150,32 +150,28 @@ void audio_config_update()
 	// Page 0
 	i2c_write_reg_nb(base, I2C_ADDR, 0x00, 0x00);
 	// Starting from register 0x40
-	const uint8_t cmd40[] ALIGN(32) = {
-		c.dac,		// DAC configuration
-		c.ch.vol[0],	// DAC left volume
-		c.ch.vol[1],	// DAC right volume
-	};
-	SCB_CleanDCache_by_Addr((void *)cmd40, sizeof(cmd40));
+	static uint8_t cmd40[3] SECTION(.dtcm);
+	cmd40[0] = c.dac;		// DAC configuration
+	cmd40[1] = c.ch.vol[0];		// DAC left volume
+	cmd40[2] = c.ch.vol[1];		// DAC right volume
 	i2c_write_nb(base, I2C_ADDR, 0x40, cmd40, sizeof(cmd40), 1);
 
 	// Page 1
 	i2c_write_reg_nb(base, I2C_ADDR, 0x00, 0x01);
 	// Starting from register 0x24
-	const uint8_t cmd24[] ALIGN(32) = {
-		// HPL analog volume
-		(c.hp.atten[0] & 0x80) ? c.hp.atten[0] : 0x7f,
-		// HPR analog volume
-		(c.hp.atten[1] & 0x80) ? c.hp.atten[1] : 0x7f,
-		// SPL analog volume
-		(c.sp.atten[0] & 0x80) ? c.sp.atten[0] : 0x7f,
-		// SPR analog volume
-		(c.sp.atten[1] & 0x80) ? c.sp.atten[1] : 0x7f,
-		c.hp.gain[0],	// HPL driver
-		c.hp.gain[1],	// HPR driver
-		c.sp.gain[0],	// SPL driver
-		c.sp.gain[1],	// SPR driver
-	};
-	SCB_CleanDCache_by_Addr((void *)cmd24, sizeof(cmd24));
+	static uint8_t cmd24[8] SECTION(.dtcm);
+	// HPL analog volume
+	cmd24[0] = (c.hp.atten[0] & 0x80) ? c.hp.atten[0] : 0x7f,
+	// HPR analog volume
+	cmd24[1] = (c.hp.atten[1] & 0x80) ? c.hp.atten[1] : 0x7f,
+	// SPL analog volume
+	cmd24[2] = (c.sp.atten[0] & 0x80) ? c.sp.atten[0] : 0x7f,
+	// SPR analog volume
+	cmd24[3] = (c.sp.atten[1] & 0x80) ? c.sp.atten[1] : 0x7f,
+	cmd24[4] = c.hp.gain[0],	// HPL driver
+	cmd24[5] = c.hp.gain[1],	// HPR driver
+	cmd24[6] = c.sp.gain[0],	// SPL driver
+	cmd24[7] = c.sp.gain[1],	// SPR driver
 	i2c_write_nb(base, I2C_ADDR, 0x24, cmd24, sizeof(cmd24), 1);
 }
 
