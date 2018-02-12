@@ -38,7 +38,7 @@ typedef struct scsi_handlers_t {
 
 	// Read operations
 
-	// Read: Start -> ((Available?) -> Data) -> Stop
+	// Read: Start -> ((Available?) -> Data -> Complete) -> Stop
 	uint32_t (*read_start)(void *data, uint32_t offset, uint32_t size);
 	// Return < 0 for error
 	// Return unit: Bytes
@@ -46,6 +46,7 @@ typedef struct scsi_handlers_t {
 	// Returned address need to be aligned to 32-bytes boundary for DMA
 	// Length unit: Bytes
 	void *(*read_data)(void *data, uint32_t *length);
+	void (*read_cplt)(void *data, uint32_t length, const void *p);
 	uint32_t (*read_stop)(void *data);
 
 	// Write operations
@@ -70,6 +71,7 @@ typedef struct scsi_if_t {
 scsi_t *scsi_init(const scsi_if_t iface);
 scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size);
 scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size);
+scsi_state_t scsi_data_cplt(scsi_t *scsi, const void *pdata, uint32_t size);
 scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize);
 extern void *scsi_buffer(uint32_t *length);
 

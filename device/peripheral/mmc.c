@@ -725,6 +725,11 @@ static void *scsi_read_data(void *p, uint32_t *length)
 	return ptr;
 }
 
+static void scsi_read_cplt(void *p, uint32_t length, const void *data)
+{
+	dbgprintf(ESC_DEBUG "[MMC] %p, %lu\n", data, length);
+}
+
 static uint32_t scsi_read_stop(void *p)
 {
 	return mmc_stop();
@@ -773,6 +778,7 @@ scsi_if_t mmc_scsi_handlers()
 		scsi_read_start,
 		scsi_read_available,
 		scsi_read_data,
+		scsi_read_cplt,
 		scsi_read_stop,
 
 		scsi_write_start,

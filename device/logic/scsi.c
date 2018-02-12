@@ -480,6 +480,14 @@ scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size)
 	return scsi->state;
 }
 
+scsi_state_t scsi_data_cplt(scsi_t *scsi, const void *pdata, uint32_t size)
+{
+	if (scsi->h->read_cplt)
+		scsi->h->read_cplt(scsi->p, size, pdata);
+	scsi->state &= ~SCSIBusy;
+	return scsi->state;
+}
+
 scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize)
 {
 	// Avoid failure sort packet looping
@@ -533,6 +541,8 @@ scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize)
 		} else {
 			scsi->state = SCSIGood;
 		}
+	} else {
+		scsi->state |= SCSIBusy;
 	}
 	return (scsi_ret_t){p, size, scsi->state};
 }

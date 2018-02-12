@@ -11,7 +11,7 @@
 #include "usb_msc.h"
 #include "usb_msc_defs.h"
 
-#define MSC_IN_MAX_SIZE		1024u
+#define MSC_IN_MAX_SIZE		512u
 #define MSC_OUT_MAX_SIZE	512u
 #define MSC_OUT_MAX_PKT		1u
 
@@ -42,7 +42,10 @@ typedef struct usb_msc_t {
 	volatile uint32_t buf_size[2];
 	uint8_t lun_max ALIGN(4);
 	volatile uint8_t outbuf;
-	uint8_t active;
+	volatile uint8_t active;
+	uint8_t in_active;
+	uint16_t in_size;
+	void *in_ptr;
 } usb_msc_t;
 
 static usb_msc_t msc SECTION(.dtcm);
@@ -73,6 +76,16 @@ static void epin_init(usb_t *usb, uint32_t n)
 	usb_msc_t *data = (usb_msc_t *)usb->epin[n].data;
 	csw_t *csw = &inbuf.csw;
 	csw->dCSWSignature = 0x53425355;
+}
+
+static void epin_xfr_cplt(usb_t *usb, uint32_t n)
+{
+	usb_msc_t *msc = (usb_msc_t *)usb->epin[n].data;
+	if (msc->in_active == 0xff)
+		return;
+	scsi_t *scsi = *(msc->scsi + msc->in_active);
+	scsi_data_cplt(scsi, msc->in_ptr, msc->in_size);
+	msc->in_active = 0xff;
 }
 
 static void epout_swap(usb_t *usb, uint32_t n)
@@ -162,7 +175,7 @@ static void usbif_config(usb_t *usb, void *pdata)
 		.data = msc,
 		.init = &epin_init,
 		//.halt = &epin_halt,
-		//.xfr_cplt = &epin_xfr_cplt,
+		.xfr_cplt = &epin_xfr_cplt,
 	};
 	const epout_t epout = {
 		.data = msc,
@@ -277,6 +290,9 @@ static void process_data(usb_t *usb, usb_msc_t *msc)
 	// Process SCSI initiated data packets
 	scsi_ret_t ret = scsi_process(scsi, MSC_IN_MAX_SIZE);
 	if (ret.length || ret.state == SCSIFailure) {
+		msc->in_active = msc->active;
+		msc->in_ptr = ret.p;
+		msc->in_size = ret.length;
 		if (usb_ep_in_transfer(usb->base, msc->ep_in,
 				       ret.p, ret.length) != ret.length)
 			dbgbkpt();
@@ -326,10 +342,10 @@ static void process_data(usb_t *usb, usb_msc_t *msc)
 	// Send CSW after transfer finished
 s_csw:	csw->bCSWStatus = ret.state == SCSIFailure;
 	if (ret.state == SCSIGood || ret.state == SCSIFailure) {
-		if (usb_ep_in_transfer(usb->base, msc->ep_in, csw, 13u) != 13u)
-			dbgbkpt();
 		// Process new CBW packets
 		msc->active = 0xff;
+		if (usb_ep_in_transfer(usb->base, msc->ep_in, csw, 13u) != 13u)
+			dbgbkpt();
 	}
 }
 
@@ -337,7 +353,7 @@ usb_msc_t *usb_msc_init(usb_t *usb)
 {
 	usb_msc_t *data = &msc;
 	memset(data, 0, sizeof(usb_msc_t));
-	data->active = data->lun_max = 0xff;
+	data->active = data->in_active = data->lun_max = 0xff;
 	// Audio control interface
 	const usb_if_t usbif = {
 		.data = data,

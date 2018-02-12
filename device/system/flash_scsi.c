@@ -493,6 +493,7 @@ scsi_if_t flash_scsi_handlers(uint32_t region)
 		scsi_read_start,
 		scsi_read_available,
 		scsi_read_data,
+		0,
 		scsi_read_stop,
 
 		scsi_write_start,
