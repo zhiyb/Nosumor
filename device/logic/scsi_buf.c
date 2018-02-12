@@ -4,7 +4,7 @@
 #ifdef BOOTLOADER
 #define BUFFER_SIZE	(128 * 1024)
 #else
-#define BUFFER_SIZE	(64 * 1024)
+#define BUFFER_SIZE	(16 * 1024)
 #endif
 
 static uint8_t scsi_buf[BUFFER_SIZE] ALIGN(32);

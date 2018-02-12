@@ -3,6 +3,7 @@
 #include <macros.h>
 #include <escape.h>
 #include <debug.h>
+#include <irq.h>
 #include <system/systick.h>
 #include <system/clocks.h>
 #include <logic/scsi_defs_sense.h>
@@ -34,6 +35,13 @@ static DSTATUS stat = STA_NOINIT;
 static uint32_t ccs = 0, capacity = 0, blocks = 0, rca = 0;
 enum {MMCIdle = 0, MMCRead, MMCWrite, MMCMulti = 0x80} status = MMCIdle;
 
+struct {
+	uint8_t buf[2][512] ALIGN(4);
+	volatile uint32_t cnt;
+	volatile uint16_t size[2];
+	volatile uint8_t idx;
+} data SECTION(.dtcm);
+
 uint32_t mmc_capacity()
 {
 	return capacity;
@@ -50,6 +58,9 @@ void mmc_reset(DSTATUS s)
 		capacity = 0;
 	status = MMCIdle;
 	stat = s;
+	data.cnt = 0;
+	data.idx = 0;
+	data.size[0] = data.size[1] = 0;
 }
 
 // Send command to card, with optional status output
@@ -138,6 +149,12 @@ static inline void mmc_base_init()
 	STREAM->PAR = (uint32_t)&MMC->FIFO;
 	// FIFO control
 	STREAM->FCR = DMA_SxFCR_DMDIS_Msk | (0b11 << DMA_SxFCR_FTH_Pos);
+
+	// Enable NVIC interrupts
+	uint32_t pg = NVIC_GetPriorityGrouping();
+	NVIC_SetPriority(SDMMC1_IRQn,
+			 NVIC_EncodePriority(pg, NVIC_PRIORITY_MMC, 0));
+	NVIC_EnableIRQ(SDMMC1_IRQn);
 }
 
 static DSTATUS mmc_cd()
@@ -232,6 +249,46 @@ static uint32_t mmc_ping()
 	return 0;
 }
 
+static uint32_t mmc_data(const void *p, uint32_t count)
+{
+	if (!(status & (MMCWrite | MMCRead))) {
+		dbgbkpt();
+		return 0;
+	}
+
+	if (count == 0)
+		return 0;
+
+	// Wait for data block transmission
+	while (MMC->STA & (SDMMC_STA_TXACT_Msk | SDMMC_STA_RXACT_Msk));
+	// Wait for DMA
+	while (STREAM->CR & DMA_SxCR_EN_Msk);
+
+	// Clear SDMMC flags
+	MMC->ICR = SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_DATAENDC_Msk |
+			SDMMC_ICR_TXUNDERRC_Msk | SDMMC_ICR_RXOVERRC_Msk;
+	// Clear DMA interrupts
+	DMA2->LIFCR = DMA_LIFCR_CTCIF3_Msk | DMA_LIFCR_CHTIF3_Msk |
+			DMA_LIFCR_CTEIF3_Msk | DMA_LIFCR_CDMEIF3_Msk |
+			DMA_LIFCR_CFEIF3_Msk;
+
+	// Set memory address
+	STREAM->M0AR = (uint32_t)p;
+	// Enable DMA stream
+	STREAM->CR |= DMA_SxCR_EN_Msk;
+
+	// Set transfer length
+	MMC->DLEN = count * 512ul;
+	// Start data transfer
+	MMC->DCTRL = ((status & MMCRead) ? SDMMC_DCTRL_DTDIR_Msk : 0) |
+			SDMMC_DCTRL_DMAEN_Msk | SDMMC_DCTRL_DTEN_Msk |
+			(9ul << SDMMC_DCTRL_DBLOCKSIZE_Pos);
+
+	// Statistics
+	blocks += count;
+	return count;
+}
+
 static uint32_t mmc_read_prepare()
 {
 	if (status != MMCIdle) {
@@ -274,6 +331,14 @@ static uint32_t mmc_read_start(uint32_t start, uint32_t count)
 	if (ccs == 0)
 		start *= 512u;
 
+	// Enable data end interrupt
+	MMC->ICR = SDMMC_ICR_DATAENDC_Msk;
+	MMC->MASK |= SDMMC_MASK_DATAENDIE_Msk;
+	// Setup data transfer
+	data.cnt = count;
+	if (mmc_data(data.buf[data.idx], 1) != 1)
+		return 0;
+
 	// Send command to start transfer
 	uint32_t resp, stat;
 	resp = mmc_command(count == 1 ? READ_SINGLE_BLOCK : READ_MULTIPLE_BLOCK, start, &stat);
@@ -285,6 +350,21 @@ static uint32_t mmc_read_start(uint32_t start, uint32_t count)
 	// Update status
 	status = (count == 1 ? 0 : MMCMulti) | MMCRead;
 	return count;
+}
+
+static void mmc_read_cplt()
+{
+	uint8_t idx = data.idx;
+	NVIC_DisableIRQ(SDMMC1_IRQn);
+	data.size[!idx] = 0;
+	uint16_t size = data.size[idx];
+	NVIC_EnableIRQ(SDMMC1_IRQn);
+	// Restart data transfer
+	if (size == 512u) {
+		data.idx = idx = !idx;
+		if (data.cnt && mmc_data(data.buf[idx], 1) != 1)
+			dbgbkpt();
+	}
 }
 
 static uint32_t mmc_write_start(uint32_t start, uint32_t count)
@@ -340,46 +420,6 @@ static uint32_t mmc_write_start(uint32_t start, uint32_t count)
 	return count;
 }
 
-static uint32_t mmc_data(const void *p, uint32_t count)
-{
-	if (!(status & (MMCWrite | MMCRead))) {
-		dbgbkpt();
-		return 0;
-	}
-
-	if (count == 0)
-		return 0;
-
-	// Wait for data block transmission
-	while (MMC->STA & (SDMMC_STA_TXACT_Msk | SDMMC_STA_RXACT_Msk));
-	// Wait for DMA
-	while (STREAM->CR & DMA_SxCR_EN_Msk);
-
-	// Clear SDMMC flags
-	MMC->ICR = SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_DATAENDC_Msk |
-			SDMMC_ICR_TXUNDERRC_Msk | SDMMC_ICR_RXOVERRC_Msk;
-	// Clear DMA interrupts
-	DMA2->LIFCR = DMA_LIFCR_CTCIF3_Msk | DMA_LIFCR_CHTIF3_Msk |
-			DMA_LIFCR_CTEIF3_Msk | DMA_LIFCR_CDMEIF3_Msk |
-			DMA_LIFCR_CFEIF3_Msk;
-
-	// Set memory address
-	STREAM->M0AR = (uint32_t)p;
-	// Enable DMA stream
-	STREAM->CR |= DMA_SxCR_EN_Msk;
-
-	// Set transfer length
-	MMC->DLEN = count * 512ul;
-	// Start data transfer
-	MMC->DCTRL = ((status & MMCRead) ? SDMMC_DCTRL_DTDIR_Msk : 0) |
-			SDMMC_DCTRL_DMAEN_Msk | SDMMC_DCTRL_DTEN_Msk |
-			(9ul << SDMMC_DCTRL_DBLOCKSIZE_Pos);
-
-	// Statistics
-	blocks += count;
-	return count;
-}
-
 static int32_t mmc_busy()
 {
 	if (MMC->STA & (SDMMC_STA_TXACT_Msk | SDMMC_STA_RXACT_Msk))
@@ -390,11 +430,6 @@ static int32_t mmc_busy()
 		return !(MMC->STA & SDMMC_STA_DATAEND_Msk);
 	else
 		return 0;
-}
-
-static int32_t mmc_transferred()
-{
-	return 0xffffu - STREAM->NDTR;
 }
 
 static uint32_t mmc_stop()
@@ -409,6 +444,9 @@ static uint32_t mmc_stop()
 	MMC->DCTRL = 0;
 	// Wait for DMA
 	while (STREAM->CR & DMA_SxCR_EN_Msk);
+
+	// Disable data end interrupt
+	MMC->MASK &= ~SDMMC_MASK_DATAENDIE_Msk;
 
 	// Clear SDMMC flags
 	MMC->ICR = SDMMC_ICR_DBCKENDC_Msk | SDMMC_ICR_DATAENDC_Msk |
@@ -433,28 +471,167 @@ static uint32_t mmc_stop()
 	return 0;
 }
 
-static uint32_t mmc_write_block(const void *p, uint32_t start, uint32_t count)
+void SDMMC1_IRQHandler()
 {
-	if (mmc_write_start(start, count) != count)
-		return 0;
-	if (mmc_data(p, count) != count)
-		return 0;
-	if (mmc_stop() != 0)
-		return 0;
-	return count;
+	uint32_t i = MMC->STA;
+	if (i & SDMMC_STA_DATAEND_Msk) {
+		MMC->ICR = SDMMC_ICR_DATAENDC_Msk;
+		if (!data.cnt)
+			dbgbkpt();
+		// Buffer full
+		uint8_t idx = data.idx;
+		__disable_irq();
+		data.size[idx] = 512u;
+		data.cnt--;
+		// Check alternative buffer
+		idx = !idx;
+		uint16_t size = data.size[idx];
+		if (size == 0u)
+			// Swap buffer
+			data.idx = idx;
+		__enable_irq();
+		if (size == 0u)
+			// Start new transfer
+			if (data.cnt && mmc_data(data.buf[idx], 1) != 1)
+					dbgbkpt();
+	}
 }
 
-static uint32_t mmc_read_block(void *p, uint32_t start, uint32_t count)
+/* SCSI interface functions */
+
+static uint8_t scsi_sense(void *p, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
+{
+	// Update status
+	mmc_disk_status();
+	// Construct SCSI sense code
+	if (stat & STA_NODISK) {
+		*sense = NOT_READY;
+		// 3A/00  DZT ROM  BK    MEDIUM NOT PRESENT
+		*asc = 0x3a;
+		*ascq = 0x00;
+		return CHECK_CONDITION;
+	} else if (stat & STA_ERROR) {
+		*sense = MEDIUM_ERROR;
+		// 30/00  DZT ROM  BK    INCOMPATIBLE MEDIUM INSTALLED
+		*asc = 0x30;
+		*ascq = 0x00;
+		return CHECK_CONDITION;
+	} else if (stat) {
+		*sense = HARDWARE_ERROR;
+		// 04/00  DZTPROMAEBKVF  LOGICAL UNIT NOT READY, CAUSE NOT REPORTABLE
+		*asc = 0x04;
+		*ascq = 0x00;
+		return CHECK_CONDITION;
+	}
+	*sense = NO_SENSE;
+	// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
+	*asc = 0x00;
+	*ascq = 0x00;
+	return GOOD;
+}
+
+static uint32_t scsi_capacity(void *p, uint32_t *lbnum, uint32_t *lbsize)
+{
+	*lbnum = stat ? 0ul : capacity;
+	*lbsize = 512ul;
+	return 0;
+}
+
+static uint32_t scsi_read_start(void *p, uint32_t offset, uint32_t size)
 {
 	if (mmc_read_prepare() != 0)
 		return 0;
-	if (mmc_data(p, count) != count)
+	if (mmc_read_start(offset, size) != size)
 		return 0;
-	if (mmc_read_start(start, count) != count)
+	return size;
+}
+
+static int32_t scsi_read_available(void *p)
+{
+	// Update status
+	if (mmc_disk_status())
+		return -1;
+
+	uint8_t idx = !data.idx;
+	return data.size[idx];
+}
+
+static void *scsi_read_data(void *p, uint32_t *length)
+{
+	uint8_t idx = !data.idx;
+
+	// Check buffer size
+	if (*length != data.size[idx]) {
+		dbgbkpt();
+		*length = 0;
 		return 0;
-	if (mmc_stop() != 0)
-		return 0;
-	return count;
+	}
+
+	return data.buf[idx];
+}
+
+static void scsi_read_cplt(void *p, uint32_t length, const void *dp)
+{
+	mmc_read_cplt();
+}
+
+static uint32_t scsi_read_stop(void *p)
+{
+	return mmc_stop();
+}
+
+static uint32_t scsi_write_start(void *p, uint32_t offset, uint32_t size)
+{
+	return mmc_write_start(offset, size);
+}
+
+static uint32_t scsi_write_data(void *p, uint32_t length, const void *data)
+{
+	// Check for sector alignment
+	if (length % 512ul)
+		dbgbkpt();
+	return mmc_data(data, length / 512ul) * 512ul;
+}
+
+static int32_t scsi_write_busy(void *p)
+{
+	// Update status
+	if (mmc_disk_status())
+		return -1;
+
+	return mmc_busy();
+}
+
+static uint32_t scsi_write_stop(void *p)
+{
+	return mmc_stop();
+}
+
+static const char *scsi_name()
+{
+	return "SD Card Reader";
+}
+
+scsi_if_t mmc_scsi_handlers()
+{
+	static const scsi_handlers_t handlers = {
+		SCSIRemovable,
+		scsi_name,
+		scsi_sense,
+		scsi_capacity,
+
+		scsi_read_start,
+		scsi_read_available,
+		scsi_read_data,
+		scsi_read_cplt,
+		scsi_read_stop,
+
+		scsi_write_start,
+		scsi_write_data,
+		scsi_write_busy,
+		scsi_write_stop,
+	};
+	return (scsi_if_t){&handlers, 0};
 }
 
 /* FatFs interface functions */
@@ -470,13 +647,13 @@ DSTATUS mmc_disk_init()
 	if (mmc_cd() & STA_NODISK)
 		return stat;
 
-	mmc_reset(STA_ERROR);
-
 	// Initialise SDMMC module
 	RCC->APB2ENR |= RCC_APB2ENR_SDMMC1EN_Msk;
-
 	// Disable interrupts
 	MMC->MASK = 0ul;
+
+	mmc_reset(STA_ERROR);
+
 	// 1-bit bus, clock enable, 400kHz
 	MMC->CLKCR = SDMMC_CLKCR_CLKEN_Msk | (CEIL(clkSDMMC1(), 400000ul) - 2ul);
 	// Start card clock
@@ -623,168 +800,23 @@ DRESULT mmc_disk_read(BYTE *buff, DWORD sector, UINT count)
 {
 	if (stat)
 		return RES_ERROR;
-	if (mmc_read_block(buff, sector, count) != count)
+
+	if (scsi_read_start(0, sector, count) != count)
+		return RES_ERROR;
+	while (count--) {
+		int32_t size;
+		while ((size = scsi_read_available(0)) != 512u)
+			if (size == -1)
+				return RES_ERROR;
+			else
+				__WFI();
+		void *dp = scsi_read_data(0, (uint32_t *)&size);
+		if (size != 512u)
+			return RES_ERROR;
+		memcpy(buff, dp, size);
+		scsi_read_cplt(0, size, dp);
+	}
+	if (scsi_read_stop(0) != 0)
 		return RES_ERROR;
 	return RES_OK;
-}
-
-/* SCSI interface functions */
-
-void *scsi_ptr;
-
-static uint8_t scsi_sense(void *p, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
-{
-	// Update status
-	mmc_disk_status();
-	// Construct SCSI sense code
-	if (stat & STA_NODISK) {
-		*sense = NOT_READY;
-		// 3A/00  DZT ROM  BK    MEDIUM NOT PRESENT
-		*asc = 0x3a;
-		*ascq = 0x00;
-		return CHECK_CONDITION;
-	} else if (stat & STA_ERROR) {
-		*sense = MEDIUM_ERROR;
-		// 30/00  DZT ROM  BK    INCOMPATIBLE MEDIUM INSTALLED
-		*asc = 0x30;
-		*ascq = 0x00;
-		return CHECK_CONDITION;
-	} else if (stat) {
-		*sense = HARDWARE_ERROR;
-		// 04/00  DZTPROMAEBKVF  LOGICAL UNIT NOT READY, CAUSE NOT REPORTABLE
-		*asc = 0x04;
-		*ascq = 0x00;
-		return CHECK_CONDITION;
-	}
-	*sense = NO_SENSE;
-	// 00/00  DZTPROMAEBKVF  NO ADDITIONAL SENSE INFORMATION
-	*asc = 0x00;
-	*ascq = 0x00;
-	return GOOD;
-}
-
-static uint32_t scsi_capacity(void *p, uint32_t *lbnum, uint32_t *lbsize)
-{
-	*lbnum = stat ? 0ul : capacity;
-	*lbsize = 512ul;
-	return 0;
-}
-
-static uint32_t scsi_read_start(void *p, uint32_t offset, uint32_t size)
-{
-	// Retrive SCSI buffer
-	uint32_t buf_size;
-	void *buf = scsi_buffer(&buf_size);
-
-	// Check buffer overflow
-	if (size * 512ul > buf_size) {
-		dbgbkpt();
-		return 0;
-	}
-
-	// Invalidate data cache for DMA operation
-	SCB_InvalidateDCache_by_Addr(buf, size * 512ul);
-
-	if (mmc_read_prepare() != 0)
-		return 0;
-	if (mmc_data(buf, size) != size)
-		return 0;
-	if (mmc_read_start(offset, size) != size)
-		return 0;
-	scsi_ptr = buf;
-	return size;
-}
-
-static int32_t scsi_read_available(void *p)
-{
-	// Update status
-	if (mmc_disk_status())
-		return -1;
-
-	int32_t size = mmc_transferred();
-	if (size < 0)
-		return size;
-	return size * 4ul - (scsi_ptr - scsi_buffer(0));
-}
-
-static void *scsi_read_data(void *p, uint32_t *length)
-{
-	// Retrive SCSI buffer
-	uint32_t buf_size;
-	void *buf = scsi_buffer(&buf_size);
-
-	// Check buffer overflow
-	if (*length + (scsi_ptr - buf) > buf_size) {
-		dbgbkpt();
-		*length = 0;
-		return 0;
-	}
-
-	void *ptr = scsi_ptr;
-	scsi_ptr += *length / sizeof(*scsi_ptr);
-	return ptr;
-}
-
-static void scsi_read_cplt(void *p, uint32_t length, const void *data)
-{
-	dbgprintf(ESC_DEBUG "[MMC] %p, %lu\n", data, length);
-}
-
-static uint32_t scsi_read_stop(void *p)
-{
-	return mmc_stop();
-}
-
-static uint32_t scsi_write_start(void *p, uint32_t offset, uint32_t size)
-{
-	return mmc_write_start(offset, size);
-}
-
-static uint32_t scsi_write_data(void *p, uint32_t length, const void *data)
-{
-	// Check for sector alignment
-	if (length % 512ul)
-		dbgbkpt();
-	return mmc_data(data, length / 512ul) * 512ul;
-}
-
-static int32_t scsi_write_busy(void *p)
-{
-	// Update status
-	if (mmc_disk_status())
-		return -1;
-
-	return mmc_busy();
-}
-
-static uint32_t scsi_write_stop(void *p)
-{
-	return mmc_stop();
-}
-
-static const char *scsi_name()
-{
-	return "SD Card Reader";
-}
-
-scsi_if_t mmc_scsi_handlers()
-{
-	static const scsi_handlers_t handlers = {
-		SCSIRemovable,
-		scsi_name,
-		scsi_sense,
-		scsi_capacity,
-
-		scsi_read_start,
-		scsi_read_available,
-		scsi_read_data,
-		scsi_read_cplt,
-		scsi_read_stop,
-
-		scsi_write_start,
-		scsi_write_data,
-		scsi_write_busy,
-		scsi_write_stop,
-	};
-	return (scsi_if_t){&handlers, 0};
 }
