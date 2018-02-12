@@ -193,9 +193,6 @@ static void op_start(struct i2c_t *i2c, const struct i2c_op_t *op)
 	if (op->op == (I2CRead | I2CDMA))
 		// Enable reception DMA
 		base->CR1 |= I2C_CR1_RXDMAEN_Msk;
-	else
-		// Enable RX register not empty interrupt
-		base->CR1 |= I2C_CR1_RXIE_Msk;
 	// Critical section, op_done should not be invoked
 	if (base == I2C1)
 		NVIC_DisableIRQ(I2C1_EV_IRQn);
@@ -206,22 +203,25 @@ static void op_start(struct i2c_t *i2c, const struct i2c_op_t *op)
 		base->CR2 = ((op->addr << 1u) << I2C_CR2_SADD_Pos) |
 				(0u << I2C_CR2_NBYTES_Pos) |
 				I2C_CR2_START_Msk | I2C_CR2_AUTOEND_Msk;
-		goto check;
 	} else if ((op->op & (I2CRead | I2CWrite)) == I2CRead) {
 		base->CR2 = ((op->addr << 1u) << I2C_CR2_SADD_Pos) |
 				I2C_CR2_START_Msk | (1u << I2C_CR2_NBYTES_Pos);
+		// Transmit register address
+		base->TXDR = op->reg;
+		// Enable RX register not empty interrupt
+		base->CR1 |= I2C_CR1_RXIE_Msk;
 	} else {
 		base->CR2 = ((op->addr << 1u) << I2C_CR2_SADD_Pos) |
 				((1u + op->size) << I2C_CR2_NBYTES_Pos) |
 				I2C_CR2_START_Msk | I2C_CR2_AUTOEND_Msk;
+		// Transmit register address
+		base->TXDR = op->reg;
 		// Enable TX register empty interrupt
 		base->CR1 |= I2C_CR1_TXIE_Msk;
 	}
-	// Transmit register address
-	base->TXDR = op->reg;
 	// Update I2C status
 	i2c->p = op->p;
-check:	i2c->cnt = op->size;
+	i2c->cnt = op->size;
 	i2c->status = Write;
 	// Critical section end
 	if (base == I2C1)
