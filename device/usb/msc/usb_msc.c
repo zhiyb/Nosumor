@@ -11,7 +11,7 @@
 #include "usb_msc.h"
 #include "usb_msc_defs.h"
 
-#define MSC_IN_MAX_SIZE		512u
+#define MSC_IN_MAX_SIZE		((USB_OTG_DIEPTSIZ_XFRSIZ_Msk + 1ul) >> 1ul)
 #define MSC_IN_PKT_SIZE		512u
 #define MSC_OUT_MAX_SIZE	512u
 #define MSC_OUT_MAX_PKT		1u
@@ -94,7 +94,7 @@ static const void *fifo_pop(struct fifo_t *fifo, uint32_t *size)
 
 static void epin_init(usb_t *usb, uint32_t n)
 {
-	uint32_t size = MSC_IN_MAX_SIZE, addr = usb_ram_alloc(usb, &size);
+	uint32_t size = MSC_IN_PKT_SIZE + 64, addr = usb_ram_alloc(usb, &size);
 	usb->base->DIEPTXF[n - 1] = DIEPTXF(addr, size);
 	// Unmask interrupts
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
@@ -128,6 +128,8 @@ static void epin_xfr_cplt(usb_t *usb, uint32_t n)
 			dbgbkpt();
 		msc->in_ptr = p;
 		msc->in_size = length;
+		if (!length)
+			dbgbkpt();
 	} else {
 		msc->in_active = 0xff;
 	}
@@ -335,7 +337,7 @@ static void process_data(usb_t *usb, usb_msc_t *msc)
 	scsi_t *scsi = *(msc->scsi + msc->active);
 
 	// Process SCSI initiated data packets
-	scsi_ret_t ret = scsi_process(scsi, MSC_IN_MAX_SIZE);
+	scsi_ret_t ret = scsi_process(scsi, MSC_IN_PKT_SIZE, MSC_IN_MAX_SIZE);
 	if (ret.length || ret.state == SCSIFailure) {
 		USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
 		// Disable EP IN interrupts

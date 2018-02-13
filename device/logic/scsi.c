@@ -458,7 +458,7 @@ scsi_state_t scsi_data_cplt(scsi_t *scsi, const void *pdata, uint32_t size)
 	return scsi->state;
 }
 
-scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize)
+scsi_ret_t scsi_process(scsi_t *scsi, uint32_t pktsize, uint32_t maxsize)
 {
 	// Avoid failure sort packet looping
 	if (scsi->state == SCSIFailure)
@@ -483,13 +483,14 @@ scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize)
 		// Reset SCSI state machine
 		scsi->state = SCSIFailure;
 		return (scsi_ret_t){0, 0, scsi->state};
-	} else if ((uint32_t)available < size)
+	} else if ((uint32_t)available < pktsize)
 		return (scsi_ret_t){0, 0, scsi->state};
 
 	// Read available data
-	uint32_t length = size;
+	available &= ~(pktsize - 1);
+	uint32_t length = available;
 	void *p = scsi->h->read_data(scsi->p, &length);
-	if (!p || length != size) {
+	if (!p || length != (uint32_t)available) {
 		dbgprintf(ESC_ERROR "[SCSI] Read data failure\n");
 		// Update sense data
 		test_unit_ready(scsi, 0);
@@ -499,7 +500,7 @@ scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize)
 	}
 
 	// Update status
-	scsi->length -= size;
+	scsi->length -= length;
 	if (!scsi->length) {
 		if (scsi->h->read_stop(scsi->p)) {
 			dbgprintf(ESC_ERROR "[SCSI] Read failed\n");
@@ -514,5 +515,5 @@ scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize)
 	} else {
 		scsi->state |= SCSIBusy;
 	}
-	return (scsi_ret_t){p, size, scsi->state};
+	return (scsi_ret_t){p, length, scsi->state};
 }
