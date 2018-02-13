@@ -10,8 +10,9 @@
 #include "mmc.h"
 #include "mmc_defs.h"
 
-#define BUF_NUM		16u
-#define BUF_BLOCKS	1u
+#define BUF_BLOCKS	16u
+// Maximum number of blocks for a single transfer
+#define MAX_BLOCKS	4u
 
 #if HWVER >= 0x0100
 #define GPIO	GPIOB
@@ -39,12 +40,11 @@ static uint32_t ccs = 0, capacity = 0, blocks = 0, rca = 0;
 enum {MMCIdle = 0, MMCRead, MMCWrite, MMCMulti = 0x80} status = MMCIdle;
 
 struct {
-	uint8_t buf[BUF_NUM][512u * BUF_BLOCKS] ALIGN(4);
-	volatile uint16_t size[BUF_NUM];
-	volatile uint32_t cnt;
+	uint8_t buf[BUF_BLOCKS][512u] ALIGN(4);
+	volatile uint32_t blocks;
 	struct PACKED {
 		volatile uint8_t mmc, rd, cplt;
-	} idx;
+	} cnt;
 } data SECTION(.dtcm);
 
 uint32_t mmc_capacity()
@@ -63,10 +63,8 @@ void mmc_reset(DSTATUS s)
 		capacity = 0;
 	status = MMCIdle;
 	stat = s;
-	data.cnt = 0;
-	data.idx.mmc = data.idx.rd = data.idx.cplt = 0;
-	for (uint32_t i = 0; i != BUF_NUM; i++)
-		data.size[i] = 0;
+	data.blocks = 0;
+	data.cnt.mmc = data.cnt.rd = data.cnt.cplt = 0;
 }
 
 // Send command to card, with optional status output
@@ -295,12 +293,45 @@ static uint32_t mmc_data(const void *p, uint32_t count)
 	return count;
 }
 
-static uint32_t mmc_read_prepare()
+static uint32_t mmc_buf_start(uint8_t mmc, uint8_t cplt)
+{
+	uint8_t cnt = mmc;
+	// Check remaining block count
+	uint32_t blocks = data.blocks;
+	if (!blocks)
+		return 0;
+	blocks = blocks >= MAX_BLOCKS ? MAX_BLOCKS : blocks;
+	// Check available buffers
+	uint8_t i = BUF_BLOCKS - (cnt - cplt);
+	if (!i)
+		return 0;
+	blocks = blocks >= i ? i : blocks;
+	// Check end buffer boundary
+	uint8_t idx = cnt & (BUF_BLOCKS - 1u);
+	i = BUF_BLOCKS - idx;
+	if (!i)
+		return 0;
+	blocks = blocks >= i ? i : blocks;
+	// Setup data transfer
+	return mmc_data(data.buf[idx], blocks) != blocks;
+}
+
+static uint32_t mmc_read_start(uint32_t start, uint32_t count)
 {
 	if (status != MMCIdle) {
 		dbgbkpt();
-		return 1;
+		return 0;
 	}
+
+	if (count == 0)
+		return 0;
+
+	// Correct start address for SDSC cards
+	if (ccs == 0)
+		start *= 512u;
+
+	// Update status
+	status = MMCRead;
 
 	// Peripheral to memory, 32bit -> 32bit, burst of 4 beats, low priority
 	STREAM->CR = (4ul << DMA_SxCR_CHSEL_Pos) | (0b00ul << DMA_SxCR_PL_Pos) |
@@ -308,42 +339,12 @@ static uint32_t mmc_read_prepare()
 			(0b10ul << DMA_SxCR_MSIZE_Pos) | (0b10ul << DMA_SxCR_PSIZE_Pos) |
 			(0b00ul << DMA_SxCR_DIR_Pos) | DMA_SxCR_MINC_Msk | DMA_SxCR_PFCTRL_Msk;
 
-	// Polling for card busy
-	uint32_t resp, stat;
-	do {
-		resp = mmc_command(SEND_STATUS, rca, &stat);
-		if (!(stat & SDMMC_STA_CMDREND_Msk))
-			return 2;
-	} while (resp >> 9u != 4u);
-
-	// Update status
-	status = MMCRead;
-	return 0;
-}
-
-static uint32_t mmc_read_start(uint32_t start, uint32_t count)
-{
-	if (status != MMCRead) {
-		dbgbkpt();
-		return 0;
-	}
-
-	if (count == 0) {
-		status = MMCIdle;
-		return 0;
-	}
-
-	// Correct start address for SDSC cards
-	if (ccs == 0)
-		start *= 512u;
-
 	// Enable data end interrupt
 	MMC->ICR = SDMMC_ICR_DATAENDC_Msk;
 	MMC->MASK |= SDMMC_MASK_DATAENDIE_Msk;
 	// Setup data transfer
-	data.cnt = count;
-	uint32_t cnt = count >= BUF_BLOCKS ? BUF_BLOCKS : count;
-	if (mmc_data(data.buf[data.idx.mmc], cnt) != cnt)
+	data.blocks = count;
+	if (mmc_buf_start(data.cnt.mmc, data.cnt.cplt) != 0)
 		return 0;
 
 	// Send command to start transfer
@@ -361,40 +362,44 @@ static uint32_t mmc_read_start(uint32_t start, uint32_t count)
 
 static void mmc_read_cplt(uint32_t length)
 {
-	uint8_t idx = data.idx.cplt;
-	// Check completed buffers
-	uint8_t idx_cplt = idx;
-	while (length) {
-		int16_t size = data.size[idx_cplt];
-		size = size < 0 ? -size : size;
-		if (length < (uint16_t)size) {
-			dbgbkpt();
-			break;
-		}
-		length -= size;
-		idx_cplt = (idx_cplt + 1) & (BUF_NUM - 1);
-	}
-	// Update buffer sizes
-	uint8_t i = (idx - 1) & (BUF_NUM - 1);
+	// Check block alignment
+	if (length & (512ul - 1ul))
+		dbgbkpt();
+	length /= 512ul;
+
+	// Update completed blocks
 	NVIC_DisableIRQ(SDMMC1_IRQn);
-	int16_t psize = data.size[i];
-	i = idx;
-	do {
-		data.size[i] = 0;
-		i = (i + 1) & (BUF_NUM - 1);
-	} while (i != idx_cplt);
+	uint8_t mmc = data.cnt.mmc, c = data.cnt.cplt, cplt = c + length;
+	data.cnt.cplt = cplt;
 	NVIC_EnableIRQ(SDMMC1_IRQn);
-	data.idx.cplt = i;
-	// Restart data transfer
-	if (psize != 0) {
-		if (data.idx.mmc != idx)
+
+	// Restart data transfer if necessary
+	if ((uint8_t)(mmc - c) == BUF_BLOCKS)
+		if (mmc_buf_start(mmc, cplt) != 0)
 			dbgbkpt();
-		data.idx.mmc = idx;
-		uint32_t cnt = data.cnt;
-		cnt = cnt >= BUF_BLOCKS ? BUF_BLOCKS : cnt;
-		if (cnt && mmc_data(data.buf[idx], cnt) != cnt)
-			dbgbkpt();
+}
+
+static uint32_t mmc_read_available()
+{
+	uint8_t rd = data.cnt.rd;
+	// Calculate buffer end boundary
+	uint8_t e = (rd + BUF_BLOCKS) & ~(BUF_BLOCKS - 1u);
+	// Align available blocks to buffer end boundary
+	uint8_t mmc = data.cnt.mmc;
+	mmc = (uint8_t)(e - mmc) <= BUF_BLOCKS ? mmc : e;
+	return (uint32_t)(uint8_t)(mmc - rd) * 512ul;
+}
+
+static void *mmc_read(uint32_t length)
+{
+	if (mmc_read_available() < length) {
+		dbgbkpt();
+		return 0;
 	}
+	uint8_t rd = data.cnt.rd;
+	void *p = data.buf[rd & (BUF_BLOCKS - 1u)];
+	data.cnt.rd = rd + length / 512ul;
+	return p;
 }
 
 static uint32_t mmc_write_start(uint32_t start, uint32_t count)
@@ -498,6 +503,16 @@ static uint32_t mmc_stop()
 		}
 	}
 
+	// Polling for card busy
+	if (status & MMCWrite) {
+		uint32_t resp, stat;
+		do {
+			resp = mmc_command(SEND_STATUS, rca, &stat);
+			if (!(stat & SDMMC_STA_CMDREND_Msk))
+				return 0;
+		} while (resp >> 9u != 4u);
+	}
+
 	status = MMCIdle;
 	return 0;
 }
@@ -507,26 +522,23 @@ void SDMMC1_IRQHandler()
 	uint32_t i = MMC->STA;
 	if (i & SDMMC_STA_DATAEND_Msk) {
 		MMC->ICR = SDMMC_ICR_DATAENDC_Msk;
-		if (!data.cnt)
+		if (!data.blocks)
 			dbgbkpt();
-		// Buffer full
-		uint8_t idx = data.idx.mmc;
-		uint8_t idx_next = (idx + 1) & (BUF_NUM - 1);
+		// Available blocks
 		uint32_t dlen = MMC->DLEN;
+		// Check block alignment
+		if (dlen & (512ul - 1ul))
+			dbgbkpt();
+		dlen /= 512ul;
+		// Update available blocks
 		__disable_irq();
-		data.size[idx] = dlen;
-		// Check next buffer
-		uint16_t size = data.size[idx_next];
-		data.idx.mmc = idx_next;
-		data.cnt -= dlen / 512u;
+		uint8_t mmc = data.cnt.mmc + dlen, cplt = data.cnt.cplt;
+		data.cnt.mmc = mmc;
+		data.blocks -= dlen;
 		__enable_irq();
-		if (size == 0u) {
-			// Start new transfer
-			uint32_t cnt = data.cnt;
-			cnt = cnt >= BUF_BLOCKS ? BUF_BLOCKS : cnt;
-			if (cnt && mmc_data(data.buf[idx_next], cnt) != cnt)
-					dbgbkpt();
-		}
+		// Restart data transfer
+		if (mmc_buf_start(mmc, cplt))
+			dbgbkpt();
 	}
 }
 
@@ -572,8 +584,6 @@ static uint32_t scsi_capacity(void *p, uint32_t *lbnum, uint32_t *lbsize)
 
 static uint32_t scsi_read_start(void *p, uint32_t offset, uint32_t size)
 {
-	if (mmc_read_prepare() != 0)
-		return 0;
 	if (mmc_read_start(offset, size) != size)
 		return 0;
 	return size;
@@ -584,46 +594,27 @@ static int32_t scsi_read_available(void *p)
 	// Update status
 	if (mmc_disk_status())
 		return -1;
-
-	int32_t size = 0;
-	for (uint8_t i = data.idx.rd; i != BUF_NUM; i++) {
-		int16_t s = data.size[i];
-		if (s <= 0)
-			break;
-		size += s;
-	}
-	return size;
+	int32_t s = mmc_read_available();
+	if (s < 0)
+		dbgbkpt();
+	return mmc_read_available();
 }
 
 static void *scsi_read_data(void *p, uint32_t *length)
 {
-	uint8_t idx = data.idx.rd;
-
-	// Check buffer size
-	int32_t size = *length;
-	uint8_t i;
-	for (i = idx; size && i != BUF_NUM; i++) {
-		int16_t s = data.size[i];
-		if (size < s)
-			break;
-		data.size[i] = -s;
-		size -= s;
-	}
-	if (size) {
-		dbgbkpt();
+	void *ptr = mmc_read(*length);
+	if (!ptr) {
 		*length = 0;
 		return 0;
 	}
-
-	data.idx.rd = i & (BUF_NUM - 1);
-	return data.buf[idx];
+	return ptr;
 }
 
 static void scsi_read_cplt(void *p, uint32_t length, const void *dp)
 {
 	if (stat)
 		return;
-	if (dp != &data.buf[data.idx.cplt])
+	if (dp != &data.buf[data.cnt.cplt & (BUF_BLOCKS - 1u)])
 		dbgbkpt();
 	mmc_read_cplt(length);
 }
