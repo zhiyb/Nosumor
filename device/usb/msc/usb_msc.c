@@ -12,8 +12,10 @@
 #include "usb_msc_defs.h"
 
 #define MSC_IN_MAX_SIZE		512u
+#define MSC_IN_PKT_SIZE		512u
 #define MSC_OUT_MAX_SIZE	512u
 #define MSC_OUT_MAX_PKT		1u
+#define MSC_FIFO_LEVEL		8u
 
 #define CBW_DIR_Msk	0x80
 #define CBW_DIR_IN	0x80
@@ -36,6 +38,13 @@ typedef struct PACKED csw_t {
 	uint8_t bCSWStatus;
 } csw_t;
 
+struct fifo_t {
+	const void *entry[MSC_FIFO_LEVEL];
+	uint32_t size[MSC_FIFO_LEVEL];
+	volatile uint16_t next;
+	volatile uint16_t level;
+};
+
 typedef struct usb_msc_t {
 	int ep_in, ep_out;
 	scsi_t **scsi;
@@ -43,9 +52,10 @@ typedef struct usb_msc_t {
 	uint8_t lun_max ALIGN(4);
 	volatile uint8_t outbuf;
 	volatile uint8_t active;
-	uint8_t in_active;
+	volatile uint8_t in_active;
+	const void *in_ptr;
 	uint16_t in_size;
-	void *in_ptr;
+	struct fifo_t fifo;
 } usb_msc_t;
 
 static usb_msc_t msc SECTION(.dtcm);
@@ -53,11 +63,34 @@ static usb_msc_t msc SECTION(.dtcm);
 static union {
 	cbw_t cbw;
 	uint8_t raw[MSC_OUT_MAX_SIZE];
-} buf[2] SECTION(.dtcm);
+} buf[2] SECTION(.dtcm) ALIGN(4);
 static union {
 	csw_t csw;
 	uint8_t raw[0];
-} inbuf SECTION(.dtcm);
+} inbuf SECTION(.dtcm) ALIGN(4);
+
+static uint16_t fifo_level(struct fifo_t *fifo)
+{
+	return fifo->level;
+}
+
+static void fifo_push(struct fifo_t *fifo, const void *p, uint32_t size)
+{
+	uint16_t idx = fifo->next;
+	fifo->level++;
+	fifo->next = (idx + 1) & (MSC_FIFO_LEVEL - 1);
+	fifo->entry[idx] = p;
+	fifo->size[idx] = size;
+}
+
+static const void *fifo_pop(struct fifo_t *fifo, uint32_t *size)
+{
+	uint16_t idx = (fifo->next - fifo->level) & (MSC_FIFO_LEVEL - 1);
+	fifo->level--;
+	*size = fifo->size[idx];
+	const void *p = fifo->entry[idx];
+	return p;
+}
 
 static void epin_init(usb_t *usb, uint32_t n)
 {
@@ -71,7 +104,7 @@ static void epin_init(usb_t *usb, uint32_t n)
 	// Configure endpoint
 	ep->DIEPCTL = USB_OTG_DIEPCTL_USBAEP_Msk | EP_TYP_BULK |
 			(n << USB_OTG_DIEPCTL_TXFNUM_Pos) |
-			(MSC_IN_MAX_SIZE << USB_OTG_DIEPCTL_MPSIZ_Pos);
+			(MSC_IN_PKT_SIZE << USB_OTG_DIEPCTL_MPSIZ_Pos);
 	// Initialise buffers
 	usb_msc_t *data = (usb_msc_t *)usb->epin[n].data;
 	csw_t *csw = &inbuf.csw;
@@ -81,11 +114,25 @@ static void epin_init(usb_t *usb, uint32_t n)
 static void epin_xfr_cplt(usb_t *usb, uint32_t n)
 {
 	usb_msc_t *msc = (usb_msc_t *)usb->epin[n].data;
-	if (msc->in_active == 0xff)
+	uint8_t active = msc->in_active;
+	// Skip for CSW transfers
+	if (active == 0xff)
 		return;
-	scsi_t *scsi = *(msc->scsi + msc->in_active);
-	scsi_data_cplt(scsi, msc->in_ptr, msc->in_size);
-	msc->in_active = 0xff;
+	const void *ptr = msc->in_ptr;
+	uint16_t size = msc->in_size;
+	// Start new transfer if data is available
+	if (fifo_level(&msc->fifo)) {
+		uint32_t length;
+		const void *p = fifo_pop(&msc->fifo, &length);
+		if (usb_ep_in_transfer(usb->base, n, p, length) != length)
+			dbgbkpt();
+		msc->in_ptr = p;
+		msc->in_size = length;
+	} else {
+		msc->in_active = 0xff;
+	}
+	scsi_t *scsi = *(msc->scsi + active);
+	scsi_data_cplt(scsi, ptr, size);
 }
 
 static void epout_swap(usb_t *usb, uint32_t n)
@@ -188,7 +235,7 @@ static void usbif_config(usb_t *usb, void *pdata)
 	uint32_t s = usb_desc_add_string(usb, 0, LANG_EN_US, "USB Mass Storage");
 	usb_desc_add_interface(usb, 0u, 2u, MASS_STORAGE, SCSI_TRANSPARENT, BBB, s);
 	usb_desc_add_endpoint(usb, EP_DIR_IN | msc->ep_in,
-			      EP_BULK, MSC_IN_MAX_SIZE, 0u);
+			      EP_BULK, MSC_IN_PKT_SIZE, 0u);
 	usb_desc_add_endpoint(usb, EP_DIR_OUT | msc->ep_out,
 			      EP_BULK, MSC_OUT_MAX_SIZE, 0u);
 }
@@ -290,12 +337,23 @@ static void process_data(usb_t *usb, usb_msc_t *msc)
 	// Process SCSI initiated data packets
 	scsi_ret_t ret = scsi_process(scsi, MSC_IN_MAX_SIZE);
 	if (ret.length || ret.state == SCSIFailure) {
-		msc->in_active = msc->active;
-		msc->in_ptr = ret.p;
-		msc->in_size = ret.length;
-		if (usb_ep_in_transfer(usb->base, msc->ep_in,
-				       ret.p, ret.length) != ret.length)
-			dbgbkpt();
+		USB_OTG_DeviceTypeDef *dev = DEV(usb->base);
+		// Disable EP IN interrupts
+		dev->DAINTMSK &= ~DAINTMSK_IN(msc->ep_in);
+		__ISB();
+		// If the endpoint is not active, start transfer immediately
+		if (msc->in_active == 0xff) {
+			if (usb_ep_in_transfer(usb->base, msc->ep_in,
+					       ret.p, ret.length) != ret.length)
+				dbgbkpt();
+			msc->in_active = msc->active;
+			msc->in_ptr = ret.p;
+			msc->in_size = ret.length;
+		} else {
+			fifo_push(&msc->fifo, ret.p, ret.length);
+		}
+		// Enable interrupts
+		dev->DAINTMSK |= DAINTMSK_IN(msc->ep_in);
 		// Update Command Status Wrapper (CSW)
 		csw->dCSWDataResidue -= ret.length;
 		// Send CSW after transfer finished
@@ -344,6 +402,8 @@ s_csw:	csw->bCSWStatus = ret.state == SCSIFailure;
 	if (ret.state == SCSIGood || ret.state == SCSIFailure) {
 		// Process new CBW packets
 		msc->active = 0xff;
+		while (msc->in_active != 0xff)
+			__WFI();
 		if (usb_ep_in_transfer(usb->base, msc->ep_in, csw, 13u) != 13u)
 			dbgbkpt();
 	}
@@ -383,6 +443,10 @@ scsi_t *usb_msc_scsi_register(usb_msc_t *msc, const scsi_if_t iface)
 void usb_msc_process(usb_t *usb, usb_msc_t *msc)
 {
 	if (!msc || msc->lun_max == 0xff)
+		return;
+
+	// Wait until FIFO available
+	if (fifo_level(&msc->fifo) == MSC_FIFO_LEVEL)
 		return;
 
 	if (msc->active == 0xff)
