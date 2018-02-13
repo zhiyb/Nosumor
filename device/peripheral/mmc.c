@@ -10,7 +10,8 @@
 #include "mmc.h"
 #include "mmc_defs.h"
 
-#define BUF_NUM	4
+#define BUF_NUM		8u
+#define BUF_BLOCKS	1u
 
 #if HWVER >= 0x0100
 #define GPIO	GPIOB
@@ -38,7 +39,7 @@ static uint32_t ccs = 0, capacity = 0, blocks = 0, rca = 0;
 enum {MMCIdle = 0, MMCRead, MMCWrite, MMCMulti = 0x80} status = MMCIdle;
 
 struct {
-	uint8_t buf[BUF_NUM][512] ALIGN(4);
+	uint8_t buf[BUF_NUM][512u * BUF_BLOCKS] ALIGN(4);
 	volatile uint16_t size[BUF_NUM];
 	volatile uint32_t cnt;
 	struct PACKED {
@@ -341,8 +342,8 @@ static uint32_t mmc_read_start(uint32_t start, uint32_t count)
 	MMC->MASK |= SDMMC_MASK_DATAENDIE_Msk;
 	// Setup data transfer
 	data.cnt = count;
-	data.idx.rd = data.idx.cplt = data.idx.mmc;
-	if (mmc_data(data.buf[data.idx.mmc], 1) != 1)
+	uint32_t cnt = count >= BUF_BLOCKS ? BUF_BLOCKS : count;
+	if (mmc_data(data.buf[data.idx.mmc], cnt) != cnt)
 		return 0;
 
 	// Send command to start transfer
@@ -368,9 +369,13 @@ static void mmc_read_cplt()
 	uint16_t size = data.size[idx_prev];
 	NVIC_EnableIRQ(SDMMC1_IRQn);
 	// Restart data transfer
-	if (size == 512u) {
+	if (size != 0) {
+		if (data.idx.mmc != idx)
+			dbgbkpt();
 		data.idx.mmc = idx;
-		if (data.cnt && mmc_data(data.buf[idx], 1) != 1)
+		uint32_t cnt = data.cnt;
+		cnt = cnt >= BUF_BLOCKS ? BUF_BLOCKS : cnt;
+		if (cnt && mmc_data(data.buf[idx], cnt) != cnt)
 			dbgbkpt();
 	}
 }
@@ -489,17 +494,21 @@ void SDMMC1_IRQHandler()
 		// Buffer full
 		uint8_t idx = data.idx.mmc;
 		uint8_t idx_next = (idx + 1) & (BUF_NUM - 1);
+		uint32_t dlen = MMC->DLEN;
 		__disable_irq();
-		data.size[idx] = 512u;
+		data.size[idx] = dlen;
 		// Check next buffer
 		uint16_t size = data.size[idx_next];
-		__enable_irq();
 		data.idx.mmc = idx_next;
-		data.cnt--;
-		if (size == 0u)
+		data.cnt -= dlen / 512u;
+		__enable_irq();
+		if (size == 0u) {
 			// Start new transfer
-			if (data.cnt && mmc_data(data.buf[idx_next], 1) != 1)
+			uint32_t cnt = data.cnt;
+			cnt = cnt >= BUF_BLOCKS ? BUF_BLOCKS : cnt;
+			if (cnt && mmc_data(data.buf[idx_next], cnt) != cnt)
 					dbgbkpt();
+		}
 	}
 }
 
@@ -558,7 +567,8 @@ static int32_t scsi_read_available(void *p)
 	if (mmc_disk_status())
 		return -1;
 
-	return data.size[data.idx.rd];
+	int16_t size = data.size[data.idx.rd];
+	return size < 0 ? 0 : size;
 }
 
 static void *scsi_read_data(void *p, uint32_t *length)
@@ -572,12 +582,15 @@ static void *scsi_read_data(void *p, uint32_t *length)
 		return 0;
 	}
 
+	data.size[idx] = -1;
 	data.idx.rd = (idx + 1) & (BUF_NUM - 1);
 	return data.buf[idx];
 }
 
 static void scsi_read_cplt(void *p, uint32_t length, const void *dp)
 {
+	if (dp != &data.buf[data.idx.cplt])
+		dbgbkpt();
 	mmc_read_cplt();
 }
 
