@@ -10,7 +10,7 @@
 #include "mmc.h"
 #include "mmc_defs.h"
 
-#define BUF_NUM		8u
+#define BUF_NUM		16u
 #define BUF_BLOCKS	1u
 
 #if HWVER >= 0x0100
@@ -174,7 +174,7 @@ static DSTATUS mmc_cd()
 	uint32_t cd_mask = 1ul << 12;
 #endif
 	// Debouncing
-	if ((GPIO->IDR & cd_mask) && (stat & STA_NODISK))
+	if ((GPIO->IDR & cd_mask) && stat)
 		systick_delay(10);
 
 	if (GPIO->IDR & cd_mask) {
@@ -359,17 +359,34 @@ static uint32_t mmc_read_start(uint32_t start, uint32_t count)
 	return count;
 }
 
-static void mmc_read_cplt()
+static void mmc_read_cplt(uint32_t length)
 {
 	uint8_t idx = data.idx.cplt;
-	uint8_t idx_prev = (idx - 1) & (BUF_NUM - 1);
-	data.idx.cplt = (idx + 1) & (BUF_NUM - 1);
+	// Check completed buffers
+	uint8_t idx_cplt = idx;
+	while (length) {
+		int16_t size = data.size[idx_cplt];
+		size = size < 0 ? -size : size;
+		if (length < (uint16_t)size) {
+			dbgbkpt();
+			break;
+		}
+		length -= size;
+		idx_cplt = (idx_cplt + 1) & (BUF_NUM - 1);
+	}
+	// Update buffer sizes
+	uint8_t i = (idx - 1) & (BUF_NUM - 1);
 	NVIC_DisableIRQ(SDMMC1_IRQn);
-	data.size[idx] = 0;
-	uint16_t size = data.size[idx_prev];
+	int16_t psize = data.size[i];
+	i = idx;
+	do {
+		data.size[i] = 0;
+		i = (i + 1) & (BUF_NUM - 1);
+	} while (i != idx_cplt);
 	NVIC_EnableIRQ(SDMMC1_IRQn);
+	data.idx.cplt = i;
 	// Restart data transfer
-	if (size != 0) {
+	if (psize != 0) {
 		if (data.idx.mmc != idx)
 			dbgbkpt();
 		data.idx.mmc = idx;
@@ -453,7 +470,8 @@ static uint32_t mmc_stop()
 	}
 
 	// Wait for data block transfer
-	while (MMC->STA & (SDMMC_STA_TXACT_Msk | SDMMC_STA_RXACT_Msk));
+	while (MMC->STA & (SDMMC_STA_TXACT_Msk | SDMMC_STA_RXACT_Msk))
+		__WFI();
 	MMC->DCTRL = 0;
 	// Wait for DMA
 	while (STREAM->CR & DMA_SxCR_EN_Msk);
@@ -567,8 +585,14 @@ static int32_t scsi_read_available(void *p)
 	if (mmc_disk_status())
 		return -1;
 
-	int16_t size = data.size[data.idx.rd];
-	return size < 0 ? 0 : size;
+	int32_t size = 0;
+	for (uint8_t i = data.idx.rd; i != BUF_NUM; i++) {
+		int16_t s = data.size[i];
+		if (s <= 0)
+			break;
+		size += s;
+	}
+	return size;
 }
 
 static void *scsi_read_data(void *p, uint32_t *length)
@@ -576,22 +600,32 @@ static void *scsi_read_data(void *p, uint32_t *length)
 	uint8_t idx = data.idx.rd;
 
 	// Check buffer size
-	if (*length != data.size[idx]) {
+	int32_t size = *length;
+	uint8_t i;
+	for (i = idx; size && i != BUF_NUM; i++) {
+		int16_t s = data.size[i];
+		if (size < s)
+			break;
+		data.size[i] = -s;
+		size -= s;
+	}
+	if (size) {
 		dbgbkpt();
 		*length = 0;
 		return 0;
 	}
 
-	data.size[idx] = -1;
-	data.idx.rd = (idx + 1) & (BUF_NUM - 1);
+	data.idx.rd = i & (BUF_NUM - 1);
 	return data.buf[idx];
 }
 
 static void scsi_read_cplt(void *p, uint32_t length, const void *dp)
 {
+	if (stat)
+		return;
 	if (dp != &data.buf[data.idx.cplt])
 		dbgbkpt();
-	mmc_read_cplt();
+	mmc_read_cplt(length);
 }
 
 static uint32_t scsi_read_stop(void *p)
@@ -689,13 +723,14 @@ DSTATUS mmc_disk_init()
 	uint32_t resp = mmc_command(SEND_IF_COND, arg, &sta);
 	if (!(sta & SDMMC_STA_CMDREND_Msk)) {
 		// Voltage mismatch or Ver.1 or not SD
+		printf(ESC_ERROR "[MMC] Unsupported SD card: %u\n", __LINE__);
 		return stat;
 	}
 
 	// SD version 2.0 or later
 	if (resp != arg) {
 		// Unusable card
-		dbgbkpt();
+		printf(ESC_ERROR "[MMC] Unsupported SD card: %u\n", __LINE__);
 		return stat;
 	}
 
@@ -703,7 +738,7 @@ DSTATUS mmc_disk_init()
 	uint32_t ocr = mmc_app_command(SD_SEND_OP_COND, 0, 0, 0);
 	if (~ocr & (0b11 << 20u)) {
 		// 3.2~3.4V unsupported
-		dbgbkpt();
+		printf(ESC_ERROR "[MMC] Unsupported SD card: %u\n", __LINE__);
 		return stat;
 	}
 
@@ -721,7 +756,7 @@ DSTATUS mmc_disk_init()
 	// Publish relative address
 	rca = mmc_command(SEND_RELATIVE_ADDR, 0, &sta);
 	if (!(sta & SDMMC_STA_CMDREND_Msk) || (rca & STAT_ERROR)) {
-		dbgbkpt();
+		printf(ESC_ERROR "[MMC] Initialisation failed: %u\n", __LINE__);
 		return stat;
 	}
 
@@ -748,8 +783,10 @@ DSTATUS mmc_disk_init()
 
 	// Read CSD register
 	mmc_command(SEND_CSD, rca, &sta);
-	if (!(sta & SDMMC_STA_CMDREND_Msk))
+	if (!(sta & SDMMC_STA_CMDREND_Msk)) {
+		printf(ESC_ERROR "[MMC] Initialisation failed: %u\n", __LINE__);
 		return stat;
+	}
 
 	if ((MMC->RESP1 >> 30u) == 0u) {	// CSD V1
 		// Calculate card capacity from CSD register
@@ -773,14 +810,14 @@ DSTATUS mmc_disk_init()
 	// Select card
 	resp = mmc_command(SELECT_CARD, rca, &sta);
 	if (!(sta & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
-		dbgbkpt();
+		printf(ESC_ERROR "[MMC] Initialisation failed: %u\n", __LINE__);
 		return stat;
 	}
 
 	// Set bus width (4 bits bus)
 	resp = mmc_app_command(SET_BUS_WIDTH, rca, 0b10, &sta);
 	if (!(sta & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
-		dbgbkpt();
+		printf(ESC_ERROR "[MMC] Initialisation failed: %u\n", __LINE__);
 		return stat;
 	}
 
@@ -793,7 +830,7 @@ DSTATUS mmc_disk_init()
 	// Set block length
 	resp = mmc_command(SET_BLOCKLEN, 512u, &sta);
 	if (!(sta & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
-		dbgbkpt();
+		printf(ESC_ERROR "[MMC] Initialisation failed: %u\n", __LINE__);
 		return stat;
 	}
 
