@@ -62,36 +62,6 @@ static scsi_ret_t sense_fixed(scsi_t *scsi, uint8_t response, uint8_t status,
 	return ret;
 }
 
-#if 0
-static scsi_ret_t sense(scsi_t *scsi, uint8_t status,
-			uint8_t sense, uint8_t asc, uint8_t ascq)
-{
-	uint8_t response;
-	if (status == CHECK_CONDITION)
-		// Current errors
-		response = 0x70;
-	else
-		// Deferred errors
-		response = 0x71;
-
-	// Descriptor format
-	if (scsi->sense_type)
-		response += 2;
-
-	// Special modes
-	if (asc == 0x29)
-		response = 0x70;
-	// MODE PARAMETERS CHANGED
-	else if (asc == 0x2a && ascq == 0x01)
-		response = 0x70;
-
-	if (response != 0x70)
-		panic();
-	else
-		return sense_fixed(scsi, response, status, sense, asc, ascq);
-}
-#endif
-
 static scsi_ret_t unimplemented(scsi_t *scsi)
 {
 	dbgprintf(ESC_ERROR "[SCSI] Unimplemented\n");
@@ -494,7 +464,7 @@ scsi_ret_t scsi_process(scsi_t *scsi, uint32_t maxsize)
 	if (scsi->state == SCSIFailure)
 		return (scsi_ret_t){0, 0, SCSIGood};
 	// Only read events are currently processed here
-	if (scsi->state != SCSIRead)
+	if ((scsi->state & ~SCSIBusy) != SCSIRead)
 		return (scsi_ret_t){0, 0, scsi->state};
 
 	// Retrieve capacity information
