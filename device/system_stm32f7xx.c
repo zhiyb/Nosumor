@@ -161,46 +161,6 @@ void debug_handler()
 	SCB_Type scb = *SCB;
 	NVIC_Type nvic = *NVIC;
 	printf(ESC_ERROR "\nUnexpected interrupt: %lu\n", ipsr);
-	if (ipsr == 3) {	// Hard fault
-		printf("Hard fault: 0x%08lx\n", scb.HFSR);
-		printf("...\t%s%s%s\n",
-		       scb.HFSR & SCB_HFSR_DEBUGEVT_Msk ? "Debug " : "",
-		       scb.HFSR & SCB_HFSR_FORCED_Msk ? "Forced " : "",
-		       scb.HFSR & SCB_HFSR_VECTTBL_Msk ? "Vector " : "");
-		uint8_t mfsr = FIELD(scb.CFSR, SCB_CFSR_MEMFAULTSR);
-		if (mfsr & 0x80) {	// Memory manage fault valid
-			printf("Memory manage fault: 0x%02x\n", mfsr);
-			printf("...\t%s%s%s%s\n",
-			       mfsr & 0x10 ? "Entry " : "",
-			       mfsr & 0x08 ? "Return " : "",
-			       mfsr & 0x02 ? "Data " : "",
-			       mfsr & 0x01 ? "Instruction " : "");
-			printf("...\tAddress: 0x%08lx\n", scb.MMFAR);
-		}
-		uint8_t bfsr = FIELD(scb.CFSR, SCB_CFSR_BUSFAULTSR);
-		if (bfsr & 0x80) {	// Bus fault valid
-			printf("Bus fault: 0x%02x\n", bfsr);
-			printf("...\t%s%s%s%s%s\n",
-			       bfsr & 0x10 ? "Entry " : "",
-			       bfsr & 0x08 ? "Return " : "",
-			       bfsr & 0x04 ? "Imprecise " : "",
-			       bfsr & 0x02 ? "Precise " : "",
-			       bfsr & 0x01 ? "Instruction " : "");
-			if (bfsr & 0x02)
-				printf("...\tPrecise: 0x%08lx\n", scb.BFAR);
-		}
-		uint16_t ufsr = FIELD(scb.CFSR, SCB_CFSR_USGFAULTSR);
-		if (ufsr) {	// Usage fault
-			printf("Usage fault: 0x%04x\n", ufsr);
-			printf("...\t%s%s%s%s%s%s\n",
-			       ufsr & 0x0200 ? "Divide " : "",
-			       ufsr & 0x0100 ? "Unaligned " : "",
-			       ufsr & 0x0008 ? "Coprocessor " : "",
-			       ufsr & 0x0004 ? "INVPC " : "",
-			       ufsr & 0x0002 ? "INVSTATE " : "",
-			       ufsr & 0x0001 ? "UNDEFINSTR " : "");
-		}
-	}
 #endif
 #else
 	printf(ESC_ERROR "\nUnexpected fault: %lu\n\n", ipsr);
@@ -213,3 +173,55 @@ void debug_handler()
 #endif
 	NVIC_SystemReset();
 }
+
+#ifdef DEBUG
+#ifndef BOOTLOADER
+void HardFault_Handler()
+{
+	SCB_Type scb = *SCB;
+	printf(ESC_ERROR "\nHard fault: 0x%08lx\n", scb.HFSR);
+	printf("...\t%s%s%s\n",
+	       scb.HFSR & SCB_HFSR_DEBUGEVT_Msk ? "Debug " : "",
+	       scb.HFSR & SCB_HFSR_FORCED_Msk ? "Forced " : "",
+	       scb.HFSR & SCB_HFSR_VECTTBL_Msk ? "Vector " : "");
+	uint8_t mfsr = FIELD(scb.CFSR, SCB_CFSR_MEMFAULTSR);
+	if (mfsr & 0x80) {	// Memory manage fault valid
+		printf("Memory manage fault: 0x%02x\n", mfsr);
+		printf("...\t%s%s%s%s\n",
+		       mfsr & 0x10 ? "Entry " : "",
+		       mfsr & 0x08 ? "Return " : "",
+		       mfsr & 0x02 ? "Data " : "",
+		       mfsr & 0x01 ? "Instruction " : "");
+		printf("...\tAddress: 0x%08lx\n", scb.MMFAR);
+	}
+	uint8_t bfsr = FIELD(scb.CFSR, SCB_CFSR_BUSFAULTSR);
+	if (bfsr & 0x80) {	// Bus fault valid
+		printf("Bus fault: 0x%02x\n", bfsr);
+		printf("...\t%s%s%s%s%s\n",
+		       bfsr & 0x10 ? "Entry " : "",
+		       bfsr & 0x08 ? "Return " : "",
+		       bfsr & 0x04 ? "Imprecise " : "",
+		       bfsr & 0x02 ? "Precise " : "",
+		       bfsr & 0x01 ? "Instruction " : "");
+		if (bfsr & 0x02)
+			printf("...\tPrecise: 0x%08lx\n", scb.BFAR);
+	}
+	uint16_t ufsr = FIELD(scb.CFSR, SCB_CFSR_USGFAULTSR);
+	if (ufsr) {	// Usage fault
+		printf("Usage fault: 0x%04x\n", ufsr);
+		printf("...\t%s%s%s%s%s%s\n",
+		       ufsr & 0x0200 ? "Divide " : "",
+		       ufsr & 0x0100 ? "Unaligned " : "",
+		       ufsr & 0x0008 ? "Coprocessor " : "",
+		       ufsr & 0x0004 ? "INVPC " : "",
+		       ufsr & 0x0002 ? "INVSTATE " : "",
+		       ufsr & 0x0001 ? "UNDEFINSTR " : "");
+	}
+
+	fflush(stdout);
+	SCB_CleanInvalidateDCache();
+	__BKPT(0);
+	NVIC_SystemReset();
+}
+#endif
+#endif
