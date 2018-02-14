@@ -23,8 +23,10 @@ typedef struct setup_buf_t {
 } setup_buf_t;
 
 typedef struct {
-	setup_buf_t * volatile pkt;
 	uint8_t buf[MAX_SIZE] ALIGN(4);
+	setup_buf_t * volatile pkt;
+	uint32_t dma;
+	uint16_t size;
 } epout_data_t;
 
 static void epin_init(usb_t *usb, uint32_t n)
@@ -77,9 +79,12 @@ uint32_t usb_ep0_max_size(USB_OTG_GlobalTypeDef *usb)
 static inline void epout_reset(usb_t *usb, uint32_t n)
 {
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
+	if (ep->DOEPCTL & USB_OTG_DOEPCTL_EPENA_Msk)
+		dbgbkpt();
 	epout_data_t *data = usb->epout[n].data;
+	data->size = 0;
 	// Reset packet buffer
-	ep->DOEPDMA = (uint32_t)&data->buf;
+	ep->DOEPDMA = data->dma = (uint32_t)&data->buf;
 	// Reset packet counter
 	ep->DOEPTSIZ = (MAX_SETUP_CNT << USB_OTG_DOEPTSIZ_STUPCNT_Pos) |
 			(MAX_PKT_CNT << USB_OTG_DOEPTSIZ_PKTCNT_Pos) | MAX_SIZE;
@@ -99,7 +104,7 @@ static void epout_init(usb_t *usb, uint32_t n)
 	epout_reset(usb, n);
 }
 
-static void epout_pkt(usb_t *usb, uint32_t n)
+static void epout_spr(usb_t *usb, uint32_t n)
 {
 	// Check data availability
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
@@ -107,23 +112,16 @@ static void epout_pkt(usb_t *usb, uint32_t n)
 	uint16_t setup_cnt = MAX_SETUP_CNT - FIELD(siz, USB_OTG_DOEPTSIZ_STUPCNT);
 	uint16_t pkt_cnt = MAX_PKT_CNT - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
 	uint16_t size = MAX_SIZE - FIELD(siz, USB_OTG_DOEPTSIZ_XFRSIZ);
-	// Receive data packets
+	// Receive data packet
 	epout_data_t *data = usb->epout[n].data;
-	void *dma = &data->buf;
-	if (!size)
-		return;
-	if (pkt_cnt > MAX_PKT_CNT)
+	// Strange: data is aligned to buffer start, not (DOEPDMA - size)
+	void *dma = (void *)data->dma;
+	data->dma += size;
+	data->size += size;
+	if (!pkt_cnt || !size)
 		dbgbkpt();
-	if (setup_cnt > MAX_SETUP_CNT)
-		dbgbkpt();
-	if (setup_cnt)
-		pkt_cnt = 0;
 	// Find packets without data
-	setup_buf_t * volatile *p;
-	for (p = &data->pkt; *p; p = &(*p)->next) {
-		// Iterate to end if no data available
-		if (!pkt_cnt)
-			continue;
+	for (setup_buf_t * volatile *p = &data->pkt; *p; p = &(*p)->next) {
 		setup_t *setup = &(*p)->setup;
 		uint16_t wLength = setup->wLength;
 		if ((setup->bmRequestType & DIR_Msk) == DIR_H2D && wLength) {
@@ -139,8 +137,34 @@ static void epout_pkt(usb_t *usb, uint32_t n)
 			dma += wLength;
 			size -= wLength;
 			pkt_cnt--;
+			break;
 		}
 	}
+	if (size)
+		dbgbkpt();
+}
+
+static void epout_pkt(usb_t *usb, uint32_t n)
+{
+	// Check data availability
+	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
+	uint32_t siz = ep->DOEPTSIZ;
+	uint16_t setup_cnt = MAX_SETUP_CNT - FIELD(siz, USB_OTG_DOEPTSIZ_STUPCNT);
+	uint16_t pkt_cnt = MAX_PKT_CNT - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
+	uint16_t size = MAX_SIZE - FIELD(siz, USB_OTG_DOEPTSIZ_XFRSIZ);
+	// Receive setup packets
+	epout_data_t *data = usb->epout[n].data;
+	size -= data->size;
+	void *dma = (void *)(ep->DOEPDMA - size);
+	if (!size)
+		return;
+	if (pkt_cnt > MAX_PKT_CNT)
+		dbgbkpt();
+	if (setup_cnt > MAX_SETUP_CNT)
+		dbgbkpt();
+	// Iterate to end
+	setup_buf_t * volatile *p;
+	for (p = &data->pkt; *p; p = &(*p)->next);
 	// Append setup packets
 	while (setup_cnt-- && size >= 8u) {
 		// Copy setup packet
@@ -170,7 +194,7 @@ void usb_ep0_register(usb_t *usb)
 		.data = calloc(1u, sizeof(epout_data_t)),
 		.init = &epout_init,
 		.setup = &epout_pkt,
-		.spr = &epout_pkt,
+		.spr = &epout_spr,
 	};
 	if (!epout.data)
 		panic();

@@ -196,12 +196,12 @@ void OTG_HS_EP1_IN_IRQHandler()
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(base, 1);
 	uint32_t intr = ep->DIEPINT & dev->DINEP1MSK;
 	if (intr & USB_OTG_DIEPINT_XFRC_Msk) {
-		ep->DIEPINT = USB_OTG_DIEPINT_XFRC_Msk;
 		FUNC(usb->epin[1].xfr_cplt)(usb, 1);
+		ep->DIEPINT = USB_OTG_DIEPINT_XFRC_Msk;
 	}
 	if (intr & USB_OTG_DIEPINT_TOC_Msk) {
-		ep->DIEPINT = USB_OTG_DIEPINT_TOC_Msk;
 		FUNC(usb->epin[1].timeout)(usb, 1);
+		ep->DIEPINT = USB_OTG_DIEPINT_TOC_Msk;
 	}
 }
 
@@ -216,8 +216,12 @@ void OTG_HS_EP1_OUT_IRQHandler()
 		ep->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk;
 		FUNC(usb->epout[1].xfr_cplt)(usb, 1);
 	}
-	if (intr & (USB_OTG_DOEPINT_STUP_Msk | USB_OTG_DOEPINT_OTEPSPR_Msk)) {
-		ep->DOEPINT = USB_OTG_DOEPINT_STUP_Msk | USB_OTG_DOEPINT_OTEPSPR_Msk;
+	if (intr & USB_OTG_DOEPINT_STUP_Msk) {
+		ep->DOEPINT = USB_OTG_DOEPINT_STUP_Msk;
+		FUNC(usb->epout[1].setup)(usb, 1);
+	}
+	if (intr & USB_OTG_DOEPINT_OTEPSPR_Msk) {
+		ep->DOEPINT = USB_OTG_DOEPINT_OTEPSPR_Msk;
 		FUNC(usb->epout[1].setup)(usb, 1);
 	}
 }
