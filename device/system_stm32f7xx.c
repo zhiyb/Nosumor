@@ -1,68 +1,6 @@
-/**
-  ******************************************************************************
-  * @file    system_stm32f7xx.c
-  * @author  MCD Application Team
-  * @version V1.2.0
-  * @date    30-December-2016
-  * @brief   CMSIS Cortex-M7 Device Peripheral Access Layer System Source File.
-  *
-  *   This file provides two functions and one global variable to be called from 
-  *   user application:
-  *      - SystemInit(): This function is called at startup just after reset and 
-  *                      before branch to main program. This call is made inside
-  *                      the "startup_stm32f7xx.s" file.
-  *
-  *      - SystemCoreClock variable: Contains the core clock (HCLK), it can be used
-  *                                  by the user application to setup the SysTick 
-  *                                  timer or configure other parameters.
-  *                                     
-  *      - SystemCoreClockUpdate(): Updates the variable SystemCoreClock and must
-  *                                 be called whenever the core clock is changed
-  *                                 during program execution.
-  *
-  *
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; COPYRIGHT 2016 STMicroelectronics</center></h2>
-  *
-  * Redistribution and use in source and binary forms, with or without modification,
-  * are permitted provided that the following conditions are met:
-  *   1. Redistributions of source code must retain the above copyright notice,
-  *      this list of conditions and the following disclaimer.
-  *   2. Redistributions in binary form must reproduce the above copyright notice,
-  *      this list of conditions and the following disclaimer in the documentation
-  *      and/or other materials provided with the distribution.
-  *   3. Neither the name of STMicroelectronics nor the names of its contributors
-  *      may be used to endorse or promote products derived from this software
-  *      without specific prior written permission.
-  *
-  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-  * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-  * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-  *
-  ******************************************************************************
-  */
-
-/** @addtogroup CMSIS
-  * @{
-  */
-
-/** @addtogroup stm32f7xx_system
-  * @{
-  */  
-  
-/** @addtogroup STM32F7xx_System_Private_Includes
-  * @{
-  */
-
+#include <debug.h>
+#include <macros.h>
+#include <escape.h>
 #include "stm32f7xx.h"
 
 #if !defined  (HSE_VALUE) 
@@ -73,40 +11,8 @@
   #define HSI_VALUE    ((uint32_t)16000000) /*!< Value of the Internal oscillator in Hz*/
 #endif /* HSI_VALUE */
 
-/**
-  * @}
-  */
-
-/** @addtogroup STM32F7xx_System_Private_TypesDefinitions
-  * @{
-  */
-
-/**
-  * @}
-  */
-
-/** @addtogroup STM32F7xx_System_Private_Defines
-  * @{
-  */
-
 // Vector table base address
 extern const uint32_t g_pfnVectors[];
-
-/**
-  * @}
-  */
-
-/** @addtogroup STM32F7xx_System_Private_Macros
-  * @{
-  */
-
-/**
-  * @}
-  */
-
-/** @addtogroup STM32F7xx_System_Private_Variables
-  * @{
-  */
 
   /* This variable is updated in three ways:
       1) by calling CMSIS function SystemCoreClockUpdate()
@@ -119,22 +25,6 @@ extern const uint32_t g_pfnVectors[];
   uint32_t SystemCoreClock = 16000000;
   const uint8_t AHBPrescTable[16] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 7, 8, 9};
   const uint8_t APBPrescTable[8] = {0, 0, 0, 0, 1, 2, 3, 4};
-
-/**
-  * @}
-  */
-
-/** @addtogroup STM32F7xx_System_Private_FunctionPrototypes
-  * @{
-  */
-
-/**
-  * @}
-  */
-
-/** @addtogroup STM32F7xx_System_Private_Functions
-  * @{
-  */
 
 /**
   * @brief  Setup the microcontroller system
@@ -265,25 +155,61 @@ void SystemCoreClockUpdate(void)
 */
 void debug_handler()
 {
-#ifdef DEBUG
 	uint32_t ipsr = __get_IPSR();
+#ifdef DEBUG
+#ifndef BOOTLOADER
 	SCB_Type scb = *SCB;
 	NVIC_Type nvic = *NVIC;
-	SCB_CleanInvalidateDCache();
+	printf(ESC_ERROR "\nUnexpected interrupt: %lu\n", ipsr);
+	if (ipsr == 3) {	// Hard fault
+		printf("Hard fault: 0x%08lx\n", scb.HFSR);
+		printf("...\t%s%s%s\n",
+		       scb.HFSR & SCB_HFSR_DEBUGEVT_Msk ? "Debug " : "",
+		       scb.HFSR & SCB_HFSR_FORCED_Msk ? "Forced " : "",
+		       scb.HFSR & SCB_HFSR_VECTTBL_Msk ? "Vector " : "");
+		uint8_t mfsr = FIELD(scb.CFSR, SCB_CFSR_MEMFAULTSR);
+		if (mfsr & 0x80) {	// Memory manage fault valid
+			printf("Memory manage fault: 0x%02x\n", mfsr);
+			printf("...\t%s%s%s%s\n",
+			       mfsr & 0x10 ? "Entry " : "",
+			       mfsr & 0x08 ? "Return " : "",
+			       mfsr & 0x02 ? "Data " : "",
+			       mfsr & 0x01 ? "Instruction " : "");
+			printf("...\tAddress: 0x%08lx\n", scb.MMFAR);
+		}
+		uint8_t bfsr = FIELD(scb.CFSR, SCB_CFSR_BUSFAULTSR);
+		if (bfsr & 0x80) {	// Bus fault valid
+			printf("Bus fault: 0x%02x\n", bfsr);
+			printf("...\t%s%s%s%s%s\n",
+			       bfsr & 0x10 ? "Entry " : "",
+			       bfsr & 0x08 ? "Return " : "",
+			       bfsr & 0x04 ? "Imprecise " : "",
+			       bfsr & 0x02 ? "Precise " : "",
+			       bfsr & 0x01 ? "Instruction " : "");
+			if (bfsr & 0x02)
+				printf("...\tPrecise: 0x%08lx\n", scb.BFAR);
+		}
+		uint16_t ufsr = FIELD(scb.CFSR, SCB_CFSR_USGFAULTSR);
+		if (ufsr) {	// Usage fault
+			printf("Usage fault: 0x%04x\n", ufsr);
+			printf("...\t%s%s%s%s%s%s\n",
+			       ufsr & 0x0200 ? "Divide " : "",
+			       ufsr & 0x0100 ? "Unaligned " : "",
+			       ufsr & 0x0008 ? "Coprocessor " : "",
+			       ufsr & 0x0004 ? "INVPC " : "",
+			       ufsr & 0x0002 ? "INVSTATE " : "",
+			       ufsr & 0x0001 ? "UNDEFINSTR " : "");
+		}
+	}
 #endif
+#else
+	printf(ESC_ERROR "\nUnexpected fault: %lu\n\n", ipsr);
+#endif
+
+	fflush(stdout);
+#ifdef DEBUG
+	SCB_CleanInvalidateDCache();
 	__BKPT(0);
-	for (;;);
+#endif
+	NVIC_SystemReset();
 }
-
-/**
-  * @}
-  */
-
-/**
-  * @}
-  */
-  
-/**
-  * @}
-  */    
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
