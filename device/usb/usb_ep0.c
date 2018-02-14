@@ -23,14 +23,13 @@ typedef struct setup_buf_t {
 } setup_buf_t;
 
 typedef struct {
-	uint32_t siz, dma;
 	setup_buf_t * volatile pkt;
 	uint8_t buf[MAX_SIZE] ALIGN(4);
 } epout_data_t;
 
 static void epin_init(usb_t *usb, uint32_t n)
 {
-	uint32_t size = 256, addr = usb_ram_alloc(usb, &size);
+	uint32_t size = MAX_SIZE * 2ul, addr = usb_ram_alloc(usb, &size);
 	usb->base->DIEPTXF0_HNPTXFSIZ = DIEPTXF(addr, size);
 	// Unmask interrupts
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
@@ -79,13 +78,11 @@ static inline void epout_reset(usb_t *usb, uint32_t n)
 {
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 	epout_data_t *data = usb->epout[n].data;
-	data->dma = (uint32_t)&data->buf;
-	data->siz = (MAX_SETUP_CNT << USB_OTG_DOEPTSIZ_STUPCNT_Pos) |
-			(MAX_PKT_CNT << USB_OTG_DOEPTSIZ_PKTCNT_Pos) | MAX_SIZE;
 	// Reset packet buffer
-	ep->DOEPDMA = data->dma;
+	ep->DOEPDMA = (uint32_t)&data->buf;
 	// Reset packet counter
-	ep->DOEPTSIZ = data->siz;
+	ep->DOEPTSIZ = (MAX_SETUP_CNT << USB_OTG_DOEPTSIZ_STUPCNT_Pos) |
+			(MAX_PKT_CNT << USB_OTG_DOEPTSIZ_PKTCNT_Pos) | MAX_SIZE;
 	// Enable endpoint
 	ep->DOEPCTL = USB_OTG_DOEPCTL_EPENA_Msk | USB_OTG_DOEPCTL_CNAK_Msk;
 }
@@ -102,27 +99,25 @@ static void epout_init(usb_t *usb, uint32_t n)
 	epout_reset(usb, n);
 }
 
-static void epout_xfr_cplt(usb_t *usb, uint32_t n)
+static void epout_pkt(usb_t *usb, uint32_t n)
 {
+	// Check data availability
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
-	epout_data_t *data = usb->epout[n].data;
 	uint32_t siz = ep->DOEPTSIZ;
-	uint32_t psiz = data->siz;
-	data->siz = siz;
-	void *dma = (void *)data->dma;
-	data->dma = ep->DOEPDMA;
-	uint16_t setup_cnt = FIELD(psiz, USB_OTG_DOEPTSIZ_STUPCNT) -
-			FIELD(siz, USB_OTG_DOEPTSIZ_STUPCNT);
-	uint16_t pkt_cnt = FIELD(psiz, USB_OTG_DOEPTSIZ_PKTCNT) -
-			FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
-	uint16_t size = FIELD(psiz, USB_OTG_DOEPTSIZ_XFRSIZ) -
-			FIELD(siz, USB_OTG_DOEPTSIZ_XFRSIZ);
+	uint16_t setup_cnt = MAX_SETUP_CNT - FIELD(siz, USB_OTG_DOEPTSIZ_STUPCNT);
+	uint16_t pkt_cnt = MAX_PKT_CNT - FIELD(siz, USB_OTG_DOEPTSIZ_PKTCNT);
+	uint16_t size = MAX_SIZE - FIELD(siz, USB_OTG_DOEPTSIZ_XFRSIZ);
+	// Receive data packets
+	epout_data_t *data = usb->epout[n].data;
+	void *dma = &data->buf;
 	if (!size)
 		return;
 	if (pkt_cnt > MAX_PKT_CNT)
 		dbgbkpt();
 	if (setup_cnt > MAX_SETUP_CNT)
 		dbgbkpt();
+	if (setup_cnt)
+		pkt_cnt = 0;
 	// Find packets without data
 	setup_buf_t * volatile *p;
 	for (p = &data->pkt; *p; p = &(*p)->next) {
@@ -137,7 +132,7 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 				continue;
 			// Copy data packet
 			void *buf = malloc(wLength);
-			if (!buf)
+			if (!buf || size < wLength)
 				panic();
 			memcpy(buf, dma, wLength);
 			setup->data = buf;
@@ -159,29 +154,9 @@ static void epout_xfr_cplt(usb_t *usb, uint32_t n)
 		setup->next = 0;
 		setup->setup.data = 0;
 		p = &setup->next;
-		if (!pkt_cnt)
-			continue;
-		uint16_t wLength = setup->setup.wLength;
-		if ((setup->setup.bmRequestType & DIR_Msk) == DIR_H2D && wLength) {
-			// Setup packet require a data OUT stage
-			// Copy data packet
-			void *buf = malloc(wLength);
-			if (!buf)
-				panic();
-			memcpy(buf, dma, wLength);
-			setup->setup.data = buf;
-			dma += wLength;
-			size -= wLength;
-			pkt_cnt--;
-		}
 	}
 	if (size)
 		dbgbkpt();
-}
-
-static void epout_setup_cplt(usb_t *usb, uint32_t n)
-{
-	// Enable endpoint
 	epout_reset(usb, n);
 }
 
@@ -194,8 +169,8 @@ void usb_ep0_register(usb_t *usb)
 	const epout_t epout = {
 		.data = calloc(1u, sizeof(epout_data_t)),
 		.init = &epout_init,
-		.xfr_cplt = &epout_xfr_cplt,
-		.setup_cplt = &epout_setup_cplt,
+		.setup = &epout_pkt,
+		.spr = &epout_pkt,
 	};
 	if (!epout.data)
 		panic();

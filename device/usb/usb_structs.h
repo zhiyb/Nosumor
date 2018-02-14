@@ -26,7 +26,8 @@ typedef struct epout_t {
 	void *data;
 	void (*init)(usb_t *usb, uint32_t ep);
 	void (*halt)(usb_t *usb, uint32_t ep, int halt);
-	void (*setup_cplt)(usb_t *usb, uint32_t ep);
+	void (*setup)(usb_t *usb, uint32_t ep);
+	void (*spr)(usb_t *usb, uint32_t ep);
 	void (*xfr_cplt)(usb_t *usb, uint32_t ep);
 } epout_t;
 

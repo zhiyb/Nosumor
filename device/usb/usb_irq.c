@@ -72,9 +72,13 @@ static inline void usb_endpoint_irq(usb_t *usb)
 			ep->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk;
 			FUNC(usb->epout[n].xfr_cplt)(usb, n);
 		}
-		if (intr & (USB_OTG_DOEPINT_STUP_Msk | USB_OTG_DOEPINT_OTEPSPR_Msk)) {
-			ep->DOEPINT = USB_OTG_DOEPINT_STUP_Msk | USB_OTG_DOEPINT_OTEPSPR_Msk;
-			FUNC(usb->epout[n].setup_cplt)(usb, n);
+		if (intr & (USB_OTG_DOEPINT_STUP_Msk)) {
+			ep->DOEPINT = USB_OTG_DOEPINT_STUP_Msk;
+			FUNC(usb->epout[n].setup)(usb, n);
+		}
+		if (intr & (USB_OTG_DOEPINT_OTEPSPR_Msk)) {
+			ep->DOEPINT = USB_OTG_DOEPINT_OTEPSPR_Msk;
+			FUNC(usb->epout[n].spr)(usb, n);
 		}
 	}
 	mask = FIELD(daint, USB_OTG_DAINT_IEPINT);
@@ -214,6 +218,6 @@ void OTG_HS_EP1_OUT_IRQHandler()
 	}
 	if (intr & (USB_OTG_DOEPINT_STUP_Msk | USB_OTG_DOEPINT_OTEPSPR_Msk)) {
 		ep->DOEPINT = USB_OTG_DOEPINT_STUP_Msk | USB_OTG_DOEPINT_OTEPSPR_Msk;
-		FUNC(usb->epout[1].setup_cplt)(usb, 1);
+		FUNC(usb->epout[1].setup)(usb, 1);
 	}
 }
