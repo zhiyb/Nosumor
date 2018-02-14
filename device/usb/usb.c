@@ -34,11 +34,12 @@ void usb_init(usb_t *usb, USB_OTG_GlobalTypeDef *base)
 	base->GOTGCTL = USB_OTG_GOTGCTL_OTGVER;
 	base->GLPMCFG = USB_OTG_GLPMCFG_ENBESL_Msk | USB_OTG_GLPMCFG_LPMEN_Msk;
 	base->GCCFG = 0;
+	// Select ULPI interface
 	base->GUSBCFG = USB_OTG_GUSBCFG_FDMOD_Msk | USB_OTG_GUSBCFG_ULPIIPD_Msk |
 			USB_OTG_GUSBCFG_HNPCAP_Msk | USB_OTG_GUSBCFG_SRPCAP_Msk |
 			(9 << USB_OTG_GUSBCFG_TRDT_Pos) |
 			(4 << USB_OTG_GUSBCFG_TOCAL_Pos) | (1ul << 4);
-	base->GAHBCFG = (5 /* 8x 32-bit */ << USB_OTG_GAHBCFG_HBSTLEN_Pos) |
+	base->GAHBCFG = (7 /* 16x 32-bit */ << USB_OTG_GAHBCFG_HBSTLEN_Pos) |
 			USB_OTG_GAHBCFG_GINT_Msk | USB_OTG_GAHBCFG_DMAEN_Msk;
 	// Interrupt masks
 	base->GINTSTS = 0xffffffff;
@@ -143,9 +144,14 @@ void usb_init_device(usb_t *usb)
 	// Enable transceiver delay
 	dev->DCFG = (0b10 << USB_OTG_DCFG_PERSCHIVL_Pos) | (1ul << 14u) |
 			USB_OTG_DCFG_NZLSOHSK_Msk;
-	// DMA threshold
+#if 0
 	dev->DTHRCTL = (32u << USB_OTG_DTHRCTL_RXTHRLEN_Pos) | (32u << USB_OTG_DTHRCTL_TXTHRLEN_Pos) |
-			USB_OTG_DTHRCTL_RXTHREN_Msk | USB_OTG_DTHRCTL_ISOTHREN_Msk | USB_OTG_DTHRCTL_NONISOTHREN_Msk;
+			USB_OTG_DTHRCTL_RXTHREN_Msk | USB_OTG_DTHRCTL_ISOTHREN_Msk |
+			USB_OTG_DTHRCTL_NONISOTHREN_Msk | USB_OTG_DTHRCTL_ARPEN_Msk;
+#else
+	// Disable thresholding
+	dev->DTHRCTL = 0;
+#endif
 	dev->DOEPMSK = USB_OTG_DOEPMSK_XFRCM_Msk |
 			USB_OTG_DOEPMSK_STUPM_Msk | USB_OTG_DOEPMSK_OTEPSPRM_Msk;
 	dev->DIEPMSK = USB_OTG_DIEPMSK_XFRCM_Msk | USB_OTG_DIEPMSK_TOM_Msk;

@@ -271,7 +271,7 @@ loop:	// Process time consuming tasks
 
 		// SDMMC statistics
 		if (diff.blocks)
-			printf(ESC_INFO "[SDMMC] " ESC_DATA "%lu + %lu"
+			printf(ESC_INFO "[MMC] " ESC_DATA "%lu + %lu"
 			       ESC_INFO " blocks\n", prev.blocks, diff.blocks);
 
 		// MPU update frequency

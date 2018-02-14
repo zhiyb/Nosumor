@@ -363,7 +363,7 @@ void I2C1_EV_IRQHandler()
 	struct i2c_t *i2c = i2c_p[0];
 	// Find the earliest node
 	struct i2c_node_t **n;
-	for (n = &i2c->node; (*n)->next; n = &(*n)->next);
+	for (n = &i2c->node; n && (*n)->next; n = &(*n)->next);
 	const struct i2c_op_t *op = (*n)->op;
 	// Process interrupts
 	uint32_t i = I2C1->ISR &

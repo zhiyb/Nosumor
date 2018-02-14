@@ -30,7 +30,7 @@ static epdata_t epdata SECTION(.dtcm);
 static void epin_init(usb_t *usb, uint32_t n)
 {
 	// Allocate TX FIFO
-	uint32_t size = 4u, addr = usb_ram_alloc(usb, &size);
+	uint32_t size = 16u, addr = usb_ram_alloc(usb, &size);
 	usb->base->DIEPTXF[n - 1] = DIEPTXF(addr, size);
 	// Clear interrupts
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);

@@ -1,4 +1,5 @@
 #include <debug.h>
+#include <system/systick.h>
 #include "usb_ep.h"
 #include "usb_ep0.h"
 #include "usb_macros.h"
@@ -75,6 +76,7 @@ int usb_ep_in_wait(USB_OTG_GlobalTypeDef *usb, int n)
 {
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb, n);
 	// Wait for endpoint become available
+	uint32_t tick = systick_cnt();
 	uint32_t ctl;
 	while ((ctl = ep->DIEPCTL) & USB_OTG_DIEPCTL_EPENA_Msk) {
 		if (!(ctl & USB_OTG_DIEPCTL_USBAEP_Msk)) {
@@ -85,6 +87,8 @@ int usb_ep_in_wait(USB_OTG_GlobalTypeDef *usb, int n)
 			dbgbkpt();
 			return 0;
 		}
+		if (systick_cnt() - tick >= 1024)
+			dbgbkpt();
 	}
 	return 1;
 }

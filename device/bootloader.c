@@ -44,7 +44,9 @@ extern uint32_t __appi_start__;
 
 usb_t usb;	// Shared with PVD
 static usb_msc_t *usb_msc = 0;
+#if 0
 static usb_hid_if_t *usb_hid_vendor = 0;
+#endif
 
 void bootloader_check()
 {
@@ -113,7 +115,9 @@ static inline void init()
 	puts(ESC_INIT "Initialising USB HID interface...");
 	usb_hid_t *hid = usb_hid_init(&usb);
 	usb_hid_if_t *hid_keyboard = usb_hid_keyboard_init(hid);
+#if 0
 	usb_hid_vendor = usb_hid_vendor_init(hid);
+#endif
 
 	puts(ESC_INIT "Initialising keyboard...");
 	keyboard_init(hid_keyboard, 0);
@@ -211,12 +215,11 @@ loop:
 	// Process time consuming tasks
 	usb_process(&usb);
 	usb_msc_process(&usb, usb_msc);
+#if 0
 	usb_hid_vendor_process(usb_hid_vendor, &vendor_process);
+#endif
 	fflush(stdout);
 
-#ifndef DEBUG
-	__WFI();
-#endif
 	goto loop;
 	return 0;
 }

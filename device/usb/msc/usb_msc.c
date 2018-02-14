@@ -94,7 +94,7 @@ static const void *fifo_pop(struct fifo_t *fifo, uint32_t *size)
 
 static void epin_init(usb_t *usb, uint32_t n)
 {
-	uint32_t size = MSC_IN_PKT_SIZE + 64, addr = usb_ram_alloc(usb, &size);
+	uint32_t size = MSC_IN_PKT_SIZE * 2, addr = usb_ram_alloc(usb, &size);
 	usb->base->DIEPTXF[n - 1] = DIEPTXF(addr, size);
 	// Unmask interrupts
 	USB_OTG_INEndpointTypeDef *ep = EP_IN(usb->base, n);
