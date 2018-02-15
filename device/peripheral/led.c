@@ -60,6 +60,7 @@ static void base_scan_init()
 	TIM3->CCR2 = 2;
 	// Initialise registers
 	TIM3->EGR = TIM_EGR_UG_Msk;
+	while (TIM3->EGR & TIM_EGR_UG_Msk);
 	// Reset counter
 	TIM3->CNT = 0;
 	// OC1/OC2 enable, active low
@@ -89,6 +90,7 @@ static void base_scan_init()
 	TIM2->CCR2 = 2;
 	// Initialise registers
 	TIM2->EGR = TIM_EGR_UG_Msk;
+	while (TIM2->EGR & TIM_EGR_UG_Msk);
 	// Reset counter
 	TIM2->CNT = 4;
 	// OC1/OC2 enable, active low
@@ -163,6 +165,7 @@ static void base_scan_init()
 #endif
 	// Initialise registers
 	TIM12->EGR = TIM_EGR_UG_Msk;
+	while (TIM12->EGR & TIM_EGR_UG_Msk);
 	// Reset counter
 	TIM12->CNT = 0;
 	// OC1/OC2 enable, active low
@@ -196,6 +199,7 @@ static void base_scan_init()
 	TIM1->CCR4 = 6;
 	// Initialise registers
 	TIM1->EGR = TIM_EGR_UG_Msk;
+	while (TIM1->EGR & TIM_EGR_UG_Msk);
 	// Reset counter
 	TIM1->CNT = 4;
 	// OC3/OC4 enable, active low
@@ -293,6 +297,7 @@ static void base_rgb_init()
 	TIM5->CCR4 = 0x0000;
 	// Initialise registers
 	TIM5->EGR = TIM_EGR_UG_Msk;
+	while (TIM5->EGR & TIM_EGR_UG_Msk);
 	// Reset counter
 	TIM5->CNT = 0;
 	// Clear interrupt mask
@@ -404,6 +409,7 @@ static void base_rgb_init()
 	TIM1->CCR1 = 0x0000;
 	// Initialise registers
 	TIM1->EGR = TIM_EGR_UG_Msk;
+	while (TIM1->EGR & TIM_EGR_UG_Msk);
 	// Reset counter
 	TIM1->CNT = 0;
 	// Clear interrupt mask
@@ -480,6 +486,7 @@ static void base_rgb_init()
 	TIM2->CCR2 = 0x0000;
 	// Initialise registers
 	TIM2->EGR = TIM_EGR_UG_Msk;
+	while (TIM2->EGR & TIM_EGR_UG_Msk);
 	// Reset counter
 	TIM2->CNT = 0;
 	// Clear interrupt mask
@@ -523,6 +530,7 @@ static void base_psc_init()
 	TIM4->ARR = clkTimer(4) / 1000000ul - 1;
 	// Initialise registers
 	TIM4->EGR = TIM_EGR_UG_Msk;
+	while (TIM4->EGR & TIM_EGR_UG_Msk);
 	// Reset counter
 	TIM4->CNT = 0;
 	// Clear interrupt mask

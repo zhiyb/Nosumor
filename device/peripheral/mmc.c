@@ -36,7 +36,8 @@ typedef union {
 } cid_t;
 
 static DSTATUS stat = STA_NOINIT;
-static uint32_t ccs = 0, capacity = 0, blocks = 0, rca = 0;
+static uint32_t ccs = 0, capacity = 0, rca = 0;
+static volatile uint32_t blocks = 0;
 enum {MMCIdle = 0, MMCRead, MMCWrite, MMCMulti = 0x80} status = MMCIdle;
 
 struct {

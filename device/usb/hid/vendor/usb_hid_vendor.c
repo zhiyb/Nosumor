@@ -56,7 +56,9 @@ static void hid_report(usb_hid_if_t *hid, usb_hid_report_t *report, uint32_t siz
 {
 	vendor_report_t *rp = (vendor_report_t *)report;
 	// Push report to hid buffer at the front
+	__disable_irq();
 	data_t *dp = malloc(sizeof(data_t) + rp->size);
+	__enable_irq();
 	if (!dp)
 		panic();
 	memcpy(&dp->report, rp->raw, rp->size);
@@ -104,7 +106,9 @@ void usb_hid_vendor_process(usb_hid_if_t *hid, vendor_func_t func)
 		// Process report
 		func(hid, (vendor_report_t *)&dp->report);
 		// Release buffer
+		__disable_irq();
 		free(dp);
+		__enable_irq();
 	}
 }
 

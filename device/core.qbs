@@ -33,7 +33,7 @@ StaticLibrary {
 
     Properties {
         condition: qbs.buildVariant == "release"
-        cpp.optimization: "small"
+        cpp.optimization: "fast"
     }
 
     Properties {
@@ -47,6 +47,7 @@ StaticLibrary {
         cpp.includePaths: ["."]
         cpp.defines: product.cpp.defines
         cpp.driverFlags: product.cpp.driverFlags
+        cpp.optimization: product.cpp.optimization
     }
 
     Group {

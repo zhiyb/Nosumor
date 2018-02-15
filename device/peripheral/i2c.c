@@ -251,8 +251,8 @@ static void op_write(struct i2c_t *i2c, const struct i2c_op_t *op)
 		n = 255u;
 		mask |= I2C_CR2_RELOAD_Msk;
 	}
-	// Enable TX DMA
-	base->CR1 |= I2C_CR1_TXDMAEN_Msk;
+	// Disable TX register empty interrupt, enable TX DMA
+	base->CR1 = (base->CR1 & ~I2C_CR1_TXIE_Msk) | I2C_CR1_TXDMAEN_Msk;
 	// Clear DMA flags
 	*i2c->c.txr = i2c->c.txm;
 	// Setup DMA
