@@ -88,7 +88,9 @@ static void callback(struct i2c_t *i2c,
 static void callback_nb(struct i2c_t *i2c,
 			const struct i2c_op_t *op, uint32_t nack)
 {
+	__disable_irq();
 	free((void *)op);
+	__enable_irq();
 }
 
 int i2c_check(struct i2c_t *i2c, uint8_t addr)
@@ -344,7 +346,9 @@ static void op_done(struct i2c_t *i2c, struct i2c_node_t **n, uint32_t nack)
 	// Callback
 	if (node->op->cb)
 		node->op->cb(i2c, node->op, nack);
+	__disable_irq();
 	free(node);
+	__enable_irq();
 }
 
 void i2c_op(struct i2c_t *i2c, const struct i2c_op_t *op)

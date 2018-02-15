@@ -129,7 +129,9 @@ static void epout_spr(usb_t *usb, uint32_t n)
 			if (setup->data)
 				continue;
 			// Copy data packet
+			__disable_irq();
 			void *buf = malloc(wLength);
+			__enable_irq();
 			if (!buf || size < wLength)
 				panic();
 			memcpy(buf, dma, wLength);
@@ -168,7 +170,9 @@ static void epout_pkt(usb_t *usb, uint32_t n)
 	// Append setup packets
 	while (setup_cnt-- && size >= 8u) {
 		// Copy setup packet
+		__disable_irq();
 		setup_buf_t *setup = malloc(sizeof(setup_buf_t));
+		__enable_irq();
 		if (!setup)
 			panic();
 		memcpy(&setup->setup, dma, 8u);
@@ -227,8 +231,8 @@ void usb_ep0_process(usb_t *usb)
 		__disable_irq();
 		setup_buf_t *t = *p;
 		*p = (*p)->next;
-		__enable_irq();
 		free(t->setup.data);
 		free(t);
+		__enable_irq();
 	}
 }
