@@ -2,7 +2,7 @@
 #include <stm32f7xx.h>
 #include <macros.h>
 #include <debug.h>
-#include <vendor_defs.h>
+#include <api_defs.h>
 #include <system/clocks.h>
 #include "led.h"
 

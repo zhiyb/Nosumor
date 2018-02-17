@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <macros.h>
 #include <debug.h>
-#include <vendor_defs.h>
+#include <api_defs.h>
 #include "scsi.h"
 #include "scsi_defs.h"
 

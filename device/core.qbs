@@ -24,7 +24,7 @@ StaticLibrary {
         "-Wno-unused-variable",
     ]
     cpp.staticLibraries: ["m"]
-    cpp.includePaths: ["."]
+    cpp.includePaths: [".", "api"]
 
     Properties {
         condition: qbs.buildVariant == "debug"
@@ -44,7 +44,7 @@ StaticLibrary {
     Export {
         Depends {name: "cpp"}
         Depends {name: "CMSIS"}
-        cpp.includePaths: ["."]
+        cpp.includePaths: [".", "api"]
         cpp.defines: product.cpp.defines
         cpp.driverFlags: product.cpp.driverFlags
         cpp.optimization: product.cpp.optimization
@@ -174,12 +174,24 @@ StaticLibrary {
     }
 
     Group {
+        name: "Vendor HID API"
+        files: [
+            "api/api.h",
+            "api/api_defs.h",
+            "api/api_keycode.c",
+            "api/api_keycode.h",
+            "api/api_ping.c",
+            "api/api_ping.h",
+        ]
+    }
+
+    Group {
         name: "Logic modules"
         files: [
+            "logic/api_proc.c",
+            "logic/api_proc.h",
             "logic/led_trigger.c",
             "logic/led_trigger.h",
-            "vendor_defs.h",
-            "logic/vendor.h",
             "logic/syscalls.c",
             "logic/fio.c",
             "logic/fio.h",
@@ -190,7 +202,6 @@ StaticLibrary {
             "logic/scsi_defs_ops.h",
             "logic/scsi_defs_sense.h",
             "logic/scsi_buf.c",
-            "logic/vendor.c",
         ]
     }
 

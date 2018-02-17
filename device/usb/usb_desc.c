@@ -1,7 +1,7 @@
 #include <malloc.h>
 #include <string.h>
-#include <vendor_defs.h>
-#include <logic/vendor.h>
+#include <api_defs.h>
+#include <logic/api_proc.h>
 #include "../debug.h"
 #include "usb_desc.h"
 #include "usb_ep0.h"
@@ -62,7 +62,7 @@ static desc_t usb_desc_device(usb_t *usb)
 	pd->iProduct = usb_desc_add_string(usb, 0, LANG_EN_US, PRODUCT_NAME);
 	// Construct serial number from UID
 	char uid[25];
-	vendor_uid_str(uid);
+	uid_str(uid);
 	// Valid serial number characters are [0-9A-F]
 	pd->iSerialNumber = usb_desc_add_string(usb, 0, LANG_EN_US, uid);
 

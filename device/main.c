@@ -35,7 +35,7 @@
 // 3rd party libraries
 #include "fatfs/ff.h"
 // Processing functions
-#include "logic/vendor.h"
+#include "logic/api_proc.h"
 #include "logic/led_trigger.h"
 
 #ifdef DEBUG
@@ -139,9 +139,10 @@ static inline void init()
 
 	puts(ESC_INIT "Initialising USB HID interface...");
 	usb_hid_t *hid = usb_hid_init(&usb);
+	usb_hid_vendor = usb_hid_vendor_init(hid);
+	api_init(usb_hid_vendor);
 	usb_hid_if_t *hid_keyboard = usb_hid_keyboard_init(hid);
 	usb_hid_if_t *hid_joystick = usb_hid_joystick_init(hid);
-	usb_hid_vendor = usb_hid_vendor_init(hid);
 
 	puts(ESC_INIT "Initialising keyboard...");
 	keyboard_init(hid_keyboard, hid_joystick);
@@ -195,7 +196,7 @@ loop:	// Process time consuming tasks
 	if (tick != systick_cnt()) {
 		tick = systick_cnt();
 		led_trigger_process();
-		usb_hid_vendor_process(usb_hid_vendor, &vendor_process);
+		usb_hid_vendor_process(usb_hid_vendor, &api_process);
 	}
 	// Update tasks every 256 ms
 	if (systick_cnt() - tick256 >= 256u) {
