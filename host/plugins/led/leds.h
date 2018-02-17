@@ -20,7 +20,7 @@ private slots:
 
 private:
 	void getInfo();
-	void getColor(int id, uint16_t *clr);
+	void getColor(int id);
 
 	hid_device *dev;
 

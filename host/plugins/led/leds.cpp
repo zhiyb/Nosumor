@@ -1,6 +1,7 @@
 #include <QtWidgets>
-#include <dev_defs.h>
 #include <plugin.h>
+#include <dev_defs.h>
+#include <api_led.h>
 #include "leds.h"
 
 LEDs::LEDs(hid_device *dev, uint8_t channel, QWidget *parent) :
@@ -27,28 +28,23 @@ void LEDs::update(int id)
 	uint32_t size = 2u * ledList[id].elements;
 	ledList[id].set(colour);
 
-#if 0
-	vendor_report_t report;
-	report.id = HID_REPORT_ID;
-	report.size = VENDOR_REPORT_BASE_SIZE + size + 1u;
-	report.type = LEDConfig;
-	report.payload[0] = id | 0x80;
-	memcpy(&report.payload[1], ledList[id].colour, size);
-	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
-#endif
+	api_report_t report;
+	report.size = 2u + size;
+	report.payload[0] = LEDConfig;
+	report.payload[1] = id | 0x80;
+	memcpy(&report.payload[2], ledList[id].colour, size);
+	send(dev, &report);
 }
 
 void LEDs::getInfo()
 {
-#if 0
-	vendor_report_t report;
-	report.id = HID_REPORT_ID;
-	report.size = VENDOR_REPORT_BASE_SIZE;
-	report.type = LEDInfo;
-	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
+	api_report_t report;
+	report.size = 1u;
+	report.payload[0] = LEDInfo;
+	send(dev, &report);
 
-	Plugin::recv(dev, report.raw);
-	led_info_t *info = (led_info_t *)report.payload;
+	recv(dev, &report);
+	api_led_info_t *info = (api_led_info_t *)report.payload;
 	for (int i = 0; i != info->num; i++) {
 		led_t led;
 		led.id = i;
@@ -62,29 +58,22 @@ void LEDs::getInfo()
 		led.button->setAutoFillBackground(true);
 		buttons->addButton(led.button, i);
 		layout->addWidget(led.button);
-	}
 
-	for (int i = 0; i != info->num; i++) {
-		auto &led = ledList[i];
-		getColor(i, led.colour);
+		getColor(i);
 	}
-#endif
 }
 
-void LEDs::getColor(int id, uint16_t *clr)
+void LEDs::getColor(int id)
 {
-#if 0
-	vendor_report_t report;
-	report.id = HID_REPORT_ID;
-	report.size = VENDOR_REPORT_BASE_SIZE + 1u;
-	report.type = LEDConfig;
-	report.payload[0] = id;
-	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
+	api_report_t report;
+	report.size = 2u;
+	report.payload[0] = LEDConfig;
+	report.payload[1] = id;
+	send(dev, &report);
 
-	Plugin::recv(dev, report.raw);
-	led_config_t *config = (led_config_t *)report.payload;
+	recv(dev, &report);
+	api_led_config_t *config = (api_led_config_t *)report.payload;
 	ledList[id].set(config->clr);
-#endif
 }
 
 QColor LEDs::led_t::qColor() const
