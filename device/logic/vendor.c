@@ -72,29 +72,6 @@ static void vendor_led_info(usb_hid_if_t *hid)
 	usb_hid_vendor_send(hid, &report);
 }
 
-// IN; Format: ID(8), R(16), G(16), B(16)
-static void vendor_led_config(usb_hid_if_t *hid, uint8_t size, void *payload)
-{
-	uint8_t id;
-	uint16_t clr[3];
-	memcpy(&id, payload++, 1);
-	if (!(id & 0x80)) {
-		report.type = LEDConfig | Reply;
-		report.size = VENDOR_REPORT_BASE_SIZE + 7u;
-		report.payload[0] = id;
-		led_get(id, 3u, clr);
-		memcpy(&report.payload[1], clr, sizeof(clr));
-		usb_hid_vendor_send(hid, &report);
-	} else {
-		if (size != 7) {
-			dbgbkpt();
-			return;
-		}
-		memcpy(clr, payload, sizeof(clr));
-		led_set(id & 0x7f, 3u, clr);
-	}
-}
-
 static void vendor_i2c(usb_hid_if_t *hid, uint8_t size, void *payload)
 {
 	if (size-- == 0)
@@ -142,18 +119,6 @@ void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp)
 	case Ping:
 		ping(hid);
 		break;
-	case FlashReset:
-		flash_hex_free();
-		break;
-	case FlashData:
-		flash_hex_data(size, rp->payload);
-		break;
-	case FlashCheck:
-		flash_check(hid);
-		break;
-	case FlashStart:
-		flash_hex_program();
-		break;
 	case KeycodeUpdate:
 		if (size != 2)
 			break;
@@ -162,9 +127,6 @@ void vendor_process(usb_hid_if_t *hid, vendor_report_t *rp)
 #ifndef BOOTLOADER
 	case LEDInfo:
 		vendor_led_info(hid);
-		break;
-	case LEDConfig:
-		vendor_led_config(hid, size, rp->payload);
 		break;
 	case I2CData:
 		vendor_i2c(hid, size, rp->payload);
