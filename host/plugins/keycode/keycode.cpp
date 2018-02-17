@@ -1,10 +1,12 @@
 #include <QtWidgets>
-#include <dev_defs.h>
 #include <plugin.h>
+#include <dev_defs.h>
+#include <api_keycode.h>
 #include "inputcapture.h"
 #include "keycode.h"
 
-Keycode::Keycode(hid_device *dev, QWidget *parent) : PluginWidget(parent)
+Keycode::Keycode(hid_device *dev, uint8_t channel, QWidget *parent) :
+	PluginWidget(channel, parent)
 {
 	this->dev = dev;
 
@@ -55,11 +57,12 @@ void Keycode::update(int btn)
 			return;
 	}
 
-	vendor_report_t report;
-	report.id = HID_REPORT_ID;
-	report.size = VENDOR_REPORT_BASE_SIZE + 2u;
-	report.type = KeycodeUpdate;
-	report.payload[0] = btn;
-	report.payload[1] = code;
-	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
+	api_report_t report;
+	report.size = sizeof(api_keycode_t);
+
+	api_keycode_t *p = (api_keycode_t *)report.payload;
+	p->btn = btn;
+	p->code = code;
+
+	send(dev, &report);
 }

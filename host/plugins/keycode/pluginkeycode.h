@@ -10,8 +10,10 @@ public:
 	PluginKeycode() : Plugin() {}
 	~PluginKeycode() {}
 
-	virtual std::string name() const {return "Keycode settings";}
-	virtual void *pluginWidget(hid_device *dev, hid_device_info *info, void *parent = nullptr);
+	virtual std::string name() const {return "Keycode";}
+	virtual std::string displayName() const {return "Keycode settings";}
+	virtual void *pluginWidget(hid_device *dev, hid_device_info *info,
+				   uint8_t channel, void *parent = nullptr);
 };
 
 #endif // PLUGINKEYCODE_H

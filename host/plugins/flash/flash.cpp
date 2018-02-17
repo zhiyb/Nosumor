@@ -3,7 +3,8 @@
 #include <plugin.h>
 #include "flash.h"
 
-Flash::Flash(hid_device *dev, QWidget *parent) : PluginWidget(parent)
+Flash::Flash(hid_device *dev, uint8_t channel, QWidget *parent) :
+	PluginWidget(channel, parent)
 {
 	this->dev = dev;
 
@@ -21,6 +22,7 @@ Flash::Flash(hid_device *dev, QWidget *parent) : PluginWidget(parent)
 
 void Flash::reset()
 {
+#if 0
 	vendor_report_t report;
 	report.id = HID_REPORT_ID;
 	report.size = VENDOR_REPORT_BASE_SIZE;
@@ -29,6 +31,7 @@ void Flash::reset()
 	report.type = FlashStart;
 	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
 	emit devRemove();
+#endif
 }
 
 void Flash::flash()
@@ -43,6 +46,7 @@ void Flash::flash()
 		return;
 	}
 
+#if 0
 	vendor_report_t report;
 	report.id = HID_REPORT_ID;
 	// Reset flashing buffer
@@ -77,7 +81,7 @@ void Flash::flash()
 	report.size = VENDOR_REPORT_BASE_SIZE;
 	report.type = FlashCheck;
 	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
-	Plugin::readReport(dev, report.raw);
+	Plugin::recv(dev, report.raw);
 	if (!report.payload[0]) {
 		QMessageBox::critical(this, tr("Error"), tr("Invalid firmware received"));
 		return;
@@ -89,4 +93,5 @@ void Flash::flash()
 	QMessageBox::information(this, tr("Info"), tr("Firmware flashing started, "
 						      "please wait for reconnection..."));
 	emit devRemove();
+#endif
 }

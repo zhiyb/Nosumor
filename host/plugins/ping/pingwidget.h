@@ -9,7 +9,8 @@ class PingWidget : public PluginWidget
 {
 	Q_OBJECT
 public:
-	explicit PingWidget(hid_device *dev, hid_device_info *info, QWidget *parent = nullptr);
+	explicit PingWidget(hid_device *dev, hid_device_info *info,
+			    uint8_t channel, QWidget *parent = nullptr);
 
 signals:
 

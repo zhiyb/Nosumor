@@ -9,7 +9,7 @@ class I2C : public PluginWidget
 {
 	Q_OBJECT
 public:
-	explicit I2C(hid_device *dev, QWidget *parent = nullptr);
+	explicit I2C(hid_device *dev, uint8_t channel, QWidget *parent = nullptr);
 
 signals:
 

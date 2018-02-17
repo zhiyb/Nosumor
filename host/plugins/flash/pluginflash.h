@@ -10,8 +10,10 @@ public:
 	PluginFlash() : Plugin() {}
 	~PluginFlash() {}
 
-	virtual std::string name() const {return "Firmware Flash";}
-	virtual void *pluginWidget(hid_device *dev, hid_device_info *info, void *parent = nullptr);
+	virtual std::string name() const {return "Flash";}
+	virtual std::string displayName() const {return "Firmware Flash";}
+	virtual void *pluginWidget(hid_device *dev, hid_device_info *info,
+				   uint8_t channel, void *parent = nullptr);
 };
 
 #endif // PLUGINFLASH_H

@@ -8,6 +8,7 @@ Project {
         Depends {name: "Qt.widgets"}
         Depends {name: "Nosumor"}
         Depends {name: "plugin.widget"}
+        Depends {name: "plugin.info"}
 
         files: [
             "devicewidget.cpp",

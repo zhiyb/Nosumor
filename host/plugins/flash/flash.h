@@ -8,7 +8,7 @@ class Flash : public PluginWidget
 {
 	Q_OBJECT
 public:
-	explicit Flash(hid_device *dev, QWidget *parent = nullptr);
+	explicit Flash(hid_device *dev, uint8_t channel, QWidget *parent = nullptr);
 
 signals:
 

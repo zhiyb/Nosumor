@@ -1,8 +1,10 @@
-#include <dev_defs.h>
 #include <plugin.h>
+#include <dev_defs.h>
+#include <api_ping.h>
 #include "pingwidget.h"
 
-PingWidget::PingWidget(hid_device *dev, hid_device_info *info, QWidget *parent) : PluginWidget(parent)
+PingWidget::PingWidget(hid_device *dev, hid_device_info *info, uint8_t channel, QWidget *parent) :
+	PluginWidget(channel, parent)
 {
 	this->dev = dev;
 
@@ -28,13 +30,12 @@ PingWidget::PingWidget(hid_device *dev, hid_device_info *info, QWidget *parent) 
 
 void PingWidget::devPing()
 {
-	vendor_report_t report;
-	report.id = HID_REPORT_ID;
-	report.size = VENDOR_REPORT_BASE_SIZE;
-	report.type = Ping;
-	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
-	Plugin::readReport(dev, report.raw);
-	pong_t *pong = (pong_t *)report.payload;
+	api_report_t report;
+	report.size = 0u;
+	send(dev, &report);
+
+	recv(dev, &report);
+	api_pong_t *pong = (api_pong_t *)report.payload;
 	ping->setText(tr("Hardware version:\t%1\n"
 			 "Software version:\t%2\n"
 			 "Device UID:\t%3%4%5\n"

@@ -27,8 +27,9 @@ private slots:
 	void devRemove();
 
 private:
-	void readReport(hid_device *dev, void *p);
+	void enumerateChannels();
 
+	QHash<QString, QPair<uint16_t, uint8_t> > channels;
 	const QList<Plugin *> *plugins;
 	QVBoxLayout *layout;
 	QLabel *ping;

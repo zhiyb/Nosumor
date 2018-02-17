@@ -101,8 +101,8 @@ bool MainWindow::loadPlugin(const QString path)
 		return false;
 	}
 	Plugin *plugin = load();
-	plugins << plugin;
-	pluginList->addItem(tr("%1 (%2)").arg(QString::fromStdString(plugin->name())).arg(path));
+	plugins.append(plugin);
+	pluginList->addItem(tr("%1 (%2)").arg(QString::fromStdString(plugin->displayName())).arg(path));
 	return true;
 }
 

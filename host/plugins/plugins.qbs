@@ -7,6 +7,7 @@ Project {
         "keycode",
         "led",
         "i2c",
+        "info",
     ]
 
     StaticLibrary {

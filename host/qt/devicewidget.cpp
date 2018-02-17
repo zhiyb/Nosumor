@@ -1,5 +1,6 @@
 #include <pluginwidget.h>
 #include <dev_defs.h>
+#include <plugininfo.h>
 #include "devicewidget.h"
 
 #define TIMEOUT_MS	5000
@@ -27,16 +28,24 @@ bool DeviceWidget::devOpen(hid_device_info *info, const QList<Plugin *> *plugins
 		deleteLater();
 		return false;
 	}
+
 	this->plugins = plugins;
-	if (plugins)
-		foreach (Plugin *plugin, *plugins) {
-			//qDebug() << "Creating: " << QString::fromStdString(plugin->name());
-			auto w = (PluginWidget *)plugin->pluginWidget(dev, info, this);
-			if (!w)
-				continue;
-			connect(w, &PluginWidget::devRemove, this, &DeviceWidget::devRemove);
-			layout->addWidget(w);
-		}
+	if (!plugins)
+		return false;
+
+	enumerateChannels();
+	foreach (Plugin *plugin, *plugins) {
+		auto const &it = channels.find(QString::fromStdString(plugin->name()));
+		if (it == channels.end())
+			continue;
+
+		//qDebug() << "Creating: " << QString::fromStdString(plugin->name());
+		auto w = (PluginWidget *)plugin->pluginWidget(dev, info, it.value().second, this);
+		if (!w)
+			continue;
+		connect(w, &PluginWidget::devRemove, this, &DeviceWidget::devRemove);
+		layout->addWidget(w);
+	}
 	return true;
 }
 
@@ -54,15 +63,9 @@ void DeviceWidget::devRemove()
 	emit devRemoved(this);
 }
 
-void DeviceWidget::readReport(hid_device *dev, void *p)
+void DeviceWidget::enumerateChannels()
 {
-	int ret = hid_read_timeout(dev, (uint8_t *)p, VENDOR_REPORT_SIZE, TIMEOUT_MS);
-	if (ret == 0)
-		throw runtime_error("Report IN timed out");
-	else if (ret != VENDOR_REPORT_SIZE) {
-		if (ret > 0)
-			throw runtime_error("Incorrect report size: " + ret);
-		else
-			throw runtime_error("Report IN error: " + ret);
-	}
+	for (auto &it: PluginInfo().channels(dev))
+		channels.insert(QString::fromStdString(it.first),
+				QPair<uint16_t, uint8_t>(it.second.first, it.second.second));
 }

@@ -9,7 +9,7 @@ class LEDs : public PluginWidget
 {
 	Q_OBJECT
 public:
-	explicit LEDs(hid_device *dev, QWidget *parent = nullptr);
+	explicit LEDs(hid_device *dev, uint8_t channel, QWidget *parent = nullptr);
 
 signals:
 

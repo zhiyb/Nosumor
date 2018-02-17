@@ -3,7 +3,8 @@
 #include <plugin.h>
 #include "i2c.h"
 
-I2C::I2C(hid_device *dev, QWidget *parent) : PluginWidget(parent)
+I2C::I2C(hid_device *dev, uint8_t channel, QWidget *parent) :
+	PluginWidget(channel, parent)
 {
 	this->dev = dev;
 
@@ -56,6 +57,7 @@ void I2C::send()
 		values.append(v);
 	}
 
+#if 0
 	vendor_report_t report;
 	report.id = HID_REPORT_ID;
 	report.size = VENDOR_REPORT_BASE_SIZE + 1u + values.size();
@@ -64,11 +66,12 @@ void I2C::send()
 	memcpy(&report.payload[1], values.data(), values.size());
 	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
 
-	Plugin::readReport(dev, report.raw);
+	Plugin::recv(dev, report.raw);
 	a = report.payload[0];
 	uint8_t v = report.payload[1];
 	QMessageBox::information(this, tr("I2C reply"),
 				 tr("I2C reply from 0x%1: 0x%2")
 				 .arg(a, 2, 16, QChar('0'))
 				 .arg(v, 2, 16, QChar('0')));
+#endif
 }

@@ -3,6 +3,7 @@
 
 #include <string>
 #include <hidapi.h>
+#include <api_defs.h>
 
 #if defined(WIN32)
 #define PLUGIN_EXPORT	extern "C" __declspec(dllexport)
@@ -17,9 +18,12 @@ public:
 	virtual ~Plugin() {}
 
 	virtual std::string name() const = 0;
-	virtual void *pluginWidget(hid_device *dev, hid_device_info *info, void *parent = nullptr) = 0;
+	virtual std::string displayName() const = 0;
+	virtual void *pluginWidget(hid_device *dev, hid_device_info *info,
+				   uint8_t channel, void *parent = nullptr) = 0;
 
-	static void readReport(hid_device *dev, void *p);
+	static void send(hid_device *dev, uint8_t channel, api_report_t *rp);
+	static void recv(hid_device *dev, api_report_t *rp);
 };
 
 typedef Plugin *(*pluginLoad_t)();
