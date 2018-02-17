@@ -35,7 +35,7 @@
 // 3rd party libraries
 #include "fatfs/ff.h"
 // Processing functions
-#include "logic/api_proc.h"
+#include "api/api_proc.h"
 #include "logic/led_trigger.h"
 
 #ifdef DEBUG

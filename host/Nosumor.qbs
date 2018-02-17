@@ -25,6 +25,7 @@ Project {
             "include/dev_defs.h",
             "../device/api/*.h",
         ]
+        excludeFiles: "../**/api_proc.h"
     }
 
     StaticLibrary {

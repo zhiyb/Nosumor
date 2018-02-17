@@ -3,7 +3,7 @@
 #include <string.h>
 #include <escape.h>
 #include <peripheral/keyboard.h>
-#include <logic/api_proc.h>
+#include <api/api_proc.h>
 #include "api_keycode.h"
 
 static void handler(void *hid, uint8_t channel,

@@ -1,7 +1,7 @@
 #include <malloc.h>
 #include <string.h>
 #include <api_defs.h>
-#include <logic/api_proc.h>
+#include <api/api_proc.h>
 #include "../debug.h"
 #include "usb_desc.h"
 #include "usb_ep0.h"

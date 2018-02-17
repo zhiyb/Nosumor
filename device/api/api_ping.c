@@ -3,7 +3,7 @@
 #include <string.h>
 #include <escape.h>
 #include <system/flash.h>
-#include <logic/api_proc.h>
+#include <api/api_proc.h>
 #include "api_ping.h"
 
 #define UID	((uint32_t *)UID_BASE)

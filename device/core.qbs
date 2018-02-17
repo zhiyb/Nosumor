@@ -182,14 +182,14 @@ StaticLibrary {
             "api/api_keycode.h",
             "api/api_ping.c",
             "api/api_ping.h",
+            "api/api_proc.c",
+            "api/api_proc.h",
         ]
     }
 
     Group {
         name: "Logic modules"
         files: [
-            "logic/api_proc.c",
-            "logic/api_proc.h",
             "logic/led_trigger.c",
             "logic/led_trigger.h",
             "logic/syscalls.c",
