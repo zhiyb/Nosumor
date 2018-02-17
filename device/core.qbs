@@ -184,6 +184,8 @@ StaticLibrary {
             "api/api_ping.h",
             "api/api_proc.c",
             "api/api_proc.h",
+            "api/api_led.c",
+            "api/api_led.h",
         ]
     }
 

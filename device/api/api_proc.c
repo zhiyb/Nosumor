@@ -6,6 +6,7 @@
 #include <api_defs.h>
 #include <api_ping.h>
 #include <api_keycode.h>
+#include <api_led.h>
 #include <usb/hid/usb_hid.h>
 #include <usb/hid/vendor/usb_hid_vendor.h>
 #include "api_proc.h"
@@ -114,17 +115,6 @@ static void flash_check(usb_hid_if_t *hid)
 
 #ifndef BOOTLOADER
 #if 0
-// OUT; Format: Num(8), Info[N](16)
-static void vendor_led_info(usb_hid_if_t *hid)
-{
-	report.type = LEDInfo | Reply;
-	report.size = VENDOR_BASE_SIZE + 1u;
-	const void *p = led_info(&report.payload[0]);
-	memcpy(&report.payload[1], p, report.payload[0] * 2u);
-	report.size += report.payload[0] * 2u;
-	usb_hid_vendor_send(hid, &report);
-}
-
 static void vendor_i2c(usb_hid_if_t *hid, uint8_t size, void *payload)
 {
 	if (size-- == 0)
@@ -163,6 +153,9 @@ void api_init(void *hid)
 	api_register(&api_info);
 	api_register(&api_ping);
 	api_register(&api_keycode);
+#ifdef BOOTLOADER
+	api_register(&api_led);
+#endif
 }
 
 void api_process(void *hid, api_report_t *rp)
@@ -207,9 +200,6 @@ void api_process(void *hid, api_report_t *rp)
 #if 0
 	switch (rp->type) {
 #ifndef BOOTLOADER
-	case LEDInfo:
-		vendor_led_info(hid);
-		break;
 	case I2CData:
 		vendor_i2c(hid, size, rp->payload);
 		break;
