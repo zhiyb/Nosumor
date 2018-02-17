@@ -17,13 +17,13 @@ Project {
             cpp.commonCompilerFlags: ["-mno-ms-bitfields"]
             cpp.includePaths: [
                 "include",
-                "../device",
+                "../device/api",
             ]
         }
 
         files: [
             "include/dev_defs.h",
-            "../device/vendor_defs.h",
+            "../device/api/*.h",
         ]
     }
 
