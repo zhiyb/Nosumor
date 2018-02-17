@@ -3,6 +3,7 @@
 
 #include <stm32f7xx.h>
 #include <stdio.h>
+#include <escape.h>
 
 #define dbgexist()	(CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk)
 
@@ -13,10 +14,12 @@
 
 #define VARIANT	"DEBUG"
 
+extern void flushCache();
+
 #define dbgprintf	printf
 #define dbgbkpt()	do { \
 	fflush(stdout); \
-	SCB_CleanInvalidateDCache(); \
+	flushCache(); \
 	__BKPT(0); \
 } while (0)
 #define panic()		do { \

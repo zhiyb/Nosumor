@@ -119,6 +119,7 @@ void OTG_HS_IRQHandler()
 		usb_endpoint_irq(usb);
 		bk = 0;
 	}
+#ifndef BOOTLOADER
 	if (i & USB_OTG_GINTSTS_IISOIXFR_Msk) {
 		base->GINTSTS = USB_OTG_GINTSTS_IISOIXFR_Msk;
 		uint32_t mask = FIELD(usb->episoc, USB_OTG_DAINT_IEPINT);
@@ -164,6 +165,7 @@ void OTG_HS_IRQHandler()
 		}
 		bk = 0;
 	}
+#endif
 	if (i & USB_OTG_GINTSTS_OTGINT) {
 		dbgbkpt();
 	}

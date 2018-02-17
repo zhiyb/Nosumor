@@ -204,11 +204,13 @@ static void keyboard_tick(uint32_t tick)
 	debouncing &= ~mask;
 	__enable_irq();
 	if (err)
-		dbgprintf(ESC_ERROR "Keyboard tick mismatch\n");
+		dbgprintf(ESC_ERROR "[KEY] Tick mismatch\n");
 }
 
 void keyboard_keycode_set(unsigned int btn, uint8_t code)
 {
 	if (btn < ASIZE(keycodes))
 		keycodes[btn] = code;
+	else
+		printf(ESC_ERROR "[KEY] Invalid button: %u\n", btn);
 }

@@ -60,7 +60,7 @@ static void usb_setup_standard_device(usb_t *usb, uint32_t ep, setup_t pkt)
 				// Initialise endpoints
 				for (int i = 1; i != USB_EPIN_CNT; i++)
 					FUNC(usb->epin[i].init)(usb, i);
-				for (int i = 1; i != USB_EPIN_CNT; i++)
+				for (int i = 1; i != USB_EPOUT_CNT; i++)
 					FUNC(usb->epout[i].init)(usb, i);
 				// Enable endpoints
 				for (usb_if_t **ip = &usb->usbif; *ip != 0; ip = &(*ip)->next)

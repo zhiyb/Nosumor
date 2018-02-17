@@ -43,6 +43,11 @@ static uint32_t seg, saddr;
 
 /* Flash access functions */
 
+SECTION(.iram) extern void flushCache()
+{
+	SCB_CleanInvalidateDCache();
+}
+
 SECTION(.iram) STATIC_INLINE void flash_wait()
 {
 	__DSB();
@@ -112,6 +117,7 @@ SECTION(.iram) STATIC_INLINE void flash_write(uint32_t addr, uint32_t size, uint
 	}
 }
 
+#ifndef BOOTLOADER
 // Use extern to force gcc place the code in RAM
 SECTION(.iram) extern void flash_hex()
 {
@@ -165,6 +171,7 @@ reset:
 	for (;;)
 		__NOP();
 }
+#endif
 
 // Use extern to force gcc place the code in RAM
 SECTION(.iram) extern void flash_hex_segments(hex_seg_t *seg)
@@ -286,6 +293,7 @@ int flash_hex_check()
 	return !hex_invalid;
 }
 
+#ifndef BOOTLOADER
 void flash_hex_program()
 {
 	if (hex_invalid || !hex) {
@@ -299,6 +307,7 @@ void flash_hex_program()
 	pvd_disable_all();
 	flash_hex();
 }
+#endif
 
 static uint32_t toUnsigned(char *s, uint8_t b)
 {

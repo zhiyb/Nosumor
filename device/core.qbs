@@ -211,6 +211,7 @@ StaticLibrary {
         name: "FatFS"
         cpp.commonCompilerFlags: outer.concat(["-Wno-comment",
                                                "-Wno-implicit-fallthrough"])
+        cpp.optimization: "fast"
         files: [
             "fatfs/*",
         ]

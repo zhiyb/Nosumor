@@ -30,9 +30,11 @@ typedef struct flash_t {
 	uint32_t length, rdsize, wrsize;
 } flash_t;
 
-static flash_t flash[2] = {
+static flash_t flash[] = {
 	{&__conf_start__, &__conf_end__, 1, 16ul * 1024ul, Good, 0, 0, 0, 0, 0},
+#ifdef BOOTLOADER
 	{&__app_start__, &__app_end__, 5, 128ul * 1024ul, Good, 0, 0, 0, 0, 0},
+#endif
 };
 static uint32_t active = 0;
 

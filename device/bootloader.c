@@ -31,22 +31,20 @@
 // 3rd party libraries
 #include "fatfs/ff.h"
 // Processing functions
-#include "logic/vendor.h"
+#include "api/api_proc.h"
 
 #define RESET_ENTRY(b)	((void (*)())*(uint32_t *)((uint32_t)(b) + 4u))
 
 #ifdef DEBUG
-extern size_t heap_usage();
-extern size_t heap_size();
+size_t heap_usage();
+size_t heap_size();
 #endif
 
 extern uint32_t __appi_start__;
 
 usb_t usb;	// Shared with PVD
 static usb_msc_t *usb_msc = 0;
-#if 0
 static usb_hid_if_t *usb_hid_vendor = 0;
-#endif
 
 void bootloader_check()
 {
@@ -114,10 +112,9 @@ static inline void init()
 
 	puts(ESC_INIT "Initialising USB HID interface...");
 	usb_hid_t *hid = usb_hid_init(&usb);
-	usb_hid_if_t *hid_keyboard = usb_hid_keyboard_init(hid);
-#if 0
 	usb_hid_vendor = usb_hid_vendor_init(hid);
-#endif
+	api_init(usb_hid_vendor);
+	usb_hid_if_t *hid_keyboard = usb_hid_keyboard_init(hid);
 
 	puts(ESC_INIT "Initialising keyboard...");
 	keyboard_init(hid_keyboard, 0);
@@ -215,9 +212,7 @@ loop:
 	// Process time consuming tasks
 	usb_process(&usb);
 	usb_msc_process(&usb, usb_msc);
-#if 0
-	usb_hid_vendor_process(usb_hid_vendor, &vendor_process);
-#endif
+	usb_hid_vendor_process(usb_hid_vendor, &api_process);
 	fflush(stdout);
 
 	goto loop;
