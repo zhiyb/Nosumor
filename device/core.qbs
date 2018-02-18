@@ -186,6 +186,8 @@ StaticLibrary {
             "api/api_proc.h",
             "api/api_led.c",
             "api/api_led.h",
+            "api/api_i2c.c",
+            "api/api_i2c.h",
         ]
     }
 

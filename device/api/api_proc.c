@@ -3,10 +3,7 @@
 #include <string.h>
 #include <debug.h>
 #include <escape.h>
-#include <api_defs.h>
-#include <api_ping.h>
-#include <api_keycode.h>
-#include <api_led.h>
+#include <api.h>
 #include <usb/hid/usb_hid.h>
 #include <usb/hid/vendor/usb_hid_vendor.h>
 #include "api_proc.h"
@@ -25,7 +22,7 @@ static api_report_t report SECTION(.dtcm);
 static void api_info_handler(void *hid, uint8_t channel,
 			     void *data, uint8_t size, void *payload);
 static const struct api_reg_t api_info = {
-	api_info_handler, 0x0001, "Info"
+	api_info_handler, SW_VERSION, "Info"
 };
 
 static void api_info_handler(void *hid, uint8_t channel,
@@ -113,39 +110,6 @@ static void flash_check(usb_hid_if_t *hid)
 }
 #endif
 
-#ifndef BOOTLOADER
-#if 0
-static void vendor_i2c(usb_hid_if_t *hid, uint8_t size, void *payload)
-{
-	if (size-- == 0)
-		return;
-
-	uint8_t *p = payload++;
-	uint8_t addr = *p++;
-
-	report.type = I2CData | Reply;
-	report.size = VENDOR_BASE_SIZE + 2u;
-	report.payload[0] = addr;
-	if (addr & 1u)
-		report.payload[1] = i2c_read_reg(i2c, addr >> 1u, *p);
-	else {
-		addr >>= 1u;
-		uint8_t ack = 0x81;
-		uint8_t *p = payload;
-		if (size == 0)
-			ack &= i2c_check(i2c, addr);
-		// Align to 2-byte register-value pairs
-		for (size &= ~0x01; size; size -= 2u) {
-			uint8_t reg = *p++;
-			ack &= i2c_write_reg(i2c, addr, reg, *p++);
-		}
-		report.payload[1] = ack;
-	}
-	usb_hid_vendor_send(hid, &report);
-}
-#endif
-#endif
-
 void api_init(void *hid)
 {
 	report.id = usb_hid_vendor_id(hid);
@@ -155,6 +119,9 @@ void api_init(void *hid)
 	api_register(&api_keycode);
 #ifdef BOOTLOADER
 	api_register(&api_led);
+#endif
+#ifndef BOOTLOADER
+	api_register(&api_i2c);
 #endif
 }
 
@@ -196,16 +163,6 @@ void api_process(void *hid, api_report_t *rp)
 
 	uint8_t size = rp->size - API_BASE_SIZE;
 	cp->reg->handler(hid, rp->channel, rp->payload, size, report.payload);
-
-#if 0
-	switch (rp->type) {
-#ifndef BOOTLOADER
-	case I2CData:
-		vendor_i2c(hid, size, rp->payload);
-		break;
-#endif
-	}
-#endif
 }
 
 static char toHex(char c)
