@@ -6,4 +6,4 @@
 	url = https://github.com/signal11/hidapi.git
 [submodule "host/spdlog"]
 	path = host/spdlog
-	url = https://github.com/zhiyb/spdlog.git
+	url = https://github.com/gabime/spdlog.git
