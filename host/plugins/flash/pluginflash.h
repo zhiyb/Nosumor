@@ -10,6 +10,7 @@ public:
 	PluginFlash() : Plugin() {}
 	~PluginFlash() {}
 
+	virtual uint16_t version() const {return 0x0001;}
 	virtual std::string name() const {return "Flash";}
 	virtual std::string displayName() const {return "Firmware Flash";}
 	virtual void *pluginWidget(hid_device *dev, hid_device_info *info,

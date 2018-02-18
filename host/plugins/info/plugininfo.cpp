@@ -1,6 +1,9 @@
+#include <string>
+#include <sstream>
+#include <iomanip>
 #include "plugininfo.h"
 
-using std::string;
+using namespace std;
 
 PLUGIN_EXPORT Plugin *pluginLoad()
 {
@@ -27,7 +30,14 @@ uint8_t PluginInfo::channelTotal(hid_device *dev)
 	send(dev, 0, &report);
 
 	recv(dev, &report);
-	return ((api_info_t *)report.payload)->channel;
+	api_info_t *info = (api_info_t *)report.payload;
+	if (info->version > version()) {
+		stringstream ss;
+		ss << "Software outdated: 0x" << std::hex << std::noshowbase
+		   << std::setw(4) << std::setfill('0') << info->version;
+		throw runtime_error(ss.str());
+	}
+	return info->channel;
 }
 
 std::string PluginInfo::channelInfo(hid_device *dev, uint8_t channel, uint16_t *version)

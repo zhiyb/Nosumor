@@ -1,4 +1,5 @@
 #include <dev_defs.h>
+#include <plugininfo.h>
 #include "mainwindow.h"
 #include "devicewidget.h"
 #include "plugin.h"
@@ -23,7 +24,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 	vbl->addWidget(pb);
 	vbl->addStretch();
 
-	gb = new QGroupBox(tr("Plugins"), w);
+	gb = new QGroupBox(tr("Plugins (v%1)")
+			   .arg(PluginInfo().version(), 4, 16, QChar('0')), w);
 	hbl->addWidget(gb, 1);
 	vbl = new QVBoxLayout(gb);
 	pluginList = new QListWidget(gb);
@@ -102,7 +104,9 @@ bool MainWindow::loadPlugin(const QString path)
 	}
 	Plugin *plugin = load();
 	plugins.append(plugin);
-	pluginList->addItem(tr("%1 (%2)").arg(QString::fromStdString(plugin->displayName())).arg(path));
+	pluginList->addItem(tr("%1 (v%2):\t%3")
+			    .arg(QString::fromStdString(plugin->displayName()))
+			    .arg(plugin->version(), 4, 16, QChar('0')).arg(path));
 	return true;
 }
 

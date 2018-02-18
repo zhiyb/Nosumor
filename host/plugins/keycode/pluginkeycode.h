@@ -10,6 +10,7 @@ public:
 	PluginKeycode() : Plugin() {}
 	~PluginKeycode() {}
 
+	virtual uint16_t version() const {return 0x0001;}
 	virtual std::string name() const {return "Keycode";}
 	virtual std::string displayName() const {return "Keycode settings";}
 	virtual void *pluginWidget(hid_device *dev, hid_device_info *info,

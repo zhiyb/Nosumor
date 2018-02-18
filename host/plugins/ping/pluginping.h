@@ -10,6 +10,7 @@ public:
 	PluginPing() : Plugin() {}
 	~PluginPing() {}
 
+	virtual uint16_t version() const {return 0x0001;}
 	virtual std::string name() const {return "Ping";}
 	virtual std::string displayName() const {return "Ping-Pong";}
 	virtual void *pluginWidget(hid_device *dev, hid_device_info *info,

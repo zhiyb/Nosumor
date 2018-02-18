@@ -17,6 +17,7 @@ public:
 	Plugin() {}
 	virtual ~Plugin() {}
 
+	virtual uint16_t version() const = 0;
 	virtual std::string name() const = 0;
 	virtual std::string displayName() const = 0;
 	virtual void *pluginWidget(hid_device *dev, hid_device_info *info,

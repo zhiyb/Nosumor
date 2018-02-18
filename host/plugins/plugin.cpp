@@ -29,14 +29,14 @@ void Plugin::recv(hid_device *dev, api_report_t *rp)
 		throw runtime_error("Report IN timed out");
 	else if (ret != API_REPORT_SIZE) {
 		if (ret > 0)
-			throw runtime_error("Incorrect report size: " + ret);
+			throw runtime_error("Incorrect report size: " + to_string(ret));
 		else
-			throw runtime_error("Report IN error: " + ret);
+			throw runtime_error("Report IN error: " + to_string(ret));
 	}
 
 	// Check payload size
 	if (rp->size < API_BASE_SIZE || rp->size > API_REPORT_SIZE)
-		throw runtime_error("Invalid report size: " + rp->size);
+		throw runtime_error("Invalid report size: " + to_string(rp->size));
 
 	// Checksum
 	uint8_t c = 0, *p = rp->raw;

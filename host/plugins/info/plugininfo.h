@@ -3,6 +3,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <api_defs.h>
 #include "plugin.h"
 
 class PluginInfo : public Plugin
@@ -11,6 +12,7 @@ public:
 	PluginInfo() : Plugin() {}
 	~PluginInfo() {}
 
+	virtual uint16_t version() const {return SW_VERSION;}
 	virtual std::string name() const {return "Info";}
 	virtual std::string displayName() const {return "Information channel";}
 	virtual void *pluginWidget(hid_device *dev, hid_device_info *info,
