@@ -17,7 +17,7 @@ public slots:
 
 private slots:
 	void readToggled(bool e);
-	void send();
+	void run();
 
 private:
 	hid_device *dev;

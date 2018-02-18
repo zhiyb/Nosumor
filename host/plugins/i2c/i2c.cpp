@@ -23,7 +23,7 @@ I2C::I2C(hid_device *dev, uint8_t channel, QWidget *parent) :
 		QOverload<>::of(&QLineEdit::setFocus));
 	connect(read, &QCheckBox::toggled, this, &I2C::readToggled);
 	connect(data, &QLineEdit::returnPressed, pb, &QPushButton::click);
-	connect(pb, &QPushButton::clicked, this, &I2C::send);
+	connect(pb, &QPushButton::clicked, this, &I2C::run);
 }
 
 void I2C::readToggled(bool e)
@@ -33,7 +33,7 @@ void I2C::readToggled(bool e)
 	addr->setText("0x" + QString::number(a, 16));
 }
 
-void I2C::send()
+void I2C::run()
 {
 	uint8_t a = addr->text().toUInt(nullptr, 0);
 	QStringList d = data->text().split(QRegularExpression(",|\\s"),
@@ -57,21 +57,17 @@ void I2C::send()
 		values.append(v);
 	}
 
-#if 0
-	vendor_report_t report;
-	report.id = HID_REPORT_ID;
-	report.size = VENDOR_REPORT_BASE_SIZE + 1u + values.size();
-	report.type = I2CData;
+	api_report_t report;
+	report.size = 1u + values.size();
 	report.payload[0] = a;
 	memcpy(&report.payload[1], values.data(), values.size());
-	hid_write(dev, report.raw, VENDOR_REPORT_SIZE);
+	send(dev, &report);
 
-	Plugin::recv(dev, report.raw);
+	recv(dev, &report);
 	a = report.payload[0];
 	uint8_t v = report.payload[1];
 	QMessageBox::information(this, tr("I2C reply"),
 				 tr("I2C reply from 0x%1: 0x%2")
 				 .arg(a, 2, 16, QChar('0'))
 				 .arg(v, 2, 16, QChar('0')));
-#endif
 }
