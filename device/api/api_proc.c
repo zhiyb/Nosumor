@@ -22,21 +22,28 @@ static api_report_t report SECTION(.dtcm);
 static void api_info_handler(void *hid, uint8_t channel,
 			     void *data, uint8_t size, void *payload);
 static const struct api_reg_t api_info = {
-	api_info_handler, SW_VERSION, "Info"
+	api_info_handler, 0x0002, "Info"
 };
 
 static void api_info_handler(void *hid, uint8_t channel,
 			     void *data, uint8_t size, void *payload)
 {
-	if (size != 1) {
+	const struct api_channel_t *cp = channels;
+	api_info_t *p = data, *rp = payload;
+
+	if (size == 0) {
+		// Report total channel number
+		uint8_t ch = 0;
+		for (const struct api_channel_t *cp = channels; cp; ch++)
+			cp = cp->next;
+		rp->channel = ch;
+		goto ret;
+	} else if (size != 1) {
 		printf(ESC_ERROR "[INFO] Invalid size: %u\n", size);
 		return;
 	}
 
-	api_info_t *p = data, *rp = (void *)payload;
-	uint8_t ch = p->channel;
-	const struct api_channel_t *cp;
-	for (cp = channels; cp && ch; ch--)
+	for (uint8_t ch = p->channel; cp && ch; ch--)
 		cp = cp->next;
 	if (!cp) {
 		printf(ESC_ERROR "[INFO] Invalid channel: %u\n",
@@ -45,20 +52,11 @@ static void api_info_handler(void *hid, uint8_t channel,
 	}
 
 	// Construct reply packet
+	rp->channel = p->channel;
+ret:	rp->version = cp->reg->version;
 	size = strlen(cp->reg->name);
-	rp->version = cp->reg->version;
 	memcpy(rp->name, cp->reg->name, size);
-	size += sizeof(struct api_info_t);
-
-	// Report total channel number
-	if (p->channel == 0) {
-		uint8_t ch = 0;
-		for (const struct api_channel_t *cp = channels; cp; ch++)
-			cp = cp->next;
-		rp->channel = ch;
-	}
-
-	api_send(hid, channel, size);
+	api_send(hid, channel, size + sizeof(struct api_info_t));
 }
 
 /* Common functions */
