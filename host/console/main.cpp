@@ -148,11 +148,7 @@ static void keycode_update(hid_device *dev, uint8_t channel,
 static uint8_t channels(hid_device *dev)
 {
 	api_report_t report;
-	report.size = 1u;
-	report.channel = 0u;
-
-	api_info_t *p = (api_info_t *)report.payload;
-	p->channel = 0;
+	report.size = 0u;
 	send_report(dev, &report);
 
 	recv_report(dev, &report);

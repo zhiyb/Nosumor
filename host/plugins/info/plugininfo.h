@@ -12,7 +12,7 @@ public:
 	PluginInfo() : Plugin() {}
 	~PluginInfo() {}
 
-	virtual uint16_t version() const {return SW_VERSION;}
+	virtual uint16_t version() const {return 0x0002;}
 	virtual std::string name() const {return "Info";}
 	virtual std::string displayName() const {return "Information channel";}
 	virtual void *pluginWidget(hid_device *dev, hid_device_info *info,

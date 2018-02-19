@@ -22,11 +22,7 @@ void *PluginInfo::pluginWidget(hid_device *dev, hid_device_info *info, uint8_t c
 uint8_t PluginInfo::channelTotal(hid_device *dev)
 {
 	api_report_t report;
-	report.size = 1u;
-	report.channel = 0u;
-
-	api_info_t *p = (api_info_t *)report.payload;
-	p->channel = 0;
+	report.size = 0u;
 	send(dev, 0, &report);
 
 	recv(dev, &report);
