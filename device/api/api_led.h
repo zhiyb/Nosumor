@@ -16,8 +16,6 @@ typedef struct PACKED api_led_config_t {
 	uint16_t clr[];
 } api_led_config_t;
 
-enum {LEDInfo, LEDConfig};
-
 extern const struct api_reg_t api_led;
 
 #endif // API_PING_H
