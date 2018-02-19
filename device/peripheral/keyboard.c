@@ -24,6 +24,10 @@ const uint32_t keyboard_masks[KEYBOARD_KEYS] = {
 	KEYBOARD_MASK_4, KEYBOARD_MASK_5,
 };
 
+static const char keyboard_names[KEYBOARD_KEYS][8] = {
+	"Left", "Right", "K1", "K2", "K3",
+};
+
 uint8_t keycodes[KEYBOARD_KEYS] = {
 	// z,    x,    c,    ~,  ESC
 	0x1d, 0x1b, 0x06, 0x35, 0x29,
@@ -36,6 +40,14 @@ static volatile uint32_t status, debouncing, timeout[KEYBOARD_KEYS];
 
 static uint32_t keyboard_gpio_status();
 static void keyboard_tick(uint32_t tick);
+
+const char *keyboard_name(unsigned int btn)
+{
+	if (btn < ASIZE(keyboard_names))
+		return keyboard_names[btn];
+	printf(ESC_ERROR "[KEY] Invalid button: %u\n", btn);
+	return 0;
+}
 
 void keyboard_init(usb_hid_if_t *hid_keyboard, usb_hid_if_t *hid_joystick)
 {
@@ -205,6 +217,14 @@ static void keyboard_tick(uint32_t tick)
 	__enable_irq();
 	if (err)
 		dbgprintf(ESC_ERROR "[KEY] Tick mismatch\n");
+}
+
+uint8_t keyboard_keycode(unsigned int btn)
+{
+	if (btn < ASIZE(keycodes))
+		return keycodes[btn];
+	printf(ESC_ERROR "[KEY] Invalid button: %u\n", btn);
+	return 0;
 }
 
 void keyboard_keycode_set(unsigned int btn, uint8_t code)

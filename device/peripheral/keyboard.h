@@ -26,9 +26,11 @@ extern "C" {
 #define KEYBOARD_MASK_5	(1ul << 15)
 
 extern const uint32_t keyboard_masks[KEYBOARD_KEYS];
+const char *keyboard_name(unsigned int btn);
 
 void keyboard_init(usb_hid_if_t *hid_keyboard, usb_hid_if_t *hid_joystick);
 uint32_t keyboard_status();
+uint8_t keyboard_keycode(unsigned int btn);
 void keyboard_keycode_set(unsigned int btn, uint8_t code);
 
 #ifdef __cplusplus
