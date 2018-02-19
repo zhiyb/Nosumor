@@ -10,7 +10,7 @@ public:
 	PluginLEDs() : Plugin() {}
 	~PluginLEDs() {}
 
-	virtual uint16_t version() const {return 0x0001;}
+	virtual uint16_t version() const {return 0x0002;}
 	virtual std::string name() const {return "LED";}
 	virtual std::string displayName() const {return "LED configuration";}
 	virtual void *pluginWidget(hid_device *dev, hid_device_info *info,

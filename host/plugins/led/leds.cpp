@@ -29,18 +29,16 @@ void LEDs::update(int id)
 	ledList[id].set(colour);
 
 	api_report_t report;
-	report.size = 2u + size;
-	report.payload[0] = LEDConfig;
-	report.payload[1] = id | 0x80;
-	memcpy(&report.payload[2], ledList[id].colour, size);
+	report.size = 1u + size;
+	report.payload[0] = id;
+	memcpy(&report.payload[1], ledList[id].colour, size);
 	send(dev, &report);
 }
 
 void LEDs::getInfo()
 {
 	api_report_t report;
-	report.size = 1u;
-	report.payload[0] = LEDInfo;
+	report.size = 0u;
 	send(dev, &report);
 
 	recv(dev, &report);
@@ -66,9 +64,8 @@ void LEDs::getInfo()
 void LEDs::getColor(int id)
 {
 	api_report_t report;
-	report.size = 2u;
-	report.payload[0] = LEDConfig;
-	report.payload[1] = id;
+	report.size = 1u;
+	report.payload[0] = id;
 	send(dev, &report);
 
 	recv(dev, &report);
