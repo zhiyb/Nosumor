@@ -44,4 +44,6 @@ void Plugin::recv(hid_device *dev, api_report_t *rp)
 		c += *p++;
 	if (c != 0)
 		throw runtime_error("Checksum failed");
+
+	rp->size -= API_BASE_SIZE;
 }

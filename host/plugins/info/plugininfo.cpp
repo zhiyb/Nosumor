@@ -52,7 +52,7 @@ std::string PluginInfo::channelInfo(hid_device *dev, uint8_t channel, uint16_t *
 
 	recv(dev, &report);
 	*version = p->version;
-	return string(p->name, report.size - API_BASE_SIZE - sizeof(api_info_t));
+	return string(p->name, report.size - sizeof(api_info_t));
 }
 
 std::unordered_map<std::string, std::pair<uint16_t, uint8_t> >

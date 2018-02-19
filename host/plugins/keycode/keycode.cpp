@@ -4,6 +4,7 @@
 #include <api_keycode.h>
 #include "inputcapture.h"
 #include "keycode.h"
+#include "usage.h"
 
 Keycode::Keycode(hid_device *dev, uint8_t channel, QWidget *parent) :
 	PluginWidget(channel, parent)
@@ -12,29 +13,50 @@ Keycode::Keycode(hid_device *dev, uint8_t channel, QWidget *parent) :
 
 	auto layout = new QHBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);
-	auto bg = new QButtonGroup(this);
+	bg = new QButtonGroup(this);
 
-	auto pb = new QPushButton(QObject::tr("Update K&L"), this);
-	bg->addButton(pb, 0);
-	layout->addWidget(pb);
+	uint8_t num = keysTotal();
+	for (uint8_t i = 0; i != num; i++) {
+		auto pb = new QPushButton(this);
+		bg->addButton(pb, i);
+		layout->addWidget(pb);
+		updateKeyInfo(i);
+	}
 
-	pb = new QPushButton(QObject::tr("Update K&R"), this);
-	bg->addButton(pb, 1);
-	layout->addWidget(pb);
+	connect(bg, QOverload<int>::of(&QButtonGroup::buttonClicked),
+		this, &Keycode::update);
+}
 
-	pb = new QPushButton(QObject::tr("Update K&1"), this);
-	bg->addButton(pb, 2);
-	layout->addWidget(pb);
+uint8_t Keycode::keysTotal()
+{
+	api_report_t report;
+	report.size = 0u;
+	send(dev, &report);
 
-	pb = new QPushButton(QObject::tr("Update K&2"), this);
-	bg->addButton(pb, 3);
-	layout->addWidget(pb);
+	recv(dev, &report);
+	return report.payload[0];
+}
 
-	pb = new QPushButton(QObject::tr("Update K&3"), this);
-	bg->addButton(pb, 4);
-	layout->addWidget(pb);
+std::string Keycode::keyInfo(int id, uint8_t *code)
+{
+	api_report_t report;
+	report.size = 1u;
+	report.payload[0] = id;
+	send(dev, &report);
 
-	connect(bg, QOverload<int>::of(&QButtonGroup::buttonClicked), this, &Keycode::update);
+	recv(dev, &report);
+	*code = report.payload[0];
+	return std::string((const char *)&report.payload[1], report.size - 1u);
+}
+
+void Keycode::updateKeyInfo(int btn)
+{
+	uint8_t code;
+	std::string name = keyInfo(btn, &code);
+	// Update button text
+	bg->button(btn)->setText(QObject::tr("Key %1: %2")
+				 .arg(QString::fromStdString(name))
+				 .arg(Usage::keyboardString(code)));
 }
 
 void Keycode::update(int btn)
@@ -65,4 +87,5 @@ void Keycode::update(int btn)
 	p->code = code;
 
 	send(dev, &report);
+	updateKeyInfo(btn);
 }
