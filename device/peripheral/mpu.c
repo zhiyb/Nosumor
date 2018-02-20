@@ -3,6 +3,7 @@
 #include <debug.h>
 #include <system/systick.h>
 #include <peripheral/i2c.h>
+#include <api/api_config_priv.h>
 #include <usb/hid/usb_hid.h>
 #include "mpu.h"
 #include "mpu_defs.h"
@@ -137,7 +138,8 @@ static void data_callback(struct i2c_t *i2c,
 	rp->rx = data.avg.gyro[1];
 	rp->ry = data.avg.gyro[0];
 	rp->rz = data.avg.gyro[2];
-	usb_hid_update(data.hid);
+	if (api_config_data.joystick)
+		usb_hid_update(data.hid);
 }
 
 static void fifo(struct i2c_t *i2c, uint16_t cnt)

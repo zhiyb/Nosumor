@@ -120,6 +120,7 @@ void api_init(void *hid)
 #endif
 #ifndef BOOTLOADER
 	api_register(&api_i2c);
+	api_register(&api_config);
 #endif
 }
 

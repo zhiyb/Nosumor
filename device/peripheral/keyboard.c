@@ -6,6 +6,7 @@
 #include <macros.h>
 #include <debug.h>
 #include <system/systick.h>
+#include <api/api_config_priv.h>
 #include <usb/hid/usb_hid.h>
 #include "keyboard.h"
 
@@ -157,12 +158,14 @@ void keyboard_update(uint32_t status)
 		}
 	}
 	// Send report
-	usb_hid_update(hid.keyboard);
+	if (api_config_data.keyboard)
+		usb_hid_update(hid.keyboard);
 	// Update joystick report
 	if (!hid.joystick)
 		return;
 	hid.joystick->report.payload[12] = mask >> 3;
-	usb_hid_update(hid.joystick);
+	if (api_config_data.joystick)
+		usb_hid_update(hid.joystick);
 }
 
 static void keyboard_irq()
