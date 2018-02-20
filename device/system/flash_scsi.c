@@ -6,6 +6,7 @@
 #include <peripheral/mmc.h>
 #include <logic/scsi.h>
 #include <logic/scsi_defs_sense.h>
+#include <api/api_config_priv.h>
 #include "flash_scsi.h"
 
 #define LBSZ	512ul
@@ -273,6 +274,16 @@ static status_t flash_erase_all(uint32_t idx)
 
 static uint8_t scsi_sense(void *p, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
 {
+#ifndef BOOTLOADER
+	if (!api_config_data.flash) {
+		*sense = NOT_READY;
+		// 3A/00  DZT ROM  BK    MEDIUM NOT PRESENT
+		*asc = 0x3a;
+		*ascq = 0x00;
+		return CHECK_CONDITION;
+	}
+#endif
+
 	uint32_t idx = (uint32_t)p;
 	status_t status = flash[idx].status;
 	flash[idx].status = Good;

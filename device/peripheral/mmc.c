@@ -7,6 +7,7 @@
 #include <system/systick.h>
 #include <system/clocks.h>
 #include <logic/scsi_defs_sense.h>
+#include <api/api_config_priv.h>
 #include "mmc.h"
 #include "mmc_defs.h"
 
@@ -547,6 +548,14 @@ void SDMMC1_IRQHandler()
 
 static uint8_t scsi_sense(void *p, uint8_t *sense, uint8_t *asc, uint8_t *ascq)
 {
+	if (!api_config_data.microSD) {
+		*sense = NOT_READY;
+		// 3A/00  DZT ROM  BK    MEDIUM NOT PRESENT
+		*asc = 0x3a;
+		*ascq = 0x00;
+		return CHECK_CONDITION;
+	}
+
 	// Update status
 	mmc_disk_status();
 	// Construct SCSI sense code

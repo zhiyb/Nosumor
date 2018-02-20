@@ -156,16 +156,13 @@ static inline void init()
 	puts(ESC_INIT "Initialising SD/MMC card...");
 	mmc_disk_init();
 
-#ifdef DEBUG
-	puts(ESC_INIT "Initialising FatFs for flash...");
-	uint32_t err = flash_fatfs_init(FLASH_CONF, 0);
-#endif
-
 	puts(ESC_INIT "Initialising USB mass storage...");
 	usb_msc = usb_msc_init(&usb);
 	usb_msc_scsi_register(usb_msc, mmc_scsi_handlers());
+
 #ifdef DEBUG
-	if (!err)
+	puts(ESC_INIT "Initialising FatFs for flash...");
+	if (flash_fatfs_init(FLASH_CONF, 0) == 0)
 		usb_msc_scsi_register(usb_msc, flash_scsi_handlers(FLASH_CONF));
 #endif
 

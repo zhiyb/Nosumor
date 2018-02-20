@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 extern struct api_config_data_t {
-	uint8_t keyboard, joystick;
+	uint8_t keyboard, joystick, microSD, flash;
 } api_config_data;
 
 #endif // API_CONFIG_PRIV_H

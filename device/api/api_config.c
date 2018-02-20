@@ -14,7 +14,7 @@ const struct api_reg_t api_config = {
 };
 
 struct api_config_data_t api_config_data = {
-	.keyboard = 1, .joystick = 0,
+	.keyboard = 1, .joystick = 0, .microSD = 1, .flash = 0,
 };
 
 static void handler(void *hid, uint8_t channel,
@@ -27,6 +27,10 @@ static void handler(void *hid, uint8_t channel,
 	} configs[] = {
 		{&api_config_data.keyboard, 0u, "Keyboard"},
 		{&api_config_data.joystick, 0u, "Joystick"},
+		{&api_config_data.microSD, 0u, "MicroSD"},
+#ifdef DEBUG
+		{&api_config_data.flash, 0u, "Flash"},
+#endif
 	};
 	uint8_t *dp = data, *pp = payload;
 

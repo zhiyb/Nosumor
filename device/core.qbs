@@ -156,6 +156,7 @@ StaticLibrary {
 
     Group {
         name: "System modules"
+        cpp.commonCompilerFlags: outer.concat(["-Wno-array-bounds"])
         files: [
             "startup_stm32f722xx.S",
             "system/dma.txt",
