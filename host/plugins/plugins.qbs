@@ -8,6 +8,7 @@ Project {
         "led",
         "i2c",
         "info",
+        "config",
     ]
 
     StaticLibrary {
