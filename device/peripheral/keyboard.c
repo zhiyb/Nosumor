@@ -163,9 +163,10 @@ void keyboard_update(uint32_t status)
 	// Update joystick report
 	if (!hid.joystick)
 		return;
+	if (!api_config_data.joystick)
+		return;
 	hid.joystick->report.payload[12] = mask >> 3;
-	if (api_config_data.joystick)
-		usb_hid_update(hid.joystick);
+	usb_hid_update(hid.joystick);
 }
 
 static void keyboard_irq()

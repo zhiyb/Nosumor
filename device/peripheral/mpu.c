@@ -128,6 +128,8 @@ static void data_callback(struct i2c_t *i2c,
 	// Update USB HID report
 	if (!data.hid)
 		return;
+	if (!api_config_data.joystick_mpu)
+		return;
 	struct PACKED {
 		int16_t x, y, z;
 		int16_t rx, ry, rz;
@@ -138,8 +140,7 @@ static void data_callback(struct i2c_t *i2c,
 	rp->rx = data.avg.gyro[1];
 	rp->ry = data.avg.gyro[0];
 	rp->rz = data.avg.gyro[2];
-	if (api_config_data.joystick)
-		usb_hid_update(data.hid);
+	usb_hid_update(data.hid);
 }
 
 static void fifo(struct i2c_t *i2c, uint16_t cnt)
