@@ -27,6 +27,7 @@ static void handler(void *hid, uint8_t channel,
 		char name[16];
 	} configs[] = {
 		{&api_config_data.keyboard, 0u, "Keyboard"},
+		{&api_config_data.mouse, 0u, "Mouse axes"},
 		{&api_config_data.joystick, 0u, "Joystick btns"},
 		{&api_config_data.joystick_mpu, 0u, "Joystick axes"},
 		{&api_config_data.microSD, 0u, "MicroSD"},

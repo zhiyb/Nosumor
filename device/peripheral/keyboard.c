@@ -35,7 +35,7 @@ uint8_t keycodes[KEYBOARD_KEYS] = {
 };
 
 static struct {
-	usb_hid_if_t *keyboard, *joystick;
+	usb_hid_if_t *keyboard, *mouse, *joystick;
 } hid;
 static volatile uint32_t status, debouncing, timeout[KEYBOARD_KEYS];
 
@@ -50,10 +50,11 @@ const char *keyboard_name(unsigned int btn)
 	return 0;
 }
 
-void keyboard_init(usb_hid_if_t *hid_keyboard, usb_hid_if_t *hid_joystick)
+void keyboard_init(usb_hid_if_t *keyboard, usb_hid_if_t *mouse, usb_hid_if_t *joystick)
 {
-	hid.keyboard = hid_keyboard;
-	hid.joystick = hid_joystick;
+	hid.keyboard = keyboard;
+	hid.mouse = mouse;
+	hid.joystick = joystick;
 
 	// Initialise GPIOs
 #if HWVER >= 0x0100
@@ -160,7 +161,14 @@ void keyboard_update(uint32_t status)
 	// Send report
 	if (api_config_data.keyboard)
 		usb_hid_update(hid.keyboard);
-	// Update joystick report
+	// Update USB HID mouse report
+	if (!hid.mouse)
+		goto js;
+	if (!api_config_data.mouse)
+		goto js;
+	hid.mouse->report.payload[0] = mask >> 3;
+	usb_hid_update(hid.mouse);
+js:	// Update joystick report
 	if (!hid.joystick)
 		return;
 	if (!api_config_data.joystick)

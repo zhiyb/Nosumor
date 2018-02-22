@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stm32f7xx.h>
 #include <macros.h>
 #include <debug.h>
@@ -22,7 +23,7 @@ static struct {
 	} sum;
 	volatile uint16_t idx;
 	volatile uint32_t cnt;
-	usb_hid_if_t *hid;
+	usb_hid_if_t *hid, *hid_mouse;
 } data;
 
 static void start(void *i2c);
@@ -84,9 +85,10 @@ uint32_t mpu_init(void *i2c)
 	return 0;
 }
 
-void mpu_usb_hid(usb_hid_if_t *hid)
+void mpu_usb_hid(usb_hid_if_t *hid, usb_hid_if_t *hid_mouse)
 {
 	data.hid = hid;
+	data.hid_mouse = hid_mouse;
 }
 
 static void data_callback(struct i2c_t *i2c,
@@ -125,7 +127,16 @@ static void data_callback(struct i2c_t *i2c,
 	data.avg.gyro[0] = data.sum.gyro[0] >> AVG_N;
 	data.avg.gyro[1] = data.sum.gyro[1] >> AVG_N;
 	data.avg.gyro[2] = data.sum.gyro[2] >> AVG_N;
-	// Update USB HID report
+	// Update USB HID mouse report
+	if (!data.hid_mouse)
+		goto js;
+	if (!api_config_data.mouse)
+		goto js;
+	int8_t *ap = (void *)&data.hid_mouse->report.payload[1];
+	*ap = ((float)data.avg.gyro[0] / 32768.0) * 8.0;
+	*++ap = ((float)-data.avg.gyro[1] / 32768.0) * 8.0;
+	usb_hid_update(data.hid_mouse);
+js:	// Update USB HID joystick report
 	if (!data.hid)
 		return;
 	if (!api_config_data.joystick_mpu)

@@ -114,10 +114,12 @@ StaticLibrary {
         files: [
             "usb/hid/usb_hid.c",
             "usb/hid/usb_hid.h",
-            "usb/hid/keyboard/usb_hid_keyboard.c",
-            "usb/hid/keyboard/usb_hid_keyboard.h",
             "usb/hid/vendor/usb_hid_vendor.c",
             "usb/hid/vendor/usb_hid_vendor.h",
+            "usb/hid/keyboard/usb_hid_keyboard.c",
+            "usb/hid/keyboard/usb_hid_keyboard.h",
+            "usb/hid/mouse/usb_hid_mouse.c",
+            "usb/hid/mouse/usb_hid_mouse.h",
             "usb/hid/joystick/usb_hid_joystick.c",
             "usb/hid/joystick/usb_hid_joystick.h",
         ]

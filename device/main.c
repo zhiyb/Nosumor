@@ -29,9 +29,10 @@
 #include "usb/audio2/usb_audio2.h"
 #include "usb/msc/usb_msc.h"
 #include "usb/hid/usb_hid.h"
-#include "usb/hid/keyboard/usb_hid_keyboard.h"
-#include "usb/hid/joystick/usb_hid_joystick.h"
 #include "usb/hid/vendor/usb_hid_vendor.h"
+#include "usb/hid/keyboard/usb_hid_keyboard.h"
+#include "usb/hid/mouse/usb_hid_mouse.h"
+#include "usb/hid/joystick/usb_hid_joystick.h"
 // 3rd party libraries
 #include "fatfs/ff.h"
 // Processing functions
@@ -142,16 +143,17 @@ static inline void init()
 	usb_hid_vendor = usb_hid_vendor_init(hid);
 	api_init(usb_hid_vendor);
 	usb_hid_if_t *hid_keyboard = usb_hid_keyboard_init(hid);
+	usb_hid_if_t *hid_mouse = usb_hid_mouse_init(hid);
 	usb_hid_if_t *hid_joystick = usb_hid_joystick_init(hid);
 
 	puts(ESC_INIT "Initialising keyboard...");
-	keyboard_init(hid_keyboard, hid_joystick);
+	keyboard_init(hid_keyboard, hid_mouse, hid_joystick);
 
 	puts(ESC_INIT "Initialising MPU...");
 	if (mpu_init(i2c) != 0)
 		puts(ESC_ERROR "Error initialising MPU");
 	else
-		mpu_usb_hid(hid_joystick);
+		mpu_usb_hid(hid_joystick, hid_mouse);
 
 	puts(ESC_INIT "Initialising SD/MMC card...");
 	mmc_disk_init();

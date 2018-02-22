@@ -12,7 +12,7 @@ extern "C" {
 #define AK8963_I2C_ADDR	0x0c
 
 uint32_t mpu_init(void *i2c);
-void mpu_usb_hid(usb_hid_if_t *hid);
+void mpu_usb_hid(usb_hid_if_t *hid, usb_hid_if_t *hid_mouse);
 volatile int16_t *mpu_accel();
 volatile int16_t *mpu_gyro();
 volatile int16_t *mpu_accel_avg();
