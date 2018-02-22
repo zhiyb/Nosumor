@@ -16,11 +16,14 @@
 
 static struct {
 	struct PACKED {
-		int16_t gyro[3], accel[3];
+		int16_t accel[3];
 	} log[AVG_NUM], avg;
 	struct PACKED {
-		int32_t gyro[3], accel[3];
+		int32_t accel[3];
 	} sum;
+	struct {
+		int32_t sum[3], prev[3], mouse[3];
+	} gyro;
 	volatile uint16_t idx;
 	volatile uint32_t cnt;
 	usb_hid_if_t *hid, *hid_mouse;
@@ -113,28 +116,38 @@ static void data_callback(struct i2c_t *i2c,
 			*i32p++ += *i16p - *p;
 			*p++ = *i16p++;
 		}
-		i32p = data.sum.gyro;
-		p = data.log[idx].gyro;
-		for (uint32_t j = 3u; j--;) {
-			*i32p++ += *i16p - *p;
-			*p++ = *i16p++;
-		}
+		i32p = data.gyro.sum;
+		for (uint32_t j = 3u; j--;)
+			*i32p++ += *i16p++;
 	}
 	// Update average values
 	data.avg.accel[0] = data.sum.accel[0] >> AVG_N;
 	data.avg.accel[1] = data.sum.accel[1] >> AVG_N;
 	data.avg.accel[2] = data.sum.accel[2] >> AVG_N;
-	data.avg.gyro[0] = data.sum.gyro[0] >> AVG_N;
-	data.avg.gyro[1] = data.sum.gyro[1] >> AVG_N;
-	data.avg.gyro[2] = data.sum.gyro[2] >> AVG_N;
+	// Calculate gyro difference
+	int32_t gyro_diff[3] = {
+		data.gyro.sum[0] - data.gyro.prev[0],
+		data.gyro.sum[1] - data.gyro.prev[1],
+		data.gyro.sum[2] - data.gyro.prev[2],
+	};
+	memcpy(data.gyro.prev, data.gyro.sum, sizeof(data.gyro.sum));
+	const int32_t scale = 4096;
+	int32_t gyro_mouse[3] = {
+		(data.gyro.sum[0] - data.gyro.mouse[0]) / scale,
+		(data.gyro.sum[1] - data.gyro.mouse[1]) / scale,
+		(data.gyro.sum[2] - data.gyro.mouse[2]) / scale,
+	};
+	data.gyro.mouse[0] += gyro_mouse[0] * scale;
+	data.gyro.mouse[1] += gyro_mouse[1] * scale;
+	data.gyro.mouse[2] += gyro_mouse[2] * scale;
 	// Update USB HID mouse report
 	if (!data.hid_mouse)
 		goto js;
 	if (!api_config_data.mouse)
 		goto js;
 	int8_t *ap = (void *)&data.hid_mouse->report.payload[1];
-	*ap = ((float)data.avg.gyro[0] / 32768.0) * 8.0;
-	*++ap = ((float)-data.avg.gyro[1] / 32768.0) * 8.0;
+	*ap = gyro_mouse[0];
+	*++ap = -gyro_mouse[1];
 	usb_hid_update(data.hid_mouse);
 js:	// Update USB HID joystick report
 	if (!data.hid)
@@ -148,9 +161,9 @@ js:	// Update USB HID joystick report
 	rp->x = data.avg.accel[1];
 	rp->y = data.avg.accel[0];
 	rp->z = data.avg.accel[2];
-	rp->rx = data.avg.gyro[1];
-	rp->ry = data.avg.gyro[0];
-	rp->rz = data.avg.gyro[2];
+	rp->rx = gyro_diff[1] > 32767 ? 32767 : gyro_diff[1] <= -32768 ? -32768 : gyro_diff[1];
+	rp->ry = gyro_diff[0] > 32767 ? 32767 : gyro_diff[0] <= -32768 ? -32768 : gyro_diff[0];
+	rp->rz = gyro_diff[2] > 32767 ? 32767 : gyro_diff[2] <= -32768 ? -32768 : gyro_diff[2];
 	usb_hid_update(data.hid);
 }
 
@@ -201,19 +214,14 @@ volatile int16_t *mpu_accel()
 	return data.log[data.idx].accel;
 }
 
-volatile int16_t *mpu_gyro()
+volatile int32_t *mpu_gyro()
 {
-	return data.log[data.idx].gyro;
+	return data.gyro.sum;
 }
 
 volatile int16_t *mpu_accel_avg()
 {
 	return data.avg.accel;
-}
-
-volatile int16_t *mpu_gyro_avg()
-{
-	return data.avg.gyro;
 }
 
 uint32_t mpu_cnt()
