@@ -12,15 +12,12 @@
 #include "mpu.h"
 #include "mpu_defs.h"
 
-#define AVG_N	6
+#define AVG_N	2
 #define AVG_NUM	(1u << AVG_N)
-
-#define PKT_SIZE	16u
 
 #define I2C_ADDR	MPU_I2C_ADDR
 
 static struct {
-#if 0
 	struct PACKED {
 		int16_t accel[3];
 	} log[AVG_NUM], avg;
@@ -30,7 +27,6 @@ static struct {
 	struct {
 		int32_t sum[3], prev[3], mouse[3];
 	} gyro;
-#endif
 	int32_t quat[4];
 	volatile uint16_t idx;
 	volatile uint32_t cnt;
@@ -45,41 +41,6 @@ static void gpio_init()
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN_Msk;
 	GPIO_MODER(GPIOB, 15, 0b00);	// 00: Input mode
 	GPIO_PUPDR(GPIOB, 15, GPIO_PUPDR_UP);
-}
-
-static void reset(void *i2c)
-{
-	// FIFO_RST, SIG_COND_RST
-	i2c_write_reg(i2c, I2C_ADDR, USER_CTRL, 0x05);
-	while (i2c_read_reg(i2c, I2C_ADDR, USER_CTRL) != 0x00);
-}
-
-static void config(void *i2c)
-{
-	static const uint8_t cmd[] = {
-		PWR_MGMT_1, 0x00,
-		PWR_MGMT_2, 0x00,
-		// Data output rate divider
-		SMPLRT_DIV, 0x00,
-		// Disable FIFO overwrite, FSYNC disabled, DLPH 1
-		CONFIG, 0x41,
-		// Scale +250dps, Fchoice 0b11 (1kHz)
-		GYRO_CONFIG, 0x00,
-		// Scale ±2g
-		ACCEL_CONFIG, 0x00,
-		// Fchoice 1, DLPH 1 (1kHz)
-		ACCEL_CONFIG_2, 0x01,
-		// FIFO enable: GYRO, ACCEL
-		FIFO_EN, 0x78,
-		// Enable FIFO operation, reset FIFO
-		USER_CTRL, 0x44,
-	}, *p = cmd;
-
-	// Write configration sequence
-	for (uint32_t i = 0; i != sizeof(cmd) / sizeof(cmd[0]) / 2; i++) {
-		i2c_write_reg(i2c, I2C_ADDR, *p, *(p + 1));
-		p += 2;
-	}
 }
 
 uint32_t mpu_sys_init(void *i2c)
@@ -118,7 +79,9 @@ uint32_t mpu_sys_init(void *i2c)
 		return ret;
 	}
 	if ((ret = dmp_enable_feature(DMP_FEATURE_6X_LP_QUAT |
-				      DMP_FEATURE_GYRO_CAL)) != 0) {
+				      DMP_FEATURE_GYRO_CAL |
+				      DMP_FEATURE_SEND_RAW_ACCEL |
+				      DMP_FEATURE_SEND_CAL_GYRO)) != 0) {
 		dbgprintf(ESC_ERROR "[MPU] %u: %d\n", __LINE__, ret);
 		return ret;
 	}
@@ -149,10 +112,6 @@ uint32_t mpu_sys_init(void *i2c)
 		dbgprintf("\n");
 	}
 #endif
-#if 0
-	reset(i2c);
-	config(i2c);
-#endif
 	start(i2c);
 	return 0;
 }
@@ -163,40 +122,51 @@ void mpu_usb_hid(usb_hid_if_t *hid, usb_hid_if_t *hid_mouse)
 	data.hid_mouse = hid_mouse;
 }
 
+// FIFO data packet format: quat(4xi32), accel(3xi16), gyro(3xi16)
+#define PKT_SIZE	(16u + 6u + 6u)
+
 static void data_callback(struct i2c_t *i2c,
 			  const struct i2c_op_t *op, uint32_t nack)
 {
-	// Correct endianness
-	uint32_t *u32p = (void *)op->p;
-	for (uint32_t i = op->size >> 2u; i--; u32p++)
-		*u32p = __REV(*u32p);
+	void *p = op->p;
+	uint16_t idx = data.idx;
 	uint16_t cnt = op->size / PKT_SIZE;
-	for (uint32_t i = cnt; i--;)
-		memcpy(data.quat, op->p, 16u);
-#if 0
-	// Data processing
-	int32_t *i32p;
-	int16_t *i16p = (void *)op->p, *p;
-	uint16_t idx = (data.idx + 1u) & (AVG_NUM - 1u);
-	uint16_t cnt = op->size / 12u;
+	for (uint32_t i = cnt; i--; p += PKT_SIZE) {
+		idx = (idx + 1u) & (AVG_NUM - 1u);
+		// Quaternion
+		uint32_t *u32p = p;
+		data.quat[0] = __REV(*u32p++);
+		data.quat[1] = __REV(*u32p++);
+		data.quat[2] = __REV(*u32p++);
+		data.quat[3] = __REV(*u32p++);
+		// Correct endianness
+		int16_t *i16p = (void *)u32p;
+		*u32p = __REV16(*u32p);
+		u32p++;
+		*u32p = __REV16(*u32p);
+		u32p++;
+		*u32p = __REV16(*u32p);
+		u32p++;
+		// Accelerometer
+		int16_t *log = data.log[idx].accel;
+		int32_t *i32p = data.sum.accel;
+		for (uint32_t j = 3; j--; i32p++) {
+			*i32p = *i32p - *log + *i16p;
+			*log++ = *i16p++;
+		}
+		// Gyroscope
+		data.gyro.sum[0] += i16p[0];
+		data.gyro.sum[1] += i16p[1];
+		data.gyro.sum[2] += i16p[2];
+	}
 	data.idx = idx;
 	data.cnt += cnt;
-	for (uint32_t i = cnt; i--;) {
-		// Update sums, update logged values
-		i32p = data.sum.accel;
-		p = data.log[idx].accel;
-		for (uint32_t j = 3u; j--;) {
-			*i32p++ += *i16p - *p;
-			*p++ = *i16p++;
-		}
-		i32p = data.gyro.sum;
-		for (uint32_t j = 3u; j--;)
-			*i32p++ += *i16p++;
-	}
+
 	// Update average values
 	data.avg.accel[0] = data.sum.accel[0] >> AVG_N;
 	data.avg.accel[1] = data.sum.accel[1] >> AVG_N;
 	data.avg.accel[2] = data.sum.accel[2] >> AVG_N;
+
 	// Calculate gyro difference
 	int32_t gyro_diff[3] = {
 		data.gyro.sum[0] - data.gyro.prev[0],
@@ -204,7 +174,7 @@ static void data_callback(struct i2c_t *i2c,
 		data.gyro.sum[2] - data.gyro.prev[2],
 	};
 	memcpy(data.gyro.prev, data.gyro.sum, sizeof(data.gyro.sum));
-	const int32_t scale = 4096;
+	const int32_t scale = 256;
 	int32_t gyro_mouse[3] = {
 		(data.gyro.sum[0] - data.gyro.mouse[0]) / scale,
 		(data.gyro.sum[1] - data.gyro.mouse[1]) / scale,
@@ -213,6 +183,7 @@ static void data_callback(struct i2c_t *i2c,
 	data.gyro.mouse[0] += gyro_mouse[0] * scale;
 	data.gyro.mouse[1] += gyro_mouse[1] * scale;
 	data.gyro.mouse[2] += gyro_mouse[2] * scale;
+
 	// Update USB HID mouse report
 	if (!data.hid_mouse)
 		goto js;
@@ -222,6 +193,7 @@ static void data_callback(struct i2c_t *i2c,
 	*ap = gyro_mouse[0];
 	*++ap = -gyro_mouse[1];
 	usb_hid_update(data.hid_mouse);
+
 js:	// Update USB HID joystick report
 	if (!data.hid)
 		return;
@@ -238,7 +210,6 @@ js:	// Update USB HID joystick report
 	rp->ry = gyro_diff[0] > 32767 ? 32767 : gyro_diff[0] <= -32768 ? -32768 : gyro_diff[0];
 	rp->rz = gyro_diff[2] > 32767 ? 32767 : gyro_diff[2] <= -32768 ? -32768 : gyro_diff[2];
 	usb_hid_update(data.hid);
-#endif
 }
 
 static void fifo(struct i2c_t *i2c, uint16_t cnt)
@@ -283,7 +254,6 @@ static void start(void *i2c)
 	i2c_op(i2c, &op_l);
 }
 
-#if 0
 volatile int16_t *mpu_accel()
 {
 	return data.log[data.idx].accel;
@@ -298,7 +268,6 @@ volatile int16_t *mpu_accel_avg()
 {
 	return data.avg.accel;
 }
-#endif
 
 volatile int32_t *mpu_quat()
 {
