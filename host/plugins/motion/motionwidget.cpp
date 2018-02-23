@@ -12,7 +12,14 @@ MotionWidget::MotionWidget(hid_device *dev, hid_device_info *info,
 	auto layout = new QHBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);
 
-	layout->addWidget(gl = new MotionGLWidget(this));
+	layout->addWidget(gl = new MotionGLWidget, 1);
+
+	auto vLayout = new QVBoxLayout;
+	auto reset = new QPushButton(tr("Reset"));
+	vLayout->addWidget(reset);
+	layout->addLayout(vLayout);
+
+	connect(reset, &QPushButton::clicked, gl, &MotionGLWidget::reset);
 
 	update();
 	startTimer(50);
