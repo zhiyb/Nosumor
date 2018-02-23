@@ -6,6 +6,8 @@
 #include <peripheral/i2c.h>
 #include <api/api_config_priv.h>
 #include <usb/hid/usb_hid.h>
+#include <inv_mpu.h>
+#include <inv_mpu_dmp_motion_driver.h>
 #include "mpu.h"
 #include "mpu_defs.h"
 
@@ -74,7 +76,7 @@ static void config(void *i2c)
 	}
 }
 
-uint32_t mpu_init(void *i2c)
+uint32_t mpu_sys_init(void *i2c)
 {
 	if (!i2c_check(i2c, I2C_ADDR))
 		return 1;
@@ -82,9 +84,70 @@ uint32_t mpu_init(void *i2c)
 	data.idx = 0;
 	data.cnt = 0;
 	gpio_init();
+
+	int ret;
+	if ((ret = mpu_init(0)) != 0) {
+		dbgprintf(ESC_ERROR "[MPU] %u: %d\n", __LINE__, ret);
+		return ret;
+	}
+#if 0
+	long gyro[3], accel[3];
+	ret = mpu_run_6500_self_test(gyro, accel, 1);
+	dbgprintf(ESC_INFO "[MPU] self_test: " ESC_DATA "%x, ", ret);
+	dbgprintf("(%ld, %ld, %ld), ", gyro[0], gyro[1], gyro[2]);
+	dbgprintf("(%ld, %ld, %ld)\n", accel[0], accel[1], accel[2]);
+#endif
+	if ((ret = mpu_set_sensors(INV_XYZ_GYRO |
+				   INV_XYZ_ACCEL |
+				   INV_XYZ_COMPASS)) != 0) {
+		dbgprintf(ESC_ERROR "[MPU] %u: %d\n", __LINE__, ret);
+		return ret;
+	}
+	if ((ret = dmp_load_motion_driver_firmware()) != 0) {
+		dbgprintf(ESC_ERROR "[MPU] %u: %d\n", __LINE__, ret);
+		return ret;
+	}
+	if ((ret = dmp_set_fifo_rate(10)) != 0) {
+		dbgprintf(ESC_ERROR "[MPU] %u: %d\n", __LINE__, ret);
+		return ret;
+	}
+	if ((ret = dmp_enable_feature(DMP_FEATURE_6X_LP_QUAT |
+				      DMP_FEATURE_GYRO_CAL)) != 0) {
+		dbgprintf(ESC_ERROR "[MPU] %u: %d\n", __LINE__, ret);
+		return ret;
+	}
+	if ((ret = mpu_set_dmp_state(1))) {
+		dbgprintf(ESC_ERROR "[MPU] %u: %d\n", __LINE__, ret);
+		return ret;
+	}
+#if 1
+	for (;;) {
+		short gyro[3], accel[3];
+		long quat[4];
+		unsigned long ts;
+		short sensors;
+		unsigned char more;
+		if (dmp_read_fifo(gyro, accel, quat, &ts, &sensors, &more) != 0)
+			continue;
+		dbgprintf(ESC_INFO "[MPU] dmp_read @%ld(%u): " ESC_DATA "%x, ",
+			  ts, more, sensors);
+		if (sensors & INV_XYZ_GYRO)
+			dbgprintf("gyro: (%d, %d, %d), ",
+				  gyro[0], gyro[1], gyro[2]);
+		if (sensors & INV_XYZ_ACCEL)
+			dbgprintf("accel: (%d, %d, %d), ",
+				  accel[0], accel[1], accel[2]);
+		if (sensors & INV_WXYZ_QUAT)
+			dbgprintf("quat: (%ld, %ld, %ld, %ld), ",
+				  quat[0], quat[1], quat[2], quat[3]);
+		dbgprintf("\n");
+	}
+#endif
+#if 0
 	reset(i2c);
 	config(i2c);
 	start(i2c);
+#endif
 	return 0;
 }
 

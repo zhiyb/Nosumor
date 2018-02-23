@@ -44,7 +44,7 @@ extern size_t heap_usage();
 extern size_t heap_size();
 #endif
 
-void *i2c;	// Shared with vendor.c
+void *i2c;	// Shared
 usb_t usb;	// Shared with PVD
 static usb_msc_t *usb_msc = 0;
 static usb_hid_if_t *usb_hid_vendor = 0;
@@ -150,10 +150,11 @@ static inline void init()
 	keyboard_init(hid_keyboard, hid_mouse, hid_joystick);
 
 	puts(ESC_INIT "Initialising MPU...");
-	if (mpu_init(i2c) != 0)
+	if (mpu_sys_init(i2c) != 0)
 		puts(ESC_ERROR "Error initialising MPU");
 	else
 		mpu_usb_hid(hid_joystick, hid_mouse);
+	dbgbkpt();
 
 	puts(ESC_INIT "Initialising SD/MMC card...");
 	mmc_disk_init();

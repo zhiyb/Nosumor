@@ -24,7 +24,7 @@ StaticLibrary {
         "-Wno-unused-variable",
     ]
     cpp.staticLibraries: ["m"]
-    cpp.includePaths: [".", "api"]
+    cpp.includePaths: [".", "api", "motion_driver/core/driver/eMPL"]
 
     Properties {
         condition: qbs.buildVariant == "debug"
@@ -222,6 +222,14 @@ StaticLibrary {
         cpp.optimization: "fast"
         files: [
             "fatfs/*",
+        ]
+    }
+
+    Group {
+        name: "Motion Driver"
+        cpp.defines: outer.concat(["MPU9250", "EMPL_TARGET_STM32F4"])
+        files: [
+            "motion_driver/core/driver/eMPL/*",
         ]
     }
 
