@@ -7,5 +7,6 @@
 #include "api_led.h"
 #include "api_i2c.h"
 #include "api_config.h"
+#include "api_motion.h"
 
 #endif // API_H

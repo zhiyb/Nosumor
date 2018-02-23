@@ -194,6 +194,8 @@ StaticLibrary {
             "api/api_config.c",
             "api/api_config.h",
             "api/api_config_priv.h",
+            "api/api_motion.c",
+            "api/api_motion.h",
         ]
     }
 
@@ -227,6 +229,7 @@ StaticLibrary {
 
     Group {
         name: "Motion Driver"
+        cpp.commonCompilerFlags: outer.concat(["-Wno-maybe-uninitialized"])
         cpp.defines: outer.concat(["MPU9250", "EMPL_TARGET_STM32F4"])
         files: [
             "eMPL/*",

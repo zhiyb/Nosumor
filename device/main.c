@@ -37,6 +37,7 @@
 #include "fatfs/ff.h"
 // Processing functions
 #include "api/api_proc.h"
+#include "api/api_motion.h"
 #include "logic/led_trigger.h"
 
 #ifdef DEBUG
@@ -150,11 +151,12 @@ static inline void init()
 	keyboard_init(hid_keyboard, hid_mouse, hid_joystick);
 
 	puts(ESC_INIT "Initialising MPU...");
-	if (mpu_sys_init(i2c) != 0)
+	if (mpu_sys_init(i2c) != 0) {
 		puts(ESC_ERROR "Error initialising MPU");
-	else
+	} else {
 		mpu_usb_hid(hid_joystick, hid_mouse);
-	dbgbkpt();
+		api_register(&api_motion);
+	}
 
 	puts(ESC_INIT "Initialising SD/MMC card...");
 	mmc_disk_init();
