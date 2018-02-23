@@ -14,9 +14,12 @@
 #define AVG_N	6
 #define AVG_NUM	(1u << AVG_N)
 
+#define PKT_SIZE	16u
+
 #define I2C_ADDR	MPU_I2C_ADDR
 
 static struct {
+#if 0
 	struct PACKED {
 		int16_t accel[3];
 	} log[AVG_NUM], avg;
@@ -26,6 +29,8 @@ static struct {
 	struct {
 		int32_t sum[3], prev[3], mouse[3];
 	} gyro;
+#endif
+	int32_t quat[4];
 	volatile uint16_t idx;
 	volatile uint32_t cnt;
 	usb_hid_if_t *hid, *hid_mouse;
@@ -107,7 +112,7 @@ uint32_t mpu_sys_init(void *i2c)
 		dbgprintf(ESC_ERROR "[MPU] %u: %d\n", __LINE__, ret);
 		return ret;
 	}
-	if ((ret = dmp_set_fifo_rate(10)) != 0) {
+	if ((ret = dmp_set_fifo_rate(200)) != 0) {
 		dbgprintf(ESC_ERROR "[MPU] %u: %d\n", __LINE__, ret);
 		return ret;
 	}
@@ -120,7 +125,7 @@ uint32_t mpu_sys_init(void *i2c)
 		dbgprintf(ESC_ERROR "[MPU] %u: %d\n", __LINE__, ret);
 		return ret;
 	}
-#if 1
+#if 0
 	for (;;) {
 		short gyro[3], accel[3];
 		long quat[4];
@@ -146,8 +151,8 @@ uint32_t mpu_sys_init(void *i2c)
 #if 0
 	reset(i2c);
 	config(i2c);
-	start(i2c);
 #endif
+	start(i2c);
 	return 0;
 }
 
@@ -163,7 +168,11 @@ static void data_callback(struct i2c_t *i2c,
 	// Correct endianness
 	uint32_t *u32p = (void *)op->p;
 	for (uint32_t i = op->size >> 2u; i--; u32p++)
-		*u32p = __REV16(*u32p);
+		*u32p = __REV(*u32p);
+	uint16_t cnt = op->size / PKT_SIZE;
+	for (uint32_t i = cnt; i--;)
+		memcpy(data.quat, op->p, 16u);
+#if 0
 	// Data processing
 	int32_t *i32p;
 	int16_t *i16p = (void *)op->p, *p;
@@ -228,6 +237,7 @@ js:	// Update USB HID joystick report
 	rp->ry = gyro_diff[0] > 32767 ? 32767 : gyro_diff[0] <= -32768 ? -32768 : gyro_diff[0];
 	rp->rz = gyro_diff[2] > 32767 ? 32767 : gyro_diff[2] <= -32768 ? -32768 : gyro_diff[2];
 	usb_hid_update(data.hid);
+#endif
 }
 
 static void fifo(struct i2c_t *i2c, uint16_t cnt)
@@ -238,7 +248,7 @@ static void fifo(struct i2c_t *i2c, uint16_t cnt)
 		i2c_write_reg_nb(i2c, I2C_ADDR, USER_CTRL, 0x44);
 		return;
 	}
-	cnt = cnt - cnt % 12u;
+	cnt = cnt - cnt % PKT_SIZE;
 	if (!cnt)
 		return;
 	static uint8_t buf[512] SECTION(.dtcm);
@@ -272,6 +282,7 @@ static void start(void *i2c)
 	i2c_op(i2c, &op_l);
 }
 
+#if 0
 volatile int16_t *mpu_accel()
 {
 	return data.log[data.idx].accel;
@@ -285,6 +296,12 @@ volatile int32_t *mpu_gyro()
 volatile int16_t *mpu_accel_avg()
 {
 	return data.avg.accel;
+}
+#endif
+
+volatile int32_t *mpu_quat()
+{
+	return data.quat;
 }
 
 uint32_t mpu_cnt()
