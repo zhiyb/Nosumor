@@ -15,14 +15,17 @@ MotionWidget::MotionWidget(hid_device *dev, hid_device_info *info,
 	layout->addWidget(gl = new MotionGLWidget, 1);
 
 	auto vLayout = new QVBoxLayout;
+	auto upd = new QCheckBox(tr("Update"));
+	vLayout->addWidget(upd);
 	auto reset = new QPushButton(tr("Reset"));
 	vLayout->addWidget(reset);
 	layout->addLayout(vLayout);
 
+	connect(upd, &QCheckBox::toggled, this, &MotionWidget::enableTimer);
 	connect(reset, &QPushButton::clicked, gl, &MotionGLWidget::reset);
 
 	update();
-	startTimer(50);
+	upd->setChecked(true);
 }
 
 void MotionWidget::timerEvent(QTimerEvent *event)
@@ -31,6 +34,16 @@ void MotionWidget::timerEvent(QTimerEvent *event)
 		update();
 	} catch (std::exception &e) {
 		emit devRemove();
+	}
+}
+
+void MotionWidget::enableTimer(bool e)
+{
+	if (e) {
+		timer = startTimer(50);
+	} else {
+		killTimer(timer);
+		timer = 0;
 	}
 }
 

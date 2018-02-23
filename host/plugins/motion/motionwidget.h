@@ -20,12 +20,16 @@ public slots:
 protected:
 	void timerEvent(QTimerEvent *event);
 
+private slots:
+	void enableTimer(bool e);
+
 private:
 	void update();
 
 	hid_device *dev;
 
 	MotionGLWidget *gl;
+	int timer;
 };
 
 #endif // PINGWIDGET_H
