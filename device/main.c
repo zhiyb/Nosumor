@@ -204,15 +204,14 @@ loop:	// Process time consuming tasks
 	if (systick_cnt() - tick256 >= 256u) {
 		tick256 = systick_cnt();
 #ifdef DEBUG
-#if HWVER >= 0x0100
 #if 0
+#if HWVER >= 0x0100
 		volatile int16_t *accel = mpu_accel_avg();
 		volatile int32_t *gyro = mpu_gyro();
 		dbgprintf(ESC_DEBUG "[MPU] "
 			  ESC_DATA "(%6d, %6d, %6d)\t(%12ld, %12ld, %12ld)\n",
 			  accel[0], accel[1], accel[2],
 			  gyro[0], gyro[1], gyro[2]);
-#else
 		volatile int32_t *quat = mpu_quat();
 		dbgprintf(ESC_DEBUG "[MPU] " ESC_DATA "(%ld, %ld, %ld, %ld)\n",
 			  quat[0], quat[1], quat[2], quat[3]);

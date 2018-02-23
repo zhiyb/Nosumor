@@ -197,7 +197,7 @@ static void data_callback(struct i2c_t *i2c,
 js:	// Update USB HID joystick report
 	if (!data.hid)
 		return;
-	if (!api_config_data.joystick_mpu)
+	if (!api_config_data.joystick)
 		return;
 	struct PACKED {
 		int16_t x, y, z;
