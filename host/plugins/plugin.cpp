@@ -19,7 +19,12 @@ void Plugin::send(hid_device *dev, uint8_t channel, api_report_t *rp)
 		c += *p++;
 	rp->cksum = -c;
 
-	hid_write(dev, rp->raw, API_REPORT_SIZE);
+	// Retry
+	uint32_t i = 5;
+	while (--i && hid_write(dev, rp->raw, API_REPORT_SIZE) != API_REPORT_SIZE);
+
+	if (!i)
+		throw runtime_error("Report OUT timed out");
 }
 
 void Plugin::recv(hid_device *dev, api_report_t *rp)
