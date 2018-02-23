@@ -9,6 +9,7 @@ Project {
         "i2c",
         "info",
         "config",
+        "motion",
     ]
 
     StaticLibrary {
