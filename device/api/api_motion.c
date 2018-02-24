@@ -8,7 +8,7 @@
 static void handler(void *hid, uint8_t channel,
 		    void *data, uint8_t size, void *payload);
 const struct api_reg_t api_motion = {
-	handler, 0x0001, "Motion"
+	handler, 0x0002, "Motion"
 };
 
 static void handler(void *hid, uint8_t channel,
@@ -21,5 +21,6 @@ static void handler(void *hid, uint8_t channel,
 
 	api_motion_t *p = (api_motion_t *)payload;
 	memcpy(p->quat, (void *)mpu_quat(), sizeof(p->quat));
+	memcpy(p->compass, (void *)mpu_compass(), sizeof(p->compass));
 	api_send(hid, channel, sizeof(api_motion_t));
 }

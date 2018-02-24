@@ -5,6 +5,7 @@
 
 typedef struct PACKED api_motion_t {
 	int32_t quat[4];
+	int16_t compass[3];
 } api_motion_t;
 
 extern const struct api_reg_t api_motion;
