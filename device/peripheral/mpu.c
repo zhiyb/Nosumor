@@ -27,6 +27,7 @@ static struct {
 	struct {
 		int32_t sum[3], prev[3], mouse[3];
 	} gyro;
+	int16_t compass[3];
 	int32_t quat[4];
 	volatile uint16_t idx;
 	volatile uint32_t cnt;
@@ -241,12 +242,36 @@ static void fifo(struct i2c_t *i2c, uint16_t cnt)
 	i2c_op(i2c, &op);
 }
 
+static void compass_callback(struct i2c_t *i2c,
+			     const struct i2c_op_t *op, uint32_t nack)
+{
+	int ret = mpu_parse_compass_reg(op->p, (short *)data.compass);
+	if (ret != 0) {
+		dbgprintf(ESC_ERROR "[MPU] Compass data error: %d\n", ret);
+		return;
+	}
+}
+
 static void cnt_callback(struct i2c_t *i2c,
 			 const struct i2c_op_t *op, uint32_t nack)
 {
 	fifo(i2c, *(uint16_t *)op->p);
 	// Check FIFO level
 	start(i2c);
+
+	// Read compass registers
+	static int check = 0;
+	// Only update at alternative frame
+	// FIFO updates @200Hz, compass updates @100Hz
+	if ((check = !check) != 0) {
+		static uint8_t data[8] SECTION(.dtcm);
+		static const struct i2c_op_t op = {
+			.op = I2CRead,
+			.addr = I2C_ADDR, .reg = EXT_SENS_DATA(0),
+			.p = data, .size = 8, .cb = compass_callback,
+		};
+		i2c_op(i2c, &op);
+	}
 }
 
 static void start(void *i2c)
@@ -281,6 +306,11 @@ volatile int16_t *mpu_accel_avg()
 volatile int32_t *mpu_quat()
 {
 	return data.quat;
+}
+
+volatile int16_t *mpu_compass()
+{
+	return data.compass;
 }
 
 uint32_t mpu_cnt()

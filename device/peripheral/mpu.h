@@ -18,6 +18,7 @@ volatile int32_t *mpu_gyro();
 volatile int16_t *mpu_accel_avg();
 volatile int16_t *mpu_gyro_avg();
 volatile int32_t *mpu_quat();
+volatile int16_t *mpu_compass();
 uint32_t mpu_cnt();
 
 #ifdef __cplusplus
