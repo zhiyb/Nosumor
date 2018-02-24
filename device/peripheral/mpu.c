@@ -89,6 +89,10 @@ uint32_t mpu_sys_init(void *i2c)
 		dbgprintf(ESC_ERROR "[MPU] %u: %d\n", __LINE__, ret);
 		return ret;
 	}
+	if ((ret = mpu_set_compass_sample_rate(100)) != 0) {
+		dbgprintf(ESC_ERROR "[MPU] %u: %d\n", __LINE__, ret);
+		return ret;
+	}
 #if 0
 	for (;;) {
 		short gyro[3], accel[3];
@@ -110,6 +114,11 @@ uint32_t mpu_sys_init(void *i2c)
 			dbgprintf("quat: (%ld, %ld, %ld, %ld), ",
 				  quat[0], quat[1], quat[2], quat[3]);
 		dbgprintf("\n");
+		short compass[3];
+		mpu_get_compass_reg(compass, &ts);
+		dbgprintf(ESC_INFO "[MPU] compass @%ld: "
+			  ESC_DATA "(%d, %d, %d)\n",
+			  ts, compass[0], compass[1], compass[2]);
 	}
 #endif
 	start(i2c);
