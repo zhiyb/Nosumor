@@ -110,6 +110,8 @@ int mpu_get_accel_reg(short *data, unsigned long *timestamp);
 int mpu_get_compass_reg(short *data, unsigned long *timestamp);
 int mpu_get_temperature(long *data, unsigned long *timestamp);
 
+int mpu_parse_compass_reg(unsigned char *reg, short *data);
+
 int mpu_get_int_status(short *status);
 int mpu_read_fifo(short *gyro, short *accel, unsigned long *timestamp,
     unsigned char *sensors, unsigned char *more);

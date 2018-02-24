@@ -2982,6 +2982,55 @@ static int setup_compass(void)
 #endif
 
 /**
+ *  @brief      Parse raw compass data.
+ *  @param[in]  tmp         Raw data from registers.
+ *  @param[out] data        Raw data in hardware units.
+ *  @param[out] timestamp   Timestamp in milliseconds. Null if not needed.
+ *  @return     0 if successful.
+ */
+int mpu_parse_compass_reg(unsigned char *reg, short *data)
+{
+#ifdef AK89xx_SECONDARY
+    if (!(st.chip_cfg.sensors & INV_XYZ_COMPASS))
+	return -1;
+
+#ifdef AK89xx_BYPASS
+#error Unimplemented
+    if (i2c_read(st.chip_cfg.compass_addr, AKM_REG_ST1, 8, tmp))
+	return -1;
+    tmp[8] = AKM_SINGLE_MEASUREMENT;
+    if (i2c_write(st.chip_cfg.compass_addr, AKM_REG_CNTL, 1, tmp+8))
+	return -1;
+#endif
+
+#if defined AK8975_SECONDARY
+    /* AK8975 doesn't have the overrun error bit. */
+    if (!(tmp[0] & AKM_DATA_READY))
+	return -2;
+    if ((tmp[7] & AKM_OVERFLOW) || (tmp[7] & AKM_DATA_ERROR))
+	return -3;
+#elif defined AK8963_SECONDARY
+    /* AK8963 doesn't have the data read error bit. */
+    if (!(reg[0] & AKM_DATA_READY) || (reg[0] & AKM_DATA_OVERRUN))
+	return -2;
+    if (reg[7] & AKM_OVERFLOW)
+	return -3;
+#endif
+    data[0] = (reg[2] << 8) | reg[1];
+    data[1] = (reg[4] << 8) | reg[3];
+    data[2] = (reg[6] << 8) | reg[5];
+
+    data[0] = ((long)data[0] * st.chip_cfg.mag_sens_adj[0]) >> 8;
+    data[1] = ((long)data[1] * st.chip_cfg.mag_sens_adj[1]) >> 8;
+    data[2] = ((long)data[2] * st.chip_cfg.mag_sens_adj[2]) >> 8;
+
+    return 0;
+#else
+    return -1;
+#endif
+}
+
+/**
  *  @brief      Read raw compass data.
  *  @param[out] data        Raw data in hardware units.
  *  @param[out] timestamp   Timestamp in milliseconds. Null if not needed.
