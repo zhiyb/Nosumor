@@ -29,6 +29,7 @@ private:
 	hid_device *dev;
 
 	MotionGLWidget *gl;
+	QLabel *quat[4], *compass[3];
 	int timer;
 };
 

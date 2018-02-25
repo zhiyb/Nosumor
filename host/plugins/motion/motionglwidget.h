@@ -10,6 +10,7 @@ class MotionGLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_0
 public:
 	explicit MotionGLWidget(QWidget *parent = 0);
 	void updateQuaternion(int32_t *q);
+	void updateCompass(int16_t *p);
 
 public slots:
 	void reset();
@@ -29,8 +30,11 @@ private:
 			GLuint model, rot, view, projection;
 		} loc;
 		struct {
-			GLuint model, rot, view, projection;
+			GLuint view, projection;
 		} upd;
+		struct {
+			QMatrix4x4 model, rot, rv;
+		} compass;
 		QMatrix4x4 model, rot, view, projection;
 		QVector<QVector3D> vertex, colour;
 		QQuaternion quat;

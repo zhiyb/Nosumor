@@ -10,7 +10,7 @@ public:
 	PluginMotion() : Plugin() {}
 	~PluginMotion() {}
 
-	virtual uint16_t version() const {return 0x0001;}
+	virtual uint16_t version() const {return 0x0002;}
 	virtual std::string name() const {return "Motion";}
 	virtual std::string displayName() const {return "Motion Sensor";}
 	virtual void *pluginWidget(hid_device *dev, hid_device_info *info,

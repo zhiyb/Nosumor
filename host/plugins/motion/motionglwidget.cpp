@@ -8,11 +8,13 @@ MotionGLWidget::MotionGLWidget(QWidget *parent) : QOpenGLWidget(parent)
 	setAutoFillBackground(false);
 
 	data.model.setToIdentity();
-	data.model.rotate(120, 1.0, 1.0, 1.0);
 	data.model.scale(0.6, 0.2, 0.6);
-	data.upd.model = 1;
+
+	data.compass.model.setToIdentity();
+	data.compass.model.scale(0.75, 0.0125, 0.0125);
+	data.compass.model.translate(1.0, 1.0, 1.0);
+
 	data.rot.setToIdentity();
-	data.upd.rot = 1;
 	data.view.setToIdentity();
 	data.view.rotate(-90, 0.0, 1.0, 0.0);
 	data.view.rotate(-90, 1.0, 0.0, 0.0);
@@ -68,7 +70,24 @@ void MotionGLWidget::updateQuaternion(int32_t *q)
 	data.quat = QQuaternion((float)q[0] / scale, (float)q[1] / scale,
 			(float)q[2] / scale, (float)q[3] / scale);
 	data.rot = QMatrix4x4(data.quat.toRotationMatrix());
-	data.upd.rot = 1;
+	// Axis orientation correction
+	data.rot.rotate(120, 1.0, 1.0, 1.0);
+	update();
+}
+
+void MotionGLWidget::updateCompass(int16_t *p)
+{
+	const float scale = (float)1.0;
+	QVector3D v((float)p[0] / scale, (float)p[1] / scale,
+			(float)p[2] / scale);
+	// Axis orientation correction
+	QVector3D c(v.x(), -v.z(), v.y());
+	c.normalize();
+	QVector3D m(1.0, 0.0, 0.0);
+	QVector3D n(QVector3D::crossProduct(m, c));
+	float a = acos(QVector3D::dotProduct(m, c)) * 180.0 / M_PI;
+	data.compass.rot.setToIdentity();
+	data.compass.rot.rotate(a, n);
 	update();
 }
 
@@ -99,6 +118,7 @@ void MotionGLWidget::reset()
 void MotionGLWidget::initializeGL()
 {
 	initializeOpenGLFunctions();
+	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 	glClearColor(0.0, 0.0, 0.0, 1.0);
 
@@ -175,18 +195,28 @@ void MotionGLWidget::paintGL()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glUseProgram(data.program);
-	if (data.upd.model)
-		glUniformMatrix4fv(data.loc.model, 1, GL_FALSE,
-				   data.model.constData());
-	if (data.upd.rot)
-		glUniformMatrix4fv(data.loc.rot, 1, GL_FALSE,
-				   data.rot.constData());
-	if (data.upd.view)
+	if (data.upd.view) {
 		glUniformMatrix4fv(data.loc.view, 1, GL_FALSE,
 				   data.view.constData());
-	if (data.upd.projection)
+		data.upd.view = 0;
+	}
+	if (data.upd.projection) {
 		glUniformMatrix4fv(data.loc.projection, 1, GL_FALSE,
 				   data.projection.constData());
+		data.upd.projection = 0;
+	}
+	// Render box
+	glUniformMatrix4fv(data.loc.model, 1, GL_FALSE,
+			   data.model.constData());
+	glUniformMatrix4fv(data.loc.rot, 1, GL_FALSE,
+			   data.rot.constData());
+	glDrawArrays(GL_TRIANGLES, 0, data.vertex.size());
+	// Render compass
+	data.compass.rv = data.rot * data.compass.rot;
+	glUniformMatrix4fv(data.loc.model, 1, GL_FALSE,
+			   data.compass.model.constData());
+	glUniformMatrix4fv(data.loc.rot, 1, GL_FALSE,
+			   data.compass.rv.constData());
 	glDrawArrays(GL_TRIANGLES, 0, data.vertex.size());
 }
 
