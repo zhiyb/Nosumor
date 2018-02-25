@@ -9,7 +9,7 @@ class MotionGLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_0
 	Q_OBJECT
 public:
 	explicit MotionGLWidget(QWidget *parent = 0);
-	void updateQuaternion(int32_t *q);
+	void updateQuaternion(int32_t *p);
 	void updateCompass(int16_t *p);
 
 public slots:

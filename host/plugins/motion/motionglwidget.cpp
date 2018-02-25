@@ -64,14 +64,12 @@ MotionGLWidget::MotionGLWidget(QWidget *parent) : QOpenGLWidget(parent)
 	});
 }
 
-void MotionGLWidget::updateQuaternion(int32_t *q)
+void MotionGLWidget::updateQuaternion(int32_t *p)
 {
 	const float scale = (float)(1 << 30);
-	data.quat = QQuaternion((float)q[0] / scale, (float)q[1] / scale,
-			(float)q[2] / scale, (float)q[3] / scale);
+	data.quat = QQuaternion((float)p[0] / scale, (float)p[1] / scale,
+			(float)p[2] / scale, (float)p[3] / scale);
 	data.rot = QMatrix4x4(data.quat.toRotationMatrix());
-	// Axis orientation correction
-	data.rot.rotate(120, 1.0, 1.0, 1.0);
 	update();
 }
 
@@ -80,12 +78,10 @@ void MotionGLWidget::updateCompass(int16_t *p)
 	const float scale = (float)1.0;
 	QVector3D v((float)p[0] / scale, (float)p[1] / scale,
 			(float)p[2] / scale);
-	// Axis orientation correction
-	QVector3D c(v.x(), -v.z(), v.y());
-	c.normalize();
+	v.normalize();
 	QVector3D m(1.0, 0.0, 0.0);
-	QVector3D n(QVector3D::crossProduct(m, c));
-	float a = acos(QVector3D::dotProduct(m, c)) * 180.0 / M_PI;
+	QVector3D n(QVector3D::crossProduct(m, v));
+	float a = acos(QVector3D::dotProduct(m, v)) * 180.0 / M_PI;
 	data.compass.rot.setToIdentity();
 	data.compass.rot.rotate(a, n);
 	update();
