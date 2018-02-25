@@ -4,7 +4,7 @@
 
 MotionGLWidget::MotionGLWidget(QWidget *parent) : QOpenGLWidget(parent)
 {
-	setMinimumSize(160, 160);
+	setMinimumSize(320, 160);
 	setAutoFillBackground(false);
 
 	data.model.setToIdentity();
@@ -19,8 +19,8 @@ MotionGLWidget::MotionGLWidget(QWidget *parent) : QOpenGLWidget(parent)
 	data.view.rotate(-90, 0.0, 1.0, 0.0);
 	data.view.rotate(-90, 1.0, 0.0, 0.0);
 	data.upd.view = 1;
-	data.projection.setToIdentity();
-	data.upd.projection = 1;
+	data.projection[0].setToIdentity();
+	data.projection[1].setToIdentity();
 
 	data.vertex = QVector<QVector3D>({
 	// Right
@@ -182,9 +182,13 @@ void MotionGLWidget::resizeGL(int w, int h)
 {
 	glViewport(0, 0, w, h);
 	float asp = (float)w / (float)h;
-	data.projection.setToIdentity();
-	data.projection.ortho(-asp, asp, -1, 1, -1, 1);
-	data.upd.projection = 1;
+	data.projection[0].setToIdentity();
+	data.projection[0].translate(-0.5, 0.0, 0.0);
+	data.projection[0].ortho(-asp, asp, -1, 1, -1, 1);
+	data.projection[1].setToIdentity();
+	data.projection[1].translate(0.5, 0.0, 0.0);
+	data.projection[1].ortho(-asp, asp, -1, 1, -1, 1);
+	data.projection[1].rotate(90, 1.0, 0.0, 0.0);
 }
 
 void MotionGLWidget::paintGL()
@@ -196,16 +200,19 @@ void MotionGLWidget::paintGL()
 				   data.view.constData());
 		data.upd.view = 0;
 	}
-	if (data.upd.projection) {
-		glUniformMatrix4fv(data.loc.projection, 1, GL_FALSE,
-				   data.projection.constData());
-		data.upd.projection = 0;
-	}
+	render(0);
+	render(1);
+}
+
+void MotionGLWidget::render(int pj)
+{
 	// Render box
 	glUniformMatrix4fv(data.loc.model, 1, GL_FALSE,
 			   data.model.constData());
 	glUniformMatrix4fv(data.loc.rot, 1, GL_FALSE,
 			   data.rot.constData());
+	glUniformMatrix4fv(data.loc.projection, 1, GL_FALSE,
+			   data.projection[pj].constData());
 	glDrawArrays(GL_TRIANGLES, 0, data.vertex.size());
 	// Render compass
 	data.compass.rv = data.rot * data.compass.rot;
@@ -213,6 +220,8 @@ void MotionGLWidget::paintGL()
 			   data.compass.model.constData());
 	glUniformMatrix4fv(data.loc.rot, 1, GL_FALSE,
 			   data.compass.rv.constData());
+	glUniformMatrix4fv(data.loc.projection, 1, GL_FALSE,
+			   data.projection[pj].constData());
 	glDrawArrays(GL_TRIANGLES, 0, data.vertex.size());
 }
 

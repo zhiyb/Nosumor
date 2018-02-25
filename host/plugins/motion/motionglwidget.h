@@ -21,6 +21,7 @@ protected:
 	virtual void paintGL();
 
 private:
+	void render(int pj);
 	GLuint loadShader(GLenum type, const QByteArray& context);
 
 	struct {
@@ -30,12 +31,12 @@ private:
 			GLuint model, rot, view, projection;
 		} loc;
 		struct {
-			GLuint view, projection;
+			GLuint view;
 		} upd;
 		struct {
 			QMatrix4x4 model, rot, rv;
 		} compass;
-		QMatrix4x4 model, rot, view, projection;
+		QMatrix4x4 model, rot, view, projection[2];
 		QVector<QVector3D> vertex, colour;
 		QQuaternion quat;
 	} data;
