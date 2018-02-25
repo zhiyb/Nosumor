@@ -35,9 +35,11 @@ private:
 			GLuint view;
 		} upd;
 		struct {
+			GLuint vao;
 			QMatrix4x4 model, rot, rv;
 			QVector<QVector3D> colour;
 		} compass;
+		GLuint vao;
 		QMatrix4x4 model, rot, view, projection[2];
 		QVector<QVector3D> vertex, colour;
 		QQuaternion quat;

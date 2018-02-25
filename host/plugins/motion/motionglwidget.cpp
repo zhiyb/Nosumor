@@ -22,6 +22,7 @@ MotionGLWidget::MotionGLWidget(QWidget *parent) : QOpenGLWidget(parent)
 	data.projection[0].setToIdentity();
 	data.projection[1].setToIdentity();
 
+	// 3D models
 	data.vertex = QVector<QVector3D>({
 	// Right
 	QVector3D(1.0, -1.0, -1.0), QVector3D(1.0, 1.0, -1.0), QVector3D(1.0, 1.0, 1.0),
@@ -176,10 +177,45 @@ void MotionGLWidget::initializeGL()
 	data.loc.projection = glGetUniformLocation(program, "projection");
 	glUseProgram(program);
 
+	// Box model
+	GLuint vao;
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
+	data.vao = vao;
+
+	GLuint buf;
+	glGenBuffers(1, &buf);
+	glBindBuffer(GL_ARRAY_BUFFER, buf);
+	glBufferData(GL_ARRAY_BUFFER, data.vertex.size() * sizeof(GLfloat) * 3,
+		     data.vertex.constData(), GL_STATIC_DRAW);
 	glEnableVertexAttribArray(data.loc.vertex);
-	glVertexAttribPointer(data.loc.vertex, 3, GL_FLOAT, GL_FALSE, 0,
-			      data.vertex.constData());
+	glVertexAttribPointer(data.loc.vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+	glGenBuffers(1, &buf);
+	glBindBuffer(GL_ARRAY_BUFFER, buf);
+	glBufferData(GL_ARRAY_BUFFER, data.colour.size() * sizeof(GLfloat) * 3,
+		     data.colour.constData(), GL_STATIC_DRAW);
 	glEnableVertexAttribArray(data.loc.colour);
+	glVertexAttribPointer(data.loc.colour, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+	// Compass model
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
+	data.compass.vao = vao;
+
+	glGenBuffers(1, &buf);
+	glBindBuffer(GL_ARRAY_BUFFER, buf);
+	glBufferData(GL_ARRAY_BUFFER, data.vertex.size() * sizeof(GLfloat) * 3,
+		     data.vertex.constData(), GL_STATIC_DRAW);
+	glEnableVertexAttribArray(data.loc.vertex);
+	glVertexAttribPointer(data.loc.vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+	glGenBuffers(1, &buf);
+	glBindBuffer(GL_ARRAY_BUFFER, buf);
+	glBufferData(GL_ARRAY_BUFFER, data.compass.colour.size() * sizeof(GLfloat) * 3,
+		     data.compass.colour.constData(), GL_STATIC_DRAW);
+	glEnableVertexAttribArray(data.loc.colour);
+	glVertexAttribPointer(data.loc.colour, 3, GL_FLOAT, GL_FALSE, 0, 0);
 }
 
 void MotionGLWidget::resizeGL(int w, int h)
@@ -219,8 +255,7 @@ void MotionGLWidget::render(int pj)
 	glUniformMatrix4fv(data.loc.projection, 1, GL_FALSE,
 			   data.projection[pj].constData());
 	glUniform1f(data.loc.alpha, 1.0);
-	glVertexAttribPointer(data.loc.colour, 3, GL_FLOAT, GL_FALSE, 0,
-			      data.compass.colour.constData());
+	glBindVertexArray(data.compass.vao);
 	glDrawArrays(GL_TRIANGLES, 0, data.vertex.size());
 	// Render box
 	glUniformMatrix4fv(data.loc.model, 1, GL_FALSE,
@@ -230,8 +265,7 @@ void MotionGLWidget::render(int pj)
 	glUniformMatrix4fv(data.loc.projection, 1, GL_FALSE,
 			   data.projection[pj].constData());
 	glUniform1f(data.loc.alpha, 0.75);
-	glVertexAttribPointer(data.loc.colour, 3, GL_FLOAT, GL_FALSE, 0,
-			      data.colour.constData());
+	glBindVertexArray(data.vao);
 	glDrawArrays(GL_TRIANGLES, 0, data.vertex.size());
 }
 
