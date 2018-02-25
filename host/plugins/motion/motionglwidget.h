@@ -28,6 +28,7 @@ private:
 		GLuint program;
 		struct {
 			GLuint vertex, colour;
+			GLuint alpha;
 			GLuint model, rot, view, projection;
 		} loc;
 		struct {
@@ -35,6 +36,7 @@ private:
 		} upd;
 		struct {
 			QMatrix4x4 model, rot, rv;
+			QVector<QVector3D> colour;
 		} compass;
 		QMatrix4x4 model, rot, view, projection[2];
 		QVector<QVector3D> vertex, colour;

@@ -62,6 +62,8 @@ MotionGLWidget::MotionGLWidget(QWidget *parent) : QOpenGLWidget(parent)
 	QVector3D(1.0, 1.0, 0.0), QVector3D(1.0, 1.0, 0.0), QVector3D(1.0, 1.0, 0.0),
 	QVector3D(1.0, 1.0, 0.0), QVector3D(1.0, 1.0, 0.0), QVector3D(1.0, 1.0, 0.0),
 	});
+	data.compass.colour = QVector<QVector3D>(data.colour.size(),
+						 QVector3D(1.0, 1.0, 1.0));
 }
 
 void MotionGLWidget::updateQuaternion(int32_t *p)
@@ -116,6 +118,8 @@ void MotionGLWidget::initializeGL()
 	initializeOpenGLFunctions();
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glClearColor(0.0, 0.0, 0.0, 1.0);
 
 	GLuint program = glCreateProgram();
@@ -139,9 +143,10 @@ void MotionGLWidget::initializeGL()
 				"#version 130\n"
 				"in vec3 vf_colour;\n"
 				"out vec4 colour;\n"
+				"uniform float alpha;\n"
 				"void main(void)\n"
 				"{\n"
-				"    colour = vec4(vf_colour, 1.0);\n"
+				"    colour = vec4(vf_colour, alpha);\n"
 				"}\n");
 	if (!fsh) {
 		deleteLater();
@@ -164,6 +169,7 @@ void MotionGLWidget::initializeGL()
 
 	data.loc.vertex = glGetAttribLocation(program, "vertex");
 	data.loc.colour = glGetAttribLocation(program, "colour");
+	data.loc.alpha = glGetUniformLocation(program, "alpha");
 	data.loc.model = glGetUniformLocation(program, "model");
 	data.loc.rot = glGetUniformLocation(program, "rot");
 	data.loc.view = glGetUniformLocation(program, "view");
@@ -174,8 +180,6 @@ void MotionGLWidget::initializeGL()
 	glVertexAttribPointer(data.loc.vertex, 3, GL_FLOAT, GL_FALSE, 0,
 			      data.vertex.constData());
 	glEnableVertexAttribArray(data.loc.colour);
-	glVertexAttribPointer(data.loc.colour, 3, GL_FLOAT, GL_FALSE, 0,
-			      data.colour.constData());
 }
 
 void MotionGLWidget::resizeGL(int w, int h)
@@ -206,14 +210,6 @@ void MotionGLWidget::paintGL()
 
 void MotionGLWidget::render(int pj)
 {
-	// Render box
-	glUniformMatrix4fv(data.loc.model, 1, GL_FALSE,
-			   data.model.constData());
-	glUniformMatrix4fv(data.loc.rot, 1, GL_FALSE,
-			   data.rot.constData());
-	glUniformMatrix4fv(data.loc.projection, 1, GL_FALSE,
-			   data.projection[pj].constData());
-	glDrawArrays(GL_TRIANGLES, 0, data.vertex.size());
 	// Render compass
 	data.compass.rv = data.rot * data.compass.rot;
 	glUniformMatrix4fv(data.loc.model, 1, GL_FALSE,
@@ -222,6 +218,20 @@ void MotionGLWidget::render(int pj)
 			   data.compass.rv.constData());
 	glUniformMatrix4fv(data.loc.projection, 1, GL_FALSE,
 			   data.projection[pj].constData());
+	glUniform1f(data.loc.alpha, 1.0);
+	glVertexAttribPointer(data.loc.colour, 3, GL_FLOAT, GL_FALSE, 0,
+			      data.compass.colour.constData());
+	glDrawArrays(GL_TRIANGLES, 0, data.vertex.size());
+	// Render box
+	glUniformMatrix4fv(data.loc.model, 1, GL_FALSE,
+			   data.model.constData());
+	glUniformMatrix4fv(data.loc.rot, 1, GL_FALSE,
+			   data.rot.constData());
+	glUniformMatrix4fv(data.loc.projection, 1, GL_FALSE,
+			   data.projection[pj].constData());
+	glUniform1f(data.loc.alpha, 0.75);
+	glVertexAttribPointer(data.loc.colour, 3, GL_FLOAT, GL_FALSE, 0,
+			      data.colour.constData());
 	glDrawArrays(GL_TRIANGLES, 0, data.vertex.size());
 }
 
