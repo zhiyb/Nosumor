@@ -30,9 +30,7 @@ static void handler(void *hid, uint8_t channel,
 		{&api_config_data.mouse, 0u, "Mouse"},
 		{&api_config_data.joystick, 0u, "Joystick"},
 		{&api_config_data.microSD, 0u, "MicroSD"},
-#ifdef DEBUG
 		{&api_config_data.flash, 0u, "Flash"},
-#endif
 	};
 	uint8_t *dp = data, *pp = payload;
 

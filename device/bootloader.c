@@ -117,7 +117,7 @@ static inline void init()
 	usb_hid_if_t *hid_keyboard = usb_hid_keyboard_init(hid);
 
 	puts(ESC_INIT "Initialising keyboard...");
-	keyboard_init(hid_keyboard, 0);
+	keyboard_init(hid_keyboard, 0, 0);
 
 	puts(ESC_INIT "Initialising FatFs for flash...");
 	if (flash_fatfs_init(FLASH_CONF, 0))

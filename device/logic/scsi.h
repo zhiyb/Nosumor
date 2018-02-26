@@ -73,7 +73,6 @@ scsi_ret_t scsi_cmd(scsi_t *scsi, const void *pdata, uint8_t size);
 scsi_state_t scsi_data(scsi_t *scsi, const void *pdata, uint32_t size);
 scsi_state_t scsi_data_cplt(scsi_t *scsi, const void *pdata, uint32_t size);
 scsi_ret_t scsi_process(scsi_t *scsi, uint32_t pktsize, uint32_t maxsize);
-void *scsi_buffer(uint32_t *length);
 
 #ifdef __cplusplus
 }

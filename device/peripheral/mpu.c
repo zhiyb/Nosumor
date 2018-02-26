@@ -138,7 +138,7 @@ void mpu_usb_hid(usb_hid_if_t *hid, usb_hid_if_t *hid_mouse)
 static void data_callback(struct i2c_t *i2c,
 			  const struct i2c_op_t *op, uint32_t nack)
 {
-	int32_t quat[4];
+	static int32_t quat[4];
 	void *p = op->p;
 	uint16_t idx = data.idx;
 	uint16_t cnt = op->size / PKT_SIZE;

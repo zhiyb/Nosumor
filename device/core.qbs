@@ -110,7 +110,7 @@ StaticLibrary {
     }
 
     Group {
-        name: "USB HID interface"
+        name: "USB HID"
         files: [
             "usb/hid/usb_hid.c",
             "usb/hid/usb_hid.h",
@@ -157,7 +157,7 @@ StaticLibrary {
     }
 
     Group {
-        name: "System modules"
+        name: "System Modules"
         cpp.commonCompilerFlags: outer.concat(["-Wno-array-bounds"])
         files: [
             "startup_stm32f722xx.S",
@@ -200,7 +200,7 @@ StaticLibrary {
     }
 
     Group {
-        name: "Logic modules"
+        name: "Logic Modules"
         files: [
             "logic/led_trigger.c",
             "logic/led_trigger.h",
@@ -213,7 +213,6 @@ StaticLibrary {
             "logic/scsi_defs_cmds.h",
             "logic/scsi_defs_ops.h",
             "logic/scsi_defs_sense.h",
-            "logic/scsi_buf.c",
         ]
     }
 

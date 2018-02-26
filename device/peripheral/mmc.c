@@ -252,6 +252,10 @@ static uint32_t mmc_ping()
 		dbgprintf(ESC_ERROR "[MMC] Response timed out\n");
 		return STA_ERROR;
 	}
+	if (resp & STAT_ERROR) {
+		dbgprintf(ESC_ERROR "[MMC] Status error\n");
+		return STA_ERROR;
+	}
 	return 0;
 }
 
@@ -352,7 +356,7 @@ static uint32_t mmc_read_start(uint32_t start, uint32_t count)
 	// Send command to start transfer
 	uint32_t resp, stat;
 	resp = mmc_command(count == 1 ? READ_SINGLE_BLOCK : READ_MULTIPLE_BLOCK, start, &stat);
-	if (!(stat & SDMMC_STA_CMDREND_Msk)) {
+	if (!(stat & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
 		status = MMCIdle;
 		return 0;
 	}
@@ -499,7 +503,7 @@ static uint32_t mmc_stop()
 	if (status & MMCMulti) {
 		uint32_t resp, stat;
 		resp = mmc_command(STOP_TRANSMISSION, 0, &stat);
-		if (!(stat & SDMMC_STA_CMDREND_Msk)) {
+		if (!(stat & SDMMC_STA_CMDREND_Msk) || (resp & STAT_ERROR)) {
 			status = MMCIdle;
 			return 2;
 		}

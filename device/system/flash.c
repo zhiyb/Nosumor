@@ -12,6 +12,12 @@
 #include <fatfs/ff.h>
 #include "flash.h"
 
+#ifdef BOOTLOADER
+#define BUFFER_SIZE	(128 * 1024)
+#else
+#define BUFFER_SIZE	(16 * 1024)
+#endif
+
 extern uint32_t __app_start__, __appi_start__;
 
 enum FlashInterface {AXI, ICTM};
@@ -40,6 +46,15 @@ typedef struct hex_t {
 static hex_t *hex = 0, **hex_last = &hex;
 static int hex_invalid = 0;
 static uint32_t seg, saddr;
+
+static uint8_t flash_buf[BUFFER_SIZE] ALIGN(32);
+
+void *flash_buffer(uint32_t *length)
+{
+	if (length)
+		*length = sizeof(flash_buf);
+	return flash_buf;
+}
 
 /* Flash access functions */
 
@@ -420,7 +435,7 @@ void flash_fatfs_hex_program(const char *path)
 	}
 
 	// Borrow buffer space
-	uint64_t *buf = scsi_buffer(0);
+	uint64_t *buf = flash_buffer(0);
 	hex_seg_t *seg = (void *)buf;
 	uint8_t *p = seg->payload;
 	seg->cnt = 0;

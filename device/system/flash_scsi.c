@@ -7,6 +7,7 @@
 #include <logic/scsi.h>
 #include <logic/scsi_defs_sense.h>
 #include <api/api_config_priv.h>
+#include "flash.h"
 #include "flash_scsi.h"
 
 #define LBSZ	512ul
@@ -74,8 +75,8 @@ static status_t flash_program(void *dst, const void *src, uint32_t size)
 	}
 #endif
 
-	printf(ESC_WRITE "[FLASH] Program: "
-	       ESC_DATA "@%p <= @%p+%lu\n", dst, src, size);
+	dbgprintf(ESC_WRITE "[FLASH] Program: "
+		  ESC_DATA "@%p <= @%p+%lu\n", dst, src, size);
 	SCB_CleanInvalidateDCache_by_Addr(dst, size);
 	active = 1;
 
@@ -119,7 +120,7 @@ static status_t flash_program(void *dst, const void *src, uint32_t size)
 
 static status_t flash_erase_sector(uint32_t sec)
 {
-	printf(ESC_WRITE "[FLASH] Erase sector " ESC_DATA "%lu\n", sec);
+	dbgprintf(ESC_WRITE "[FLASH] Erase sector " ESC_DATA "%lu\n", sec);
 	active = 1;
 
 	// Unlock flash
@@ -192,7 +193,7 @@ static status_t flash_erase_region(uint32_t idx, uint32_t offset, uint32_t size)
 		return status;
 	}
 
-	dbgprintf(ESC_WRITE "[FLASH %lu] Erase: "
+	dbgprintf(ESC_DEBUG "[FLASH %lu] Erase: "
 		  ESC_DATA "%lu+%lu\n", idx, offset, size);
 
 	// Offset to the start of the sector
@@ -202,7 +203,7 @@ static status_t flash_erase_region(uint32_t idx, uint32_t offset, uint32_t size)
 	// Erased pattern
 	static const uint64_t full = 0xffffffffffffffff;
 	// Borrow buffer space
-	uint64_t *buf = scsi_buffer(0);
+	uint64_t *buf = flash_buffer(0);
 	// 8-byte aligned
 	size >>= 3ul;
 	ssize >>= 3ul;
@@ -260,7 +261,7 @@ static status_t flash_erase_region(uint32_t idx, uint32_t offset, uint32_t size)
 	status = flash_program(start + offset, buf + offset,
 			       (ssize - offset) << 3u);
 
-	dbgprintf(ESC_WRITE "[FLASH %lu] Sector "
+	dbgprintf(ESC_DEBUG "[FLASH %lu] Sector "
 		  ESC_DATA "%lu" ESC_WRITE " recovered\n", idx, fs);
 	return status;
 }
@@ -355,8 +356,10 @@ static uint32_t scsi_read_start(void *p, uint32_t offset, uint32_t size)
 	flash[idx].length = size * LBSZ;
 	flash[idx].read = flash[idx].start + offset * LBSZ;
 #ifdef SHADOW_CONF
-	if (idx == FLASH_CONF)
+	if (idx == FLASH_CONF) {
 		flash[idx].read = conf_shadow + offset * LBSZ;
+		SCB_CleanDCache_by_Addr(flash[idx].read, size * LBSZ);
+	}
 #endif
 	return size;
 }
@@ -399,7 +402,7 @@ static uint32_t scsi_write_start(void *p, uint32_t offset, uint32_t size)
 		dbgbkpt();
 		return 0;
 	}
-	dbgprintf(ESC_WRITE "[FLASH %lu] Write: "
+	dbgprintf(ESC_DEBUG "[FLASH %lu] Write: "
 		  ESC_DATA "%lu+%lu\n", idx, offset, size);
 	offset *= LBSZ;
 
@@ -428,9 +431,9 @@ static uint32_t scsi_write_data(void *p, uint32_t length, const void *data)
 
 #ifdef SHADOW_CONF
 	if (idx == FLASH_CONF) {
-		printf(ESC_WRITE "[FLASH] Shadow program: "
-		       ESC_DATA "@%p <= @%p+%lu\n",
-		       flash[idx].write, data, length);
+		dbgprintf(ESC_WRITE "[FLASH] Shadow program: "
+			  ESC_DATA "@%p <= @%p+%lu\n",
+			  flash[idx].write, data, length);
 
 		memcpy(flash[idx].write, data, length);
 		goto stat;
@@ -598,8 +601,8 @@ uint32_t flash_fatfs_init(uint32_t idx, uint32_t erase)
 	if (!erase) {
 		// Mount volume
 		if ((res = f_mount(&fs, vols[idx], 1)) != FR_OK) {
-			dbgprintf(ESC_ERROR "[FLASH %lu] Mount failed: "
-				  ESC_DATA "%u\n", idx, res);
+			printf(ESC_ERROR "[FLASH %lu] Mount failed: "
+			       ESC_DATA "%u\n", idx, res);
 			goto erase;
 		}
 		printf(ESC_GOOD "[FLASH %lu] Mount OK, skip\n", idx);

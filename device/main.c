@@ -165,11 +165,9 @@ static inline void init()
 	usb_msc = usb_msc_init(&usb);
 	usb_msc_scsi_register(usb_msc, mmc_scsi_handlers());
 
-#ifdef DEBUG
 	puts(ESC_INIT "Initialising FatFs for flash...");
 	if (flash_fatfs_init(FLASH_CONF, 0) == 0)
 		usb_msc_scsi_register(usb_msc, flash_scsi_handlers(FLASH_CONF));
-#endif
 
 	puts(ESC_GOOD "Initialisation done");
 	usb_connect(&usb, 1);
@@ -303,7 +301,7 @@ loop:	// Process time consuming tasks
 		prev.tick = tick;
 	}
 #endif
-#if 0
+#ifndef DEBUG
 	__WFE();
 #endif
 	goto loop;
