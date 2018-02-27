@@ -39,8 +39,8 @@ bool DeviceWidget::devOpen(hid_device_info *info, const QList<Plugin *> *plugins
 			auto const &it = channels.find(QString::fromStdString(plugin->name()));
 			if (it == channels.end())
 				continue;
-			if (plugin->version() < it.value().first) {
-				layout->addWidget(new QLabel(tr("Plugin %1 outdated: v%2")
+			if (plugin->version() != it.value().first) {
+				layout->addWidget(new QLabel(tr("Incompatible version of plugin %1: v%2")
 							     .arg(QString::fromStdString(plugin->name()))
 							     .arg(it.value().first, 4, 16, QChar('0'))));
 				continue;
