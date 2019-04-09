@@ -1,10 +1,15 @@
 #include <string.h>
-#include <stm32f7xx.h>
-#include <macros.h>
+#include <device.h>
+#include <defines.h>
+#include <module.h>
 #include <debug.h>
-#include <api_defs.h>
-#include <system/clocks.h>
-#include "led.h"
+#include <clocks.h>
+
+#if HWVER == 0x0002
+#define LED_NUM	3
+#else
+#define LED_NUM	4
+#endif
 
 typedef uint32_t colour_t;
 
@@ -541,29 +546,7 @@ static void base_psc_init()
 	TIM4->CR1 |= TIM_CR1_CEN_Msk;
 }
 
-void led_init()
-{
-	static const uint16_t clr[LED_NUM][3] = {
-		// Bottom-left, RGB
-		{0x3ff, 0, 0},
-		// Top-left, RGB
-		{0, 0x3ff, 0},
-		// Top-right, RGB
-		{0, 0, 0x3ff},
-#if LED_NUM == 4
-		// Bottom-right, RGB
-		{0x3ff, 0x3ff, 0},
-#endif
-	};
-	const uint16_t (*p)[3] = clr;
-	for (uint32_t i = 0; i != LED_NUM; i++)
-		led_set(i, 3, *p++);
-
-	base_scan_init();
-	base_rgb_init();
-	base_psc_init();
-}
-
+#if 0
 const void *led_info(uint8_t *num)
 {
 	static const uint8_t info[LED_NUM][2] = {
@@ -582,8 +565,9 @@ const void *led_info(uint8_t *num)
 		*num = LED_NUM;
 	return info;
 }
+#endif
 
-void led_set(uint32_t i, uint32_t size, const uint16_t *c)
+static void led_set(uint32_t i, uint32_t size, const uint16_t *c)
 {
 	if (i >= LED_NUM || size != 3u) {
 		dbgbkpt();
@@ -627,7 +611,7 @@ void led_set(uint32_t i, uint32_t size, const uint16_t *c)
 	}
 }
 
-void led_get(uint32_t i, uint32_t size, uint16_t *c)
+static void led_get(uint32_t i, uint32_t size, uint16_t *c)
 {
 	if (i >= LED_NUM || size != 3u) {
 		dbgbkpt();
@@ -670,3 +654,48 @@ void led_get(uint32_t i, uint32_t size, uint16_t *c)
 		break;
 	}
 }
+
+static void led_init()
+{
+	for (uint32_t i = 0; i != LED_NUM; i++)
+		led_set(i, 3, 0);
+	base_scan_init();
+	base_rgb_init();
+	base_psc_init();
+}
+
+static void led_start()
+{
+	// Default colours
+	static const uint16_t clr[LED_NUM][3] = {
+		// Bottom-left, RGB
+		{0x3ff, 0, 0},
+		// Top-left, RGB
+		{0, 0x3ff, 0},
+		// Top-right, RGB
+		{0, 0, 0x3ff},
+#if LED_NUM == 4
+		// Bottom-right, RGB
+		{0x3ff, 0x3ff, 0},
+#endif
+	};
+	const uint16_t (*p)[3] = clr;
+	for (uint32_t i = 0; i != LED_NUM; i++)
+		led_set(i, 3, *p++);
+}
+
+static void *handler(void *inst, uint32_t msg, void *data)
+{
+	UNUSED(inst);
+	UNUSED(data);
+	if (msg == HASH("init")) {
+		led_init();
+		return 0;
+	} else if (msg == HASH("start")) {
+		led_start();
+		return 0;
+	}
+	return 0;
+}
+
+MODULE("led", 0, 0, handler);

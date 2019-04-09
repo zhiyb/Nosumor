@@ -14,6 +14,7 @@ uint32_t clkSDMMC1();
 uint32_t clkSDMMC2();
 uint32_t clkTimer(uint32_t i);
 
+void mco1_enable(uint32_t e);
 void rcc_init();
 
 #ifdef __cplusplus

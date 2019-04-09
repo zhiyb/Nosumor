@@ -1,17 +1,31 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <stm32f7xx.h>
+#include <device.h>
+#include <module.h>
 #include <irq.h>
-#include <macros.h>
 #include <debug.h>
-#include <system/systick.h>
-#include <api/api_config_priv.h>
-#include <usb/hid/usb_hid.h>
-#include "keyboard.h"
 
+// Number of keys
+#define KEYBOARD_KEYS		5
 // Debouncing time (SysTick counts)
 #define KEYBOARD_DEBOUNCING	5
+// Number of event handlers
+#define KEYBOARD_MAX_HANDLERS	4
+
+#if HWVER >= 0x0100
+// KEY_12:	K1(PB4), K2(PB2)
+// KEY_345:	K3(PC13), K4(PC14), K5(PC15)
+#define KEYBOARD_MASK_1	(1ul << 4)
+#else
+// KEY_12:	K1(PA6), K2(PB2)
+// KEY_345:	K3(PC13), K4(PC14), K5(PC15)
+#define KEYBOARD_MASK_1	(1ul << 6)
+#endif
+#define KEYBOARD_MASK_2	(1ul << 2)
+#define KEYBOARD_MASK_3	(1ul << 13)
+#define KEYBOARD_MASK_4	(1ul << 14)
+#define KEYBOARD_MASK_5	(1ul << 15)
 
 #if KEYBOARD_KEYS != 5
 #error Unsupported keyboard key count
@@ -20,42 +34,33 @@
 #define KEYBOARD_Msk	(KEYBOARD_MASK_1 | KEYBOARD_MASK_2 | \
 	KEYBOARD_MASK_3 | KEYBOARD_MASK_4 | KEYBOARD_MASK_5)
 
-const uint32_t keyboard_masks[KEYBOARD_KEYS] = {
-	KEYBOARD_MASK_1, KEYBOARD_MASK_2, KEYBOARD_MASK_3,
-	KEYBOARD_MASK_4, KEYBOARD_MASK_5,
+static const struct {
+	uint32_t keys;
+	uint32_t masks[KEYBOARD_KEYS];
+	const char *names[KEYBOARD_KEYS];
+} info = {
+	KEYBOARD_KEYS, {
+		KEYBOARD_MASK_1, KEYBOARD_MASK_2,
+		KEYBOARD_MASK_3, KEYBOARD_MASK_4, KEYBOARD_MASK_5,
+	}, {
+		"Left", "Right", "K1", "K2", "K3",
+	}
 };
 
-static const char keyboard_names[KEYBOARD_KEYS][8] = {
-	"Left", "Right", "K1", "K2", "K3",
-};
-
+#if 0
 uint8_t keycodes[KEYBOARD_KEYS] = {
 	// z,    x,    c,    ~,  ESC
 	0x1d, 0x1b, 0x06, 0x35, 0x29,
 };
-
-static struct {
-	usb_hid_if_t *keyboard, *mouse, *joystick;
-} hid;
+#endif
 static volatile uint32_t status, debouncing, timeout[KEYBOARD_KEYS];
+static void (*handlers[KEYBOARD_MAX_HANDLERS])(uint32_t status) = {0};
 
 static uint32_t keyboard_gpio_status();
 static void keyboard_tick(uint32_t tick);
 
-const char *keyboard_name(unsigned int btn)
+static void keyboard_init()
 {
-	if (btn < ASIZE(keyboard_names))
-		return keyboard_names[btn];
-	printf(ESC_ERROR "[KEY] Invalid button: %u\n", btn);
-	return 0;
-}
-
-void keyboard_init(usb_hid_if_t *keyboard, usb_hid_if_t *mouse, usb_hid_if_t *joystick)
-{
-	hid.keyboard = keyboard;
-	hid.mouse = mouse;
-	hid.joystick = joystick;
-
 	// Initialise GPIOs
 #if HWVER >= 0x0100
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN;
@@ -95,10 +100,8 @@ void keyboard_init(usb_hid_if_t *keyboard, usb_hid_if_t *mouse, usb_hid_if_t *jo
 	EXTI->FTSR |= KEYBOARD_Msk;
 	// Clear interrupts
 	EXTI->PR = KEYBOARD_Msk;
-	// Unmask interrupts
-	EXTI->IMR |= KEYBOARD_Msk;
-	status = keyboard_gpio_status();
-	debouncing = 0ul;
+	// Mask interrupts
+	EXTI->IMR &= ~KEYBOARD_Msk;
 
 	// Enable NVIC interrupts
 	uint32_t pg = NVIC_GetPriorityGrouping();
@@ -117,9 +120,19 @@ void keyboard_init(usb_hid_if_t *keyboard, usb_hid_if_t *mouse, usb_hid_if_t *jo
 	NVIC_SetPriority(EXTI15_10_IRQn,
 			 NVIC_EncodePriority(pg, NVIC_PRIORITY_KEYBOARD, 2));
 	NVIC_EnableIRQ(EXTI15_10_IRQn);
+}
 
+static void keyboard_start()
+{
 	// Register debouncing tick
-	systick_register_handler(&keyboard_tick);
+	MODULE_MSG(module_init, "tick.handler.install", &keyboard_tick);
+	// Clear interrupt flags
+	EXTI->PR = KEYBOARD_Msk;
+	// Update keyboard status
+	status = keyboard_gpio_status();
+	debouncing = 0;
+	// Unmask interrupts
+	EXTI->IMR |= KEYBOARD_Msk;
 }
 
 static uint32_t keyboard_gpio_status()
@@ -137,13 +150,12 @@ static uint32_t keyboard_gpio_status()
 	return ~stat;
 }
 
-uint32_t keyboard_status()
+static void keyboard_update(uint32_t status)
 {
-	return status;
-}
-
-void keyboard_update(uint32_t status)
-{
+	void (**p)(uint32_t) = handlers;
+	for (; p != &handlers[KEYBOARD_MAX_HANDLERS] && *p; p++)
+		(*p)(status);
+#if 0
 	// Clear keyboard status
 	memset(hid.keyboard->report.payload, 0, hid.keyboard->size - 1u);
 	// Modifier keys (0), reserved (1), keycodes (2*)
@@ -175,6 +187,7 @@ js:	// Update joystick report
 		return;
 	hid.joystick->report.payload[12] = mask >> 3;
 	usb_hid_update(hid.joystick);
+#endif
 }
 
 static void keyboard_irq()
@@ -193,8 +206,8 @@ static void keyboard_irq()
 	// Debouncing setup
 	debouncing |= irq;
 	// Timeout value for debouncing
-	uint32_t to = systick_cnt();
-	const uint32_t *pm = keyboard_masks;
+	uint32_t to = (uint32_t)MODULE_MSG(module_init, "tick.get", 0);
+	const uint32_t *pm = info.masks;
 	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++, pm++)
 		if (irq & *pm)
 			timeout[i] = to;
@@ -214,7 +227,7 @@ static void keyboard_tick(uint32_t tick)
 	if (!db)
 		return;
 	uint32_t stat = keyboard_gpio_status(), mask = 0;
-	const uint32_t *pm = keyboard_masks;
+	const uint32_t *pm = info.masks;
 	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++, pm++)
 		if ((db & *pm) && tick - timeout[i] > KEYBOARD_DEBOUNCING)
 			mask |= *pm;
@@ -228,21 +241,38 @@ static void keyboard_tick(uint32_t tick)
 	debouncing &= ~mask;
 	__enable_irq();
 	if (err)
-		dbgprintf(ESC_ERROR "[KEY] Tick mismatch\n");
+		dbgprintf(ESC_ERROR "[KEY] Too short\n");
 }
 
-uint8_t keyboard_keycode(unsigned int btn)
+static void register_handler(void (*func)(uint32_t))
 {
-	if (btn < ASIZE(keycodes))
-		return keycodes[btn];
-	printf(ESC_ERROR "[KEY] Invalid button: %u\n", btn);
+	void (**p)(uint32_t) = handlers;
+	for (; p != &handlers[KEYBOARD_MAX_HANDLERS] && *p; p++);
+	while (p == &handlers[KEYBOARD_MAX_HANDLERS])
+		dbgbkpt();
+	*p++ = func;
+	if (p != &handlers[KEYBOARD_MAX_HANDLERS])
+		*p = 0;
+}
+
+static void *handler(void *inst, uint32_t msg, void *data)
+{
+	UNUSED(inst);
+	if (msg == HASH("status")) {
+		return (void *)status;
+	} else if (msg == HASH("init")) {
+		keyboard_init();
+		return 0;
+	} else if (msg == HASH("start")) {
+		keyboard_start();
+		return 0;
+	} else if (msg == HASH("info")) {
+		return (void *)&info;
+	} else if (msg == HASH("handler.install")) {
+		register_handler(data);
+		return 0;
+	}
 	return 0;
 }
 
-void keyboard_keycode_set(unsigned int btn, uint8_t code)
-{
-	if (btn < ASIZE(keycodes))
-		keycodes[btn] = code;
-	else
-		printf(ESC_ERROR "[KEY] Invalid button: %u\n", btn);
-}
+MODULE("keyboard", 0, 0, handler);

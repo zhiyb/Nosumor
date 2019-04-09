@@ -1,9 +1,9 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
-#include <stm32f7xx.h>
 #include <stdio.h>
 #include <escape.h>
+#include <device.h>
 
 #define dbgexist()	(CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk)
 

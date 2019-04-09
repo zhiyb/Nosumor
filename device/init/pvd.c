@@ -1,10 +1,6 @@
-#include <stm32f7xx.h>
-#include <usb/usb.h>
+#include <device.h>
+#include <irq.h>
 #include "pvd.h"
-#include "irq.h"
-#include "macros.h"
-
-extern usb_t usb;
 
 void pvd_init()
 {
@@ -27,18 +23,13 @@ void pvd_init()
 	NVIC_SetPriority(PVD_IRQn, NVIC_EncodePriority(pg, NVIC_PRIORITY_PVD));
 	NVIC_EnableIRQ(PVD_IRQn);
 
-	// GPIO output for monitoring
+	// GPIO PB7 output for monitoring
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
-	GPIO_MODER(GPIOB, 7, 0b01);	// 01: General purpose output mode
+	GPIO_MODER(GPIOB, 7, GPIO_MODER_OUTPUT);
 	GPIOB->ODR &= ~GPIO_ODR_ODR_7;
 }
 
 void PVD_IRQHandler()
 {
 	GPIOB->ODR |= GPIO_ODR_ODR_7;
-}
-
-void pvd_disable_all()
-{
-	usb_connect(&usb, 0);
 }

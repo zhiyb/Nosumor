@@ -1,36 +1,11 @@
-#ifndef MACROS_H
-#define MACROS_H
+#ifndef DEVICE_H
+#define DEVICE_H
 
+#include <stdint.h>
+#include <defines.h>
 #include <stm32f7xx.h>
 
-// http://www.pixelbeat.org/programming/gcc/static_assert.html
-#define ASSERT_CONCAT_(a, b) a##b
-#define ASSERT_CONCAT(a, b) ASSERT_CONCAT_(a, b)
-/* These can't be used after statements in c89. */
-#ifdef __COUNTER__
-  #define STATIC_ASSERT(e,m) \
-    ;enum { ASSERT_CONCAT(static_assert_, __COUNTER__) = 1/(int)(!!(e)) }
-#else
-  /* This can't be used twice on the same line so ensure if using in headers
-   * that the headers are not included twice (by wrapping in #ifndef...#endif)
-   * Note it doesn't cause an issue when used on same line of separate modules
-   * compiled with gcc -combine -fwhole-program.  */
-  #define STATIC_ASSERT(e,m) \
-    ;enum { ASSERT_CONCAT(assert_line_, __LINE__) = 1/(int)(!!(e)) }
-#endif
-
-#define PACKED		__attribute__((packed))
-#define ALIGN(b)	__attribute__((aligned(b)))
-#define ALIGNED		__attribute__((aligned))
-#define SECTION(s)	__attribute__((section(#s)))
-#define STATIC_INLINE	__attribute__((always_inline)) static inline
-
-#define FIELD(r, f)	(((r) & (f##_Msk)) >> (f##_Pos))
-#define ASIZE(a)	(sizeof((a)) / sizeof((a)[0]))
-#define ROUND(a, b)	(((a) + ((b) / 2)) / (b))
-#define CEIL(a, b)	(((a) + (b) - 1) / (b))
-#define FLOOR(a, b)	((a) / (b))
-#define MIN(a, b)	((a) < (b) ? (a) : (b))
+#define FIELD(r, f)             (((r) & (f##_Msk)) >> (f##_Pos))
 
 #define GPIO_AFRL_AFR0_Msk	GPIO_AFRL_AFRL0_Msk
 #define GPIO_AFRL_AFR1_Msk	GPIO_AFRL_AFRL1_Msk
@@ -82,8 +57,18 @@
 #define GPIO_PUPDR(b, p, m)	(b)->PUPDR = \
 	(((b)->PUPDR & ~GPIO_PUPDR_PUPDR##p##_Msk) | \
 	((m) << GPIO_PUPDR_PUPDR##p##_Pos))
-#define GPIO_PUPDR_UP	0b01
-#define GPIO_PUPDR_DOWN	0b10
+
+#define GPIO_MODER_INPUT	0b00
+#define GPIO_MODER_OUTPUT	0b01
+#define GPIO_MODER_ALTERNATE	0b10
+#define GPIO_MODER_ANALOG	0b11
+#define GPIO_OSPEEDR_LOW	0b00
+#define GPIO_OSPEEDR_MEDIUM	0b01
+#define GPIO_OSPEEDR_HIGH	0b10
+#define GPIO_OSPEEDR_VERY_HIGH	0b11
+#define GPIO_PUPDR_FLOAT	0b00
+#define GPIO_PUPDR_UP		0b01
+#define GPIO_PUPDR_DOWN		0b10
 
 #define EXTICR_EXTI_PA	0u
 #define EXTICR_EXTI_PB	1u
@@ -105,4 +90,4 @@ static inline void exticr_exti(uint32_t pin, uint32_t port)
 	*io = (*io & ~mask) | (port << pos);
 }
 
-#endif // MACROS_H
+#endif // DEVICE_H

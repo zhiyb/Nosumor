@@ -60,6 +60,13 @@ SECTIONS
   .rodata :
   {
     . = ALIGN(4);
+    __module_start__ = .;
+    KEEP(*(.module))
+    KEEP(*(.module*))
+    . = ALIGN(4);
+    __module_end__ = .;
+
+    . = ALIGN(4);
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);

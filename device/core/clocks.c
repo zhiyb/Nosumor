@@ -1,6 +1,5 @@
-#include <stm32f7xx.h>
+#include <device.h>
 #include "clocks.h"
-#include "macros.h"
 
 extern uint32_t SystemCoreClock;
 void SystemCoreClockUpdate(void);
@@ -86,10 +85,7 @@ static inline void mco1_init()
 	}
 	// Configure GPIOs
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
-	GPIO_MODER(GPIOA, 8, 0b10);	// 10: Alternative function mode
-	GPIO_OTYPER_PP(GPIOA, 8);	// Output push-pull
-	GPIO_OSPEEDR(GPIOA, 8, 0b10);	// High speed (50~100MHz)
-	GPIO_AFRH(GPIOA, 8, 0);		// AF0: MCO1
+	mco1_enable(0);
 	// Wait for IO compensation cell
 	while (!(SYSCFG->CMPCR & SYSCFG_CMPCR_READY));
 }
@@ -138,6 +134,23 @@ void rcc_init()
 	while ((RCC->CFGR & RCC_CFGR_SWS_Msk) != RCC_CFGR_SWS_PLL);
 	// Update clock configuration
 	SystemCoreClockUpdate();
-	// Enable clock output for other chips
+	// Clock output for other chips
 	mco1_init();
+}
+
+void mco1_enable(uint32_t e)
+{
+	if (e) {
+		// GPIO AF0: MCO1
+		GPIO_MODER(GPIOA, 8, GPIO_MODER_ALTERNATE);
+		GPIO_OTYPER_PP(GPIOA, 8);
+		GPIO_OSPEEDR(GPIOA, 8, GPIO_OSPEEDR_MEDIUM);
+		GPIO_AFRH(GPIOA, 8, 0);
+	} else {
+		// GPIO connect to GND
+		GPIO_MODER(GPIOA, 8, GPIO_MODER_OUTPUT);
+		GPIO_OTYPER_PP(GPIOA, 8);
+		GPIO_OSPEEDR(GPIOA, 8, GPIO_OSPEEDR_LOW);
+		GPIOA->ODR &= ~(1u << 8);
+	}
 }

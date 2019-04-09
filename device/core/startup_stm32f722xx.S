@@ -78,7 +78,7 @@ defined in linker script */
   .type  Reset_Handler, %function
 Reset_Handler:
   ldr   sp, =_estack      /* set stack pointer */
-  bl  bootloader_check
+  //bl  bootloader_check
 
 /* Copy the data segment initializers from flash to IRAM */
   movs  r1, #0

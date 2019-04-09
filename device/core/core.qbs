@@ -1,7 +1,6 @@
 import qbs
 
 StaticLibrary {
-    name: "core"
     Depends {name: "CMSIS"}
 
     cpp.defines: {
@@ -50,7 +49,7 @@ StaticLibrary {
         cpp.optimization: product.cpp.optimization
     }
 
-    Group {
+    /*Group {
         name: "Peripherals"
         files: [
             "peripheral/audio.c",
@@ -160,9 +159,7 @@ StaticLibrary {
         name: "System Modules"
         cpp.commonCompilerFlags: outer.concat(["-Wno-array-bounds"])
         files: [
-            "startup_stm32f722xx.S",
             "system/dma.txt",
-            "system_stm32f7xx.c",
             "system/clocks.c",
             "system/clocks.h",
             "system/pvd.c",
@@ -204,7 +201,6 @@ StaticLibrary {
         files: [
             "logic/led_trigger.c",
             "logic/led_trigger.h",
-            "logic/syscalls.c",
             "logic/fio.c",
             "logic/fio.h",
             "logic/scsi.c",
@@ -233,12 +229,29 @@ StaticLibrary {
         files: [
             "eMPL/*",
         ]
+    }*/
+
+    Group {
+        name: "System"
+        files: [
+            "startup_stm32f722xx.S",
+            "system_stm32f7xx.c",
+            "syscalls.c",
+        ]
     }
 
     files: [
+        "defines.h",
+        "device.h",
+        "hash.c",
+        "module.c",
+        "module.h",
         "irq.h",
+        "clocks.h",
+        "clocks.c",
         "escape.h",
-        "macros.h",
         "debug.h",
+        "fio.h",
+        "fio.c",
     ]
 }

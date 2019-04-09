@@ -1,9 +1,8 @@
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include <ctype.h>
-#include <inttypes.h>
-#include <stm32f722xx.h>
+#include <module.h>
+#include <device.h>
+#include <debug.h>
+
+#if 0
 // Miscellaneous macros and helpers
 #include "logic/fio.h"
 #include "macros.h"
@@ -52,23 +51,6 @@ static usb_hid_if_t *usb_hid_vendor = 0;
 
 void bootloader_check() {}
 
-static inline void usart6_init()
-{
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
-	// 10: Alternative function mode
-	GPIO_MODER(GPIOC, 6, 0b10);
-	GPIO_MODER(GPIOC, 7, 0b10);
-	GPIO_OTYPER_PP(GPIOC, 6);
-	GPIO_OSPEEDR(GPIOC, 6, 0b00);	// Low speed (4MHz)
-	GPIO_PUPDR(GPIOC, 7, GPIO_PUPDR_UP);
-	// AF8: USART6
-	GPIO_AFRL(GPIOC, 6, 8);
-	GPIO_AFRL(GPIOC, 7, 8);
-	uart_init(USART6);
-	uart_config(USART6, 115200);
-	fio_setup(uart_putc, uart_getc, USART6);
-}
-
 static inline void *i2c1_init()
 {
 	// Initialise I2C GPIOs
@@ -103,24 +85,11 @@ static inline void *i2c1_init()
 	RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN_Msk;
 	return i2c_init(&config);
 }
+#endif
 
+#if 0
 static inline void init()
 {
-	SCB_EnableICache();
-	SCB_EnableDCache();
-	rcc_init();
-	NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUPING);
-	__enable_irq();
-	systick_init(1000);
-	usart6_init();
-	pvd_init();
-
-	puts(ESC_BOOT VARIANT " build @ " __DATE__ " " __TIME__);
-	printf(ESC_INFO "Core clock: " ESC_DATA "%lu\n", clkAHB());
-
-	puts(ESC_INIT "Initialising LEDs...");
-	led_init();
-
 	puts(ESC_INIT "Initialising USB HS...");
 	usb_init(&usb, USB_OTG_HS);
 	printf(ESC_INFO "USB in " ESC_DATA "%s" ESC_INFO " mode\n",
@@ -147,9 +116,6 @@ static inline void init()
 	usb_hid_if_t *hid_mouse = usb_hid_mouse_init(hid);
 	usb_hid_if_t *hid_joystick = usb_hid_joystick_init(hid);
 
-	puts(ESC_INIT "Initialising keyboard...");
-	keyboard_init(hid_keyboard, hid_mouse, hid_joystick);
-
 	puts(ESC_INIT "Initialising MPU...");
 	if (mpu_sys_init(i2c) != 0) {
 		puts(ESC_ERROR "Error initialising MPU");
@@ -172,11 +138,13 @@ static inline void init()
 	puts(ESC_GOOD "Initialisation done");
 	usb_connect(&usb, 1);
 }
+#endif
 
 int main()
 {
-	init();
+	module_load();
 
+#if 0
 #ifdef DEBUG
 	struct {
 		uint32_t tick, audio, data, feedback, blocks, mpu, heap, usbram;
@@ -186,9 +154,32 @@ int main()
 		mmc_statistics(), mpu_cnt(), 0, 0,
 	};
 #endif
+#endif
 
-	uint32_t tick = 0, tick256 = 0;
+	const void *pkey = MODULE_FIND("keyboard");
+	void **info = MODULE_MSG(pkey, "info", 0);
+	uint32_t keys = *((uint32_t *)info++);
+	static uint32_t keyprev = 0;
+	uint32_t keystatus;
+
+	//uint32_t tick = 0, tick256 = 0;
 loop:	// Process time consuming tasks
+
+	// Keyboard status report
+	keystatus = (uint32_t)MODULE_MSG(pkey, "status", 0);
+	if (keystatus != keyprev) {
+		keyprev = keystatus;
+		printf(ESC_DEBUG "[KEY]");
+		for (uint32_t i = 0; i != keys; i++) {
+			uint32_t mask = *((uint32_t *)info + i);
+			const char *name = *((const char **)info + i + keys);
+			uint32_t pressed = keystatus & mask;
+			printf(" %s%s", pressed ? ESC_RED : ESC_GREEN, name);
+		}
+		putchar('\n');
+	}
+
+#if 0
 	usb_process(&usb);
 	usb_msc_process(&usb, usb_msc);
 	audio_process();
@@ -301,6 +292,8 @@ loop:	// Process time consuming tasks
 		prev.tick = tick;
 	}
 #endif
+#endif
+
 #ifndef DEBUG
 	__WFE();
 #endif
