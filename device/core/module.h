@@ -26,19 +26,6 @@ const module_t *module_find_next(const module_t *p);
 #define MODULE_ID(name)	HASH(MODULE_PREFIX name)
 
 // Create unique module instance
-#if 0
-#ifdef DEBUG
-#define MODULE(name, deps, param, handler) \
-	static const USED SECTION(".module") module_t CONCAT(__module__, __LINE__) = { \
-		MODULE_ID(name), (deps), (name), (void *)(param), (handler) \
-	}
-#else
-#define MODULE(name, deps, param, handler) \
-	static const USED SECTION(".module") module_t CONCAT(__module__, __LINE__) = { \
-		MODULE_ID(name), (deps), (void *)(param), (handler) \
-	}
-#endif
-#else
 #ifdef DEBUG
 #define MODULE(name, deps, param, handler) \
 	LIST_ITEM(module, module_t) = { \
@@ -49,7 +36,6 @@ const module_t *module_find_next(const module_t *p);
 	LIST_ITEM(module, module_t) = { \
 		MODULE_ID(#name), (deps), (void *)(param), (handler) \
 	}
-#endif
 #endif
 
 #define MODULE_MSG_ID(p, msgid, data) \

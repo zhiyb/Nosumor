@@ -13,10 +13,6 @@ StaticLibrary {
     // status           Current key status bitmap
     //                      * Direct type casting
     //                      uint32_t status;        // Status bitmap
-    // handler.install  Install key press event handler
-    //                      * Direct type casting
-    //                      data: void handler(uint32_t status);
-    //                          status: Status bitmap of all keys
 
     Depends {name: "core"}
     Depends {name: "init"}

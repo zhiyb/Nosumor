@@ -90,13 +90,6 @@ static inline void *i2c1_init()
 #if 0
 static inline void init()
 {
-	puts(ESC_INIT "Initialising USB HS...");
-	usb_init(&usb, USB_OTG_HS);
-	printf(ESC_INFO "USB in " ESC_DATA "%s" ESC_INFO " mode\n",
-	       usb_mode(&usb) ? "host" : "device");
-	while (usb_mode(&usb) != 0);
-	usb_init_device(&usb);
-
 	puts(ESC_INIT "Initialising I2C...");
 	i2c = i2c1_init();
 

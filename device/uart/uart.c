@@ -2,6 +2,7 @@
 #include <clocks.h>
 #include <module.h>
 #include <fio.h>
+#include <debug.h>
 
 static void init(USART_TypeDef *uart)
 {
@@ -20,6 +21,9 @@ static void init(USART_TypeDef *uart)
 		// AF8: USART6
 		GPIO_AFRL(GPIOC, 6, 8);
 		GPIO_AFRL(GPIOC, 7, 8);
+		break;
+	default:
+		dbgbkpt();
 		break;
 	}
 }

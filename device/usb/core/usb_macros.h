@@ -1,8 +1,8 @@
 #ifndef USB_MACROS_H
 #define USB_MACROS_H
 
-#include <stm32f7xx.h>
-#include "../macros.h"
+#include <device.h>
+#include <defines.h>
 
 #define FUNC(f)	if (f) f
 

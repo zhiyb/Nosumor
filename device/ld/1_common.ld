@@ -48,6 +48,7 @@ SECTIONS
   .rodata :
   {
     . = ALIGN(4);
+    KEEP(*(SORT(.rolist.*)))
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);
@@ -81,48 +82,53 @@ SECTIONS
     PROVIDE_HIDDEN (__fini_array_end = .);
   } >TEXT AT >LOAD
 
-  /* Code segments in ITCM RAM */
-  _siiram = LOADADDR(.iram);
-  .iram :
+  /* Special read-only arrays */
+  list_module :
   {
     . = ALIGN(4);
-    _siram = .;
-    *(.iram)
-    *(.iram*)
+    KEEP(*(list_module))
+  } >TEXT AT >LOAD
 
-    . = ALIGN(4);
-    _eiram = .;
-  } >IRAM AT >LOAD
-
-  /* Special RAM sections */
-  .dtcm (NOLOAD) :
+  list_keyboard :
   {
     . = ALIGN(4);
-    *(.dtcm)
-    *(.dtcm*)
+    KEEP(*(list_keyboard))
+  } >TEXT AT >LOAD
 
+  list_systick :
+  {
     . = ALIGN(4);
-    __heap_start__ = .;
-  } >DTCM
+    KEEP(*(list_systick))
+  } >TEXT AT >LOAD
 
   /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);
 
   /* Initialized data sections goes into RAM, load LMA copy after code */
+  . = ALIGN(4);
+  _sdata = .;        /* create a global symbol at data start */
+
   .data :
   {
     . = ALIGN(4);
-    _sdata = .;        /* create a global symbol at data start */
+    KEEP(*(SORT(.list.*)))
     *(.data)           /* .data sections */
     *(.data*)          /* .data* sections */
     /* Special program code inside RAM */
     *(.ram)
     *(.ram*)
-
-    . = ALIGN(4);
-    _edata = .;        /* define a global symbol at data end */
   } >RAM AT >LOAD
 
+  /* Special data arrays */
+  list_usb_ep :
+  {
+    . = ALIGN(4);
+    KEEP(*(list_usb_ep))
+    KEEP(*(SORT(.list_usb_ep*)))
+  } >TEXT AT>LOAD
+
+  . = ALIGN(4);
+  _edata = .;        /* define a global symbol at data end */
 
   /* Uninitialized data section */
   . = ALIGN(4);
@@ -158,6 +164,30 @@ SECTIONS
     PROVIDE ( _end = . );
     . = . + _Min_Heap_Size;
     . = ALIGN(8);
+  } >DTCM
+
+  /* Code segments in ITCM RAM */
+  _siiram = LOADADDR(.iram);
+  .iram :
+  {
+    . = ALIGN(4);
+    _siram = .;
+    *(.iram)
+    *(.iram*)
+
+    . = ALIGN(4);
+    _eiram = .;
+  } >IRAM AT >LOAD
+
+  /* Special RAM sections */
+  .dtcm (NOLOAD) :
+  {
+    . = ALIGN(4);
+    *(.dtcm)
+    *(.dtcm*)
+
+    . = ALIGN(4);
+    __heap_start__ = .;
   } >DTCM
 
   /* Remove information from the standard libraries */

@@ -18,13 +18,16 @@ extern void flushCache();
 
 #define dbgprintf	printf
 #define dbgbkpt()	do { \
-	fflush(stdout); \
-	flushCache(); \
-	__BKPT(0); \
+	if (dbgexist()) { \
+		fflush(stdout); \
+		flushCache(); \
+		__BKPT(0); \
+	} \
 } while (0)
 #define panic()		do { \
 	printf("\nPanicked at %s:%d: %s()\n", __FILE__, __LINE__, __PRETTY_FUNCTION__); \
 	fflush(stdout); \
+	flushCache(); \
 	__BKPT(0); \
 } while (1)
 
@@ -46,10 +49,11 @@ static inline void dbgputs(char *str) {dbgcmd(0x04, str);}
 // SYS_WRITEC
 static inline void dbgputc(char c) {dbgcmd(0x03, &c);}
 
+// SYS_SYSTEM
 static inline void dbgsystem(char *cmd)
 {
 	int data[2] = {(int)cmd, (int)strlen(cmd)};
-	dbgcmd(0x12, data);  // SYS_SYSTEM
+	dbgcmd(0x12, data);
 }
 
 #else	// DEBUG

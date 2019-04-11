@@ -17,19 +17,22 @@ Project {
         "uart",
         "led",
         "keyboard",
+        "usb",
         //"api",
     ]
 
     CppApplication {
         name: project.name
         type: ["application", "hex", "size"]
+        Depends {name: "gcc-none"}
+
         Depends {name: "core"}
         Depends {name: "init"}
         Depends {name: "uart"}
         Depends {name: "led"}
         Depends {name: "keyboard"}
+        Depends {name: "usb.core"}
         //Depends {name: "api"}
-        Depends {name: "gcc-none"}
 
         files: [
             "main.c",
@@ -39,7 +42,6 @@ Project {
             name: "Linker scripts"
             files: [
                 "ld/1_common.ld",
-                "ld/2_lists.ld",
             ]
         }
 
