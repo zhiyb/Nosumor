@@ -1,13 +1,15 @@
 #include <module.h>
 #include <debug.h>
 
-extern const module_t __module_start__, __module_end__;
+LIST(module, module_t);
 
-#define INDEX(p)    ((p) - &__module_start__)
+#define INDEX(p)	LIST_INDEX(module, *p)
+#define SIZE()		LIST_SIZE(module)
+#define ITERATE(ptr)	LIST_ITERATE(module, const module_t *ptr, ptr)
 
-static void module_msg_deps(uint32_t msgid, void *data)
+static void module_msg_all(uint32_t msgid, void *data)
 {
-	const uint32_t module_num = INDEX(&__module_end__);
+	const uint32_t module_num = SIZE();
 	uint32_t module_state[module_num];
 	for (uint32_t i = 0; i != module_num; i++)
 		module_state[i] = 0;
@@ -22,7 +24,7 @@ static void module_msg_deps(uint32_t msgid, void *data)
 	uint32_t cont;
 	do {
 		cont = 0;
-		for (const module_t *p = &__module_start__; p != &__module_end__; p++) {
+		ITERATE(p) {
 			// Skip if module already loaded
 			if (module_state[INDEX(p)])
 				continue;
@@ -58,22 +60,24 @@ static void module_msg_deps(uint32_t msgid, void *data)
 void module_load()
 {
 	// Initialisation and start
-	module_msg_deps(HASH("init"), 0);
-	module_msg_deps(HASH("start"), 0);
+	module_msg_all(HASH("init"), 0);
+	module_msg_all(HASH("start"), 0);
+	module_msg_all(HASH("active"), 0);
 }
 
 const module_t *module_find(uint32_t id)
 {
-	const module_t *p = &__module_start__;
-	for (; p->id != id && p != &__module_end__; p++);
-	return p == &__module_end__ ? 0 : p;
+	ITERATE(p)
+		if (p->id == id)
+			return p;
+	return 0;
 }
 
 const module_t *module_find_next(const module_t *p)
 {
 	uint32_t id = p->id;
-	while (p++ != &__module_end__)
+	while (p++ != __stop_list_module)
 		if (p->id == id)
-			break;
-	return p == &__module_end__ ? 0 : p;
+			return p;
+	return 0;
 }

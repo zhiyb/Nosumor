@@ -19,9 +19,13 @@ StaticLibrary {
     //                          status: Status bitmap of all keys
 
     Depends {name: "core"}
+    Depends {name: "init"}
 
     Export {
+        Depends {name: "cpp"}
+        Depends {name: "core"}
         Parameters {cpp.linkWholeArchive: true}
+        cpp.includePaths: ["."]
     }
 
     Properties {
@@ -30,5 +34,6 @@ StaticLibrary {
 
     files: [
         "keyboard.c",
+        "keyboard.h",
     ]
 }

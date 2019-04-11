@@ -11,9 +11,8 @@ static const struct {
 	uint32_t v;
 	const char *s;
 } hash[] = {
-	C("init"), C("start"), C("config"), C("stdio"), C("info"), C("status"),
-	C("tick.handler.install"), C("tick.get"), C("tick.delay"),
-	C("handler.install"),
+	C("init"), C("start"), C("active"), C("config"), C("stdio"), C("info"), C("status"),
+	C("tick.get"), C("tick.delay"),
 	CM("init"), CM("uart"), CM("led"), CM("keyboard"),
 };
 

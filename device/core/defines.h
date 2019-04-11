@@ -40,7 +40,7 @@ uint32_t hash_check();
 #define USED            __attribute__((used))
 #define ALIGN(b)        __attribute__((aligned(b)))
 #define ALIGNED         __attribute__((aligned))
-#define SECTION(s)      __attribute__((section(#s)))
+#define SECTION(s)      __attribute__((section(s)))
 #define STATIC_INLINE   __attribute__((always_inline)) static inline
 
 // Miscellaneous fixed point math function

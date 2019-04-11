@@ -1,0 +1,16 @@
+/* Specify the memory areas */
+MEMORY
+{
+    IRAM (xrw)  : ORIGIN = 0x00000000, LENGTH = 16k
+    DTCM (xrw)  : ORIGIN = 0x20000000, LENGTH = 64k
+    RAM (xrw)   : ORIGIN = 0x20010000, LENGTH = 192k
+
+    BOOT (xr)	: ORIGIN = 0x08000000, LENGTH = 16k
+    CONF (rw)	: ORIGIN = 0x08004000, LENGTH = 48k
+    LOADER (xr)	: ORIGIN = 0x08010000, LENGTH = 64k
+    APPI (xr)	: ORIGIN = 0x00220000, LENGTH = 384k
+    APP (xr)	: ORIGIN = 0x08020000, LENGTH = 384k
+}
+
+REGION_ALIAS("TEXT", APP);
+REGION_ALIAS("LOAD", APP);

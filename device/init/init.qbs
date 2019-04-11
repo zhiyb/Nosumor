@@ -8,6 +8,7 @@ StaticLibrary {
     // init                 System initialisation
     // start                Start system peripherals
     //                          Set the first available UART as stdio
+    // active               Activate IRQs
     // mco1                 External clock output GPIO control
     //                          data: uint32_t enable;  // Enable/disable MCO1 GPIO
     // tick.get             System tick counter
@@ -16,15 +17,14 @@ StaticLibrary {
     // tick.delay           Delay for some ticks
     //                          * Direct type casting
     //                          uint32_t tick;          // Number of ticks to wait
-    // tick.handler.install Install system tick event handler
-    //                          * Direct type casting
-    //                          data: void handler(uint32_t cnt);
-    //                              cnt: Tick counter value
 
     Depends {name: "core"}
 
     Export {
+        Depends {name: "cpp"}
+        Depends {name: "core"}
         Parameters {cpp.linkWholeArchive: true}
+        cpp.includePaths: ["."]
     }
 
     files: [

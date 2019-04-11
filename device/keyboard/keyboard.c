@@ -5,13 +5,13 @@
 #include <module.h>
 #include <irq.h>
 #include <debug.h>
+#include <systick.h>
+#include "keyboard.h"
 
 // Number of keys
 #define KEYBOARD_KEYS		5
 // Debouncing time (SysTick counts)
 #define KEYBOARD_DEBOUNCING	5
-// Number of event handlers
-#define KEYBOARD_MAX_HANDLERS	4
 
 #if HWVER >= 0x0100
 // KEY_12:	K1(PB4), K2(PB2)
@@ -34,6 +34,8 @@
 #define KEYBOARD_Msk	(KEYBOARD_MASK_1 | KEYBOARD_MASK_2 | \
 	KEYBOARD_MASK_3 | KEYBOARD_MASK_4 | KEYBOARD_MASK_5)
 
+LIST(keyboard, keyboard_callback_t);
+
 static const struct {
 	uint32_t keys;
 	uint32_t masks[KEYBOARD_KEYS];
@@ -54,10 +56,8 @@ uint8_t keycodes[KEYBOARD_KEYS] = {
 };
 #endif
 static volatile uint32_t status, debouncing, timeout[KEYBOARD_KEYS];
-static void (*handlers[KEYBOARD_MAX_HANDLERS])(uint32_t status) = {0};
 
 static uint32_t keyboard_gpio_status();
-static void keyboard_tick(uint32_t tick);
 
 static void keyboard_init()
 {
@@ -124,8 +124,6 @@ static void keyboard_init()
 
 static void keyboard_start()
 {
-	// Register debouncing tick
-	MODULE_MSG(module_init, "tick.handler.install", &keyboard_tick);
 	// Clear interrupt flags
 	EXTI->PR = KEYBOARD_Msk;
 	// Update keyboard status
@@ -152,8 +150,7 @@ static uint32_t keyboard_gpio_status()
 
 static void keyboard_update(uint32_t status)
 {
-	void (**p)(uint32_t) = handlers;
-	for (; p != &handlers[KEYBOARD_MAX_HANDLERS] && *p; p++)
+	LIST_ITERATE(keyboard, const keyboard_callback_t *p, p)
 		(*p)(status);
 #if 0
 	// Clear keyboard status
@@ -244,20 +241,13 @@ static void keyboard_tick(uint32_t tick)
 		dbgprintf(ESC_ERROR "[KEY] Too short\n");
 }
 
-static void register_handler(void (*func)(uint32_t))
-{
-	void (**p)(uint32_t) = handlers;
-	for (; p != &handlers[KEYBOARD_MAX_HANDLERS] && *p; p++);
-	while (p == &handlers[KEYBOARD_MAX_HANDLERS])
-		dbgbkpt();
-	*p++ = func;
-	if (p != &handlers[KEYBOARD_MAX_HANDLERS])
-		*p = 0;
-}
+// Register debouncing tick
+SYSTICK_CALLBACK(&keyboard_tick);
 
 static void *handler(void *inst, uint32_t msg, void *data)
 {
 	UNUSED(inst);
+	UNUSED(data);
 	if (msg == HASH("status")) {
 		return (void *)status;
 	} else if (msg == HASH("init")) {
@@ -268,11 +258,8 @@ static void *handler(void *inst, uint32_t msg, void *data)
 		return 0;
 	} else if (msg == HASH("info")) {
 		return (void *)&info;
-	} else if (msg == HASH("handler.install")) {
-		register_handler(data);
-		return 0;
 	}
 	return 0;
 }
 
-MODULE("keyboard", 0, 0, handler);
+MODULE(keyboard, 0, 0, handler);

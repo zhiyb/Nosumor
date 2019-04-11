@@ -75,4 +75,4 @@ static void *handler(void *inst, uint32_t msg, void *data)
 	return 0;
 }
 
-MODULE("uart", 0, USART6, handler);
+MODULE(uart, 0, USART6, handler);

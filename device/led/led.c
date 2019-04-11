@@ -13,7 +13,7 @@
 
 typedef uint32_t colour_t;
 
-static colour_t colours[LED_NUM][3] ALIGN(4) SECTION(.dtcm);
+static colour_t colours[LED_NUM][3] ALIGN(4) SECTION(".dtcm");
 
 static void base_scan_init()
 {
@@ -698,4 +698,4 @@ static void *handler(void *inst, uint32_t msg, void *data)
 	return 0;
 }
 
-MODULE("led", 0, 0, handler);
+MODULE(led, 0, 0, handler);

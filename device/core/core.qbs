@@ -244,6 +244,7 @@ StaticLibrary {
         "defines.h",
         "device.h",
         "hash.c",
+        "list.h",
         "module.c",
         "module.h",
         "irq.h",

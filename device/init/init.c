@@ -10,9 +10,9 @@
 
 static void *handler(void *inst, uint32_t msg, void *data);
 
-MODULE("init", 0, 0, handler);
+MODULE(init, 0, 0, handler);
 
-const module_t *module_init = &__module__13;
+const module_t *module_init = &_module_13;
 
 static void init()
 {
@@ -27,9 +27,6 @@ static void init()
 
 static void start()
 {
-	__enable_irq();
-	systick_enable(1);
-
 	// Find a UART and set to stdio
 	const void *pio = MODULE_FIND("uart");
 	if (pio) {
@@ -44,19 +41,25 @@ static void start()
 #endif
 }
 
+static void active()
+{
+	systick_enable(1);
+	__enable_irq();
+}
+
 static void *handler(void *inst, uint32_t msg, void *data)
 {
 	UNUSED(inst);
 	if (msg == HASH("tick.get")) {
 		return (void *)systick_cnt();
-	} else if (msg == HASH("tick.handler.install")) {
-		systick_register_handler(data);
-		return 0;
 	} else if (msg == HASH("init")) {
 		init();
 		return 0;
 	} else if (msg == HASH("start")) {
 		start();
+		return 0;
+	} else if (msg == HASH("active")) {
+		active();
 		return 0;
 	} else if (msg == HASH("mco1")) {
 		mco1_enable((uint32_t)data);

@@ -36,15 +36,23 @@ Project {
         ]
 
         Group {
+            name: "Linker scripts"
+            files: [
+                "ld/1_common.ld",
+                "ld/2_lists.ld",
+            ]
+        }
+
+        Group {
             name: "Linker script for AXI"
             condition: qbs.buildVariant === "debug"
-            files: "STM32F722RETx_FLASH_AXIM.ld"
+            files: "ld/0_STM32F722RETx_FLASH_AXIM.ld"
         }
 
         Group {
             name: "Linker script for ITCM"
             condition: qbs.buildVariant === "release"
-            files: "STM32F722RETx_FLASH_ITCM.ld"
+            files: "ld/0_STM32F722RETx_FLASH_ITCM.ld"
         }
 
         Group {     // Properties for the produced executable
