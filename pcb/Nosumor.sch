@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE eagle SYSTEM "eagle.dtd">
-<eagle version="9.3.1">
+<eagle version="9.3.2">
 <drawing>
 <settings>
 <setting alwaysvectorfont="no"/>
@@ -8939,7 +8939,7 @@ Source: AVX .. aphvc.pdf</description>
 <wire x1="172.72" y1="0" x2="304.8" y2="0" width="2.54" layer="90"/>
 <text x="302.26" y="2.54" size="2.54" layer="97" align="bottom-right">Designer:  Norman Zhi
 Date:  2019-03-12</text>
-<text x="289.56" y="22.86" size="6.4516" layer="97" align="bottom-right">Unnamed USB peripheral</text>
+<text x="294.64" y="22.86" size="6.4516" layer="97" align="bottom-right">osu! USB Supplemental Box</text>
 </plain>
 <instances>
 <instance part="K3" gate="G$1" x="393.7" y="53.34" smashed="yes">
@@ -8967,7 +8967,7 @@ Date:  2019-03-12</text>
 <attribute name="VALUE" x="342.9" y="165.1" size="1.27" layer="97" rot="MR0"/>
 </instance>
 <instance part="IC1" gate="G$1" x="248.92" y="172.72" smashed="yes">
-<attribute name="NAME" x="210.82" y="177.8" size="1.778" layer="95"/>
+<attribute name="NAME" x="233.68" y="127" size="1.778" layer="95"/>
 <attribute name="VALUE" x="243.84" y="127" size="1.778" layer="96"/>
 </instance>
 <instance part="GND28" gate="1" x="406.4" y="12.7" smashed="yes">
