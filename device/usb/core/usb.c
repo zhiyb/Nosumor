@@ -4,6 +4,8 @@
 #include <debug.h>
 #include <irq.h>
 #include "usb_macros.h"
+#include "usb_ep.h"
+#include "usb_ep0.h"
 
 #if 0
 #include "usb_macros.h"
@@ -201,21 +203,24 @@ static void usb_init_device(USB_OTG_GlobalTypeDef *base)
 	base->GINTMSK |= USB_OTG_GINTMSK_USBRST_Msk | USB_OTG_GINTMSK_USBSUSPM_Msk |
 			USB_OTG_GINTMSK_ENUMDNEM_Msk |
 			USB_OTG_GINTMSK_OEPINT_Msk | USB_OTG_GINTMSK_IEPINT_Msk;
+	// Register endpoint 0
+	usb_ep0_reserve();
 }
 
 static void usb_start(USB_OTG_GlobalTypeDef *base)
 {
 	// Only device mode is supported
 	while (usb_mode(base) != 0);
-	dbgprintf(ESC_INFO "[USB] Starting in " ESC_DATA "%s" ESC_INFO " mode\n",
+	dbgprintf(ESC_INFO "[USB.Core] Starting in " ESC_DATA "%s" ESC_INFO " mode\n",
 	       usb_mode(base) ? "host" : "device");
 	usb_init_device(base);
 }
 
 static void usb_active(USB_OTG_GlobalTypeDef *base)
 {
-	MODULE_MSG(module_init, "tick.delay", 100);
-	usb_connect(base, 1);
+	MODULE_MSG(module_init, "tick.delay", 5);
+	usb_ep_reserve();
+	//usb_connect(base, 1);
 }
 
 #if 0

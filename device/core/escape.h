@@ -23,6 +23,7 @@
 #define ESC_BRIGHT_WHITE	"\033[97m"
 
 #define ESC_RGB(r, g, b)	"\033[38;2;" #r ";" #g ";" #b "m"
+#define ESC_66ccff	ESC_RGB(102, 204, 255)
 
 #define ESC_RESET	"\033[0m"
 #define ESC_BOLD	"\033[1m"

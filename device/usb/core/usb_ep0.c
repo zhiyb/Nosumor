@@ -1,3 +1,7 @@
+#include "usb_ep.h"
+#include "usb_ep0.h"
+
+#if 0
 #include <malloc.h>
 #include <string.h>
 #include "../debug.h"
@@ -6,7 +10,15 @@
 #include "usb_ram.h"
 #include "usb_macros.h"
 #include "usb_structs.h"
+#endif
 
+USB_EP(0x00, IN) = {
+};
+
+USB_EP(0x00, OUT) = {
+};
+
+#if 0
 #define MAX_SETUP_CNT	3u
 #define MAX_PKT_CNT	1u
 #define MAX_SIZE	64ul
@@ -15,7 +27,9 @@
 #define DSTS_ENUMSPD_FS_PHY_30MHZ_OR_60MHZ     (1 << 1)
 #define DSTS_ENUMSPD_LS_PHY_6MHZ               (2 << 1)
 #define DSTS_ENUMSPD_FS_PHY_48MHZ              (3 << 1)
+#endif
 
+#if 0
 typedef struct setup_buf_t {
 	struct setup_buf_t * volatile next;
 	// Setup packet buffers
@@ -28,7 +42,15 @@ typedef struct {
 	uint32_t dma;
 	uint16_t size;
 } epout_data_t;
+#endif
 
+void usb_ep0_reserve()
+{
+	USB_EP_RESERVE(0x00, IN, 1);
+	USB_EP_RESERVE(0x00, OUT, 1);
+}
+
+#if 0
 static void epin_init(usb_t *usb, uint32_t n)
 {
 	uint32_t size = MAX_SIZE * 2ul, addr = usb_ram_alloc(usb, &size);
@@ -236,3 +258,4 @@ void usb_ep0_process(usb_t *usb)
 		__enable_irq();
 	}
 }
+#endif

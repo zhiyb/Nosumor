@@ -21,5 +21,9 @@ StaticLibrary {
         "usb.c",
         "usb_macros.h",
         "usb_irq.c",
+        "usb_ep.h",
+        "usb_ep.c",
+        "usb_ep0.h",
+        "usb_ep0.c",
     ]
 }

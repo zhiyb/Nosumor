@@ -22,8 +22,8 @@ const module_t *module_find(uint32_t id);
 const module_t *module_find_next(const module_t *p);
 
 // Module ID specific hash
-#define MODULE_PREFIX	"_module."
-#define MODULE_ID(name)	HASH(MODULE_PREFIX name)
+#define MODULE_PREFIX		"_module."
+#define MODULE_ID(name)		HASH(MODULE_PREFIX name)
 
 // Create unique module instance
 #ifdef DEBUG

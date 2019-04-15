@@ -12,7 +12,7 @@ static void *handler(void *inst, uint32_t msg, void *data);
 
 MODULE(init, 0, 0, handler);
 
-const module_t *module_init = &_module_13;
+const module_t *module_init = &_list_module_13;
 
 static void init()
 {

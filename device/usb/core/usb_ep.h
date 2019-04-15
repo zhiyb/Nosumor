@@ -1,6 +1,39 @@
 #ifndef USB_EP_H
 #define USB_EP_H
 
+#include <stdint.h>
+#include <defines.h>
+#include "usb_macros.h"
+
+typedef struct {
+	uint8_t ep_req;		// Preferred endpoint number
+	uint8_t resv;		// Reserve this endpoint
+	uint8_t ep;		// Actual endpoint number
+	uint8_t active;
+} usb_ep_data_t;
+
+typedef struct {
+	void (*tmp)();
+} usb_ep_t;
+
+#define EP_ANY	0x10
+
+// Alloc a preferred endpoint storage
+// ep:   Preferred endpoint number (0xnn or EP_ANY)
+// dir:  Endpoint direction (IN, OUT)
+// = cb: Endpoint event callbacks
+#define USB_EP(ep, dir) \
+	static usb_ep_data_t CONCAT(_reserve_usb_ep_data_ ## dir ## _, ep) \
+		SECTION(".usb_ep_data." #dir "." STRING(ep) ".1") USED = {ep, 0, 0, 0}; \
+	static const usb_ep_t CONCAT(_reserve_usb_ep_text_ ## dir ## _, ep) \
+		SECTION(".usb_ep_text." #dir "." STRING(ep) ".1") USED
+// Reserve/unreserve the endpoint
+#define USB_EP_RESERVE(ep, dir, v) \
+	CONCAT(_reserve_usb_ep_data_ ## dir ## _, ep).resv = v
+
+void usb_ep_reserve();
+
+#if 0
 #include <stm32f7xx.h>
 #include <stdint.h>
 #include "usb_desc.h"
@@ -23,5 +56,6 @@ void usb_ep_out_transfer(USB_OTG_GlobalTypeDef *usb, int n, void *p,
 void usb_ep_out_ack(USB_OTG_GlobalTypeDef *usb, int n);
 void usb_ep_out_stall(USB_OTG_GlobalTypeDef *usb, int n);
 void usb_ep_out_wait(USB_OTG_GlobalTypeDef *usb, int n);
+#endif
 
 #endif // USB_EP_H

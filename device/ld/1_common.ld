@@ -48,9 +48,10 @@ SECTIONS
   .rodata :
   {
     . = ALIGN(4);
-    KEEP(*(SORT(.rolist.*)))
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
+    . = ALIGN(4);
+    KEEP(*(SORT(.olist.ro*)))
     . = ALIGN(4);
   } >TEXT AT >LOAD
 
@@ -101,34 +102,47 @@ SECTIONS
     KEEP(*(list_systick))
   } >TEXT AT >LOAD
 
+  list_usb_ep_text :
+  {
+    . = ALIGN(4);
+    KEEP(*(list_usb_ep_text))
+    . = ALIGN(4);
+    _start_usb_ep_in_text = .;
+    KEEP(*(SORT(.usb_ep_text.IN.*)))
+    . = ALIGN(4);
+    _start_usb_ep_out_text = .;
+    KEEP(*(SORT(.usb_ep_text.OUT.*)))
+  } >TEXT AT>LOAD
+
   /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);
 
   /* Initialized data sections goes into RAM, load LMA copy after code */
   . = ALIGN(4);
-  _sdata = .;        /* create a global symbol at data start */
 
   .data :
   {
+    _sdata = .;        /* create a global symbol at data start */
     . = ALIGN(4);
-    KEEP(*(SORT(.list.*)))
     *(.data)           /* .data sections */
     *(.data*)          /* .data* sections */
     /* Special program code inside RAM */
     *(.ram)
     *(.ram*)
-  } >RAM AT >LOAD
 
-  /* Special data arrays */
-  list_usb_ep :
-  {
+    /* Special USB endpoint status section */
     . = ALIGN(4);
-    KEEP(*(list_usb_ep))
-    KEEP(*(SORT(.list_usb_ep*)))
-  } >TEXT AT>LOAD
+    _start_usb_ep_in_data = .;
+    KEEP(*(SORT(.usb_ep_data.IN.*)))
+    _stop_usb_ep_in_data = .;
+    . = ALIGN(4);
+    _start_usb_ep_out_data = .;
+    KEEP(*(SORT(.usb_ep_data.OUT.*)))
+    _stop_usb_ep_out_data = .;
 
-  . = ALIGN(4);
-  _edata = .;        /* define a global symbol at data end */
+    . = ALIGN(4);
+    _edata = .;        /* define a global symbol at data end */
+  } >RAM AT >LOAD
 
   /* Uninitialized data section */
   . = ALIGN(4);
@@ -196,6 +210,7 @@ SECTIONS
     libc.a ( * )
     libm.a ( * )
     libgcc.a ( * )
+    *(.olist.*)
   }
 
   .ARM.attributes 0 : { *(.ARM.attributes) }

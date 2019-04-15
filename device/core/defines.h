@@ -23,13 +23,13 @@
 
 // Static string hash
 // http://lolengine.net/blog/2011/12/20/cpp-constant-string-hash
-#define STR_H1(s,i,x)   (x*65599u+(uint8_t)s[(i)<strlen(s)?strlen(s)-1-(i):strlen(s)])
+#define STR_H1(s,i,x)   (x*65599u+(const uint8_t)s[(i)<strlen(s)?strlen(s)-1-(i):strlen(s)])
 #define STR_H4(s,i,x)   STR_H1(s,i,STR_H1(s,i+1,STR_H1(s,i+2,STR_H1(s,i+3,x))))
 #define STR_H16(s,i,x)  STR_H4(s,i,STR_H4(s,i+4,STR_H4(s,i+8,STR_H4(s,i+12,x))))
 #define STR_H64(s,i,x)  STR_H16(s,i,STR_H16(s,i+16,STR_H16(s,i+32,STR_H16(s,i+48,x))))
 #define STR_H256(s,i,x) STR_H64(s,i,STR_H64(s,i+64,STR_H64(s,i+128,STR_H64(s,i+192,x))))
 // Limit: 256 characters
-#define HASH(s)         ((uint32_t)(STR_H256(s,0,0)^(STR_H256(s,0,0)>>16)))
+#define HASH(s)         ((const uint32_t)(STR_H256(s,0,0)^(STR_H256(s,0,0)>>16)))
 
 #ifdef DEBUG
 uint32_t hash_check();
@@ -54,5 +54,7 @@ uint32_t hash_check();
 
 #define _CONCAT(a, b)   a ## b
 #define CONCAT(a, b)    _CONCAT(a, b)
+#define _STRING(x)	#x
+#define STRING(x)	_STRING(x)
 
 #endif // DEFINES_H
