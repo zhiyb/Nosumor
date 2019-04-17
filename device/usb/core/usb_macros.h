@@ -4,8 +4,6 @@
 #include <device.h>
 #include <defines.h>
 
-#define FUNC(f)	if (f) f
-
 #define DEV(usb)	((USB_OTG_DeviceTypeDef *)((void *)(usb) + USB_OTG_DEVICE_BASE))
 #define EP_IN(usb, n)	((USB_OTG_INEndpointTypeDef *)((void *)(usb) + USB_OTG_IN_ENDPOINT_BASE + ((n) << 5)))
 #define EP_OUT(usb, n)	((USB_OTG_OUTEndpointTypeDef *)((void *)(usb) + USB_OTG_OUT_ENDPOINT_BASE + ((n) << 5)))
@@ -21,7 +19,7 @@
 #define DOEPCTL_MASK	(USB_OTG_DOEPCTL_SNPM_Msk | USB_OTG_DOEPCTL_EPTYP_Msk | \
 	USB_OTG_DOEPCTL_USBAEP_Msk | USB_OTG_DOEPCTL_MPSIZ_Msk)
 #define DOEPCTL_SET(r, m)	(r) = ((r) & DOEPCTL_MASK) | (m)
-#define DIEPTXF(a, d)	((((d) >> 2) << USB_OTG_DIEPTXF_INEPTXFD_Pos) | ((a) << USB_OTG_DIEPTXF_INEPTXSA_Pos))
+#define DIEPTXF(a, d)	(((d) << USB_OTG_DIEPTXF_INEPTXFD_Pos) | ((a) << USB_OTG_DIEPTXF_INEPTXSA_Pos))
 
 #define EP_TYP_CONTROL		(0b00ul << USB_OTG_DIEPCTL_EPTYP_Pos)
 #define EP_TYP_ISOCHRONOUS	(0b01ul << USB_OTG_DIEPCTL_EPTYP_Pos)

@@ -2,16 +2,7 @@
 #include <device.h>
 #include <debug.h>
 #include "usb_macros.h"
-#if 0
 #include "usb_ep.h"
-#include "usb_ep0.h"
-#include "usb_ram.h"
-#include "usb_structs.h"
-#endif
-
-#if 0
-usb_t *usb_hs = 0;
-#endif
 
 static void usb_reset(USB_OTG_GlobalTypeDef *base)
 {
@@ -19,11 +10,6 @@ static void usb_reset(USB_OTG_GlobalTypeDef *base)
 	// Reset USB device address
 	dev->DCFG &= ~USB_OTG_DCFG_DAD_Msk;
 	dev->DAINTMSK = 0;
-#if 0
-	// Reset USB FIFO RAM allocation
-	usb_ram_reset(usb);
-	usb->speed = USB_Reset;
-#endif
 }
 
 #if 0
@@ -248,7 +234,6 @@ void OTG_HS_IRQHandler()
 
 	// USB emulation done
 	if (i & USB_OTG_GINTSTS_ENUMDNE_Msk) {
-		dbgbkpt();
 		//usb_ep0_enum(usb, dev->DSTS & USB_OTG_DSTS_ENUMSPD_Msk);
 		base->GINTSTS = USB_OTG_GINTSTS_ENUMDNE_Msk;
 		bkpt = 0;

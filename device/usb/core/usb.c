@@ -7,23 +7,16 @@
 #include "usb_ep.h"
 #include "usb_ep0.h"
 
-#if 0
-#include "usb_macros.h"
-#include "usb_irq.h"
-#include "usb_ep0.h"
-#include "usb_structs.h"
-#include "usb.h"
-#endif
-
 static void usb_hs_init_gpio();
+
+static void *callback(void *inst, uint32_t msg, void *data);
+
+MODULE(usb.core, 0, USB_OTG_HS, callback);
+
+const module_t *module_usb_core_hs = &_list_module_14;
 
 static void usb_init(USB_OTG_GlobalTypeDef *base)
 {
-#if 0
-	memset(usb, 0, sizeof(usb_t));
-	usb->base = base;
-#endif
-
 	if (base != USB_OTG_HS) {
 		dbgbkpt();
 		return;
@@ -169,8 +162,6 @@ static void usb_connect(USB_OTG_GlobalTypeDef *base, int e)
 		dev->DCTL = USB_OTG_DCTL_SDIS_Msk;
 #if 0
 		usb_disable(usb);
-		systick_delay(100);
-		MODULE_MSG(module_init, "tick.delay", 100);
 #endif
 	} else
 		dev->DCTL = 0;	// Connect device
@@ -178,13 +169,11 @@ static void usb_connect(USB_OTG_GlobalTypeDef *base, int e)
 
 static void usb_init_device(USB_OTG_GlobalTypeDef *base)
 {
-	//USB_OTG_GlobalTypeDef *base = usb->base;
 	USB_OTG_DeviceTypeDef *dev = DEV(base);
 	// Disconnect USB
 	usb_connect(base, 0);
-#if 0
-	usb_ep0_register(usb);
-#endif
+	//MODULE_MSG(module_init, "tick.delay", 2);
+
 	// Enable transceiver delay
 	dev->DCFG = (0b10 << USB_OTG_DCFG_PERSCHIVL_Pos) | (1ul << 14u) |
 			USB_OTG_DCFG_NZLSOHSK_Msk;
@@ -203,8 +192,6 @@ static void usb_init_device(USB_OTG_GlobalTypeDef *base)
 	base->GINTMSK |= USB_OTG_GINTMSK_USBRST_Msk | USB_OTG_GINTMSK_USBSUSPM_Msk |
 			USB_OTG_GINTMSK_ENUMDNEM_Msk |
 			USB_OTG_GINTMSK_OEPINT_Msk | USB_OTG_GINTMSK_IEPINT_Msk;
-	// Register endpoint 0
-	usb_ep0_reserve();
 }
 
 static void usb_start(USB_OTG_GlobalTypeDef *base)
@@ -216,42 +203,23 @@ static void usb_start(USB_OTG_GlobalTypeDef *base)
 	usb_init_device(base);
 }
 
-static void usb_active(USB_OTG_GlobalTypeDef *base)
-{
-	MODULE_MSG(module_init, "tick.delay", 5);
-	usb_ep_reserve();
-	//usb_connect(base, 1);
-}
-
-#if 0
-void usb_process(usb_t *usb)
-{
-	usb_ep0_process(usb);
-}
-
-uint32_t usb_active(usb_t *usb)
-{
-	uint32_t active = usb->active;
-	uint32_t act = active != usb->act;
-	usb->act = active;
-	return act;
-}
-#endif
-
 static void *callback(void *inst, uint32_t msg, void *data)
 {
+	USB_OTG_GlobalTypeDef *base = inst;
 	UNUSED(data);
+
 	if (msg == HASH("init")) {
-		usb_init(inst);
+		usb_init(base);
 		return 0;
 	} else if (msg == HASH("start")) {
-		usb_start(inst);
+		usb_start(base);
 		return 0;
-	} else if (msg == HASH("active")) {
-		usb_active(inst);
+	} else if (msg == HASH("connect")) {	// "active"
+		uint32_t e = (uint32_t)data;
+		if (e)
+			usb_ep_active(base);
+		usb_connect(base, e);
 		return 0;
 	}
 	return 0;
 }
-
-MODULE(usb, 0, USB_OTG_HS, callback);

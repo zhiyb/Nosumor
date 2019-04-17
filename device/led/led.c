@@ -611,47 +611,45 @@ static void led_set(uint32_t i, uint32_t size, const uint16_t *c)
 	}
 }
 
-static void led_get(uint32_t i, uint32_t size, uint16_t *c)
+static void led_get(uint16_t *c)
 {
-	if (i >= LED_NUM || size != 3u) {
-		dbgbkpt();
-		return;
-	}
-	colour_t *p = &colours[i][0];
-	// Fix for out-of-order hardware connections
-	switch (i) {
+	for (uint32_t i = 0; i != LED_NUM; i++) {
+		colour_t *p = &colours[i][0];
+		// Fix for out-of-order hardware connections
+		switch (i) {
 #if HWVER == 0x0003
-	case 1:
-	case 2: {
-		uint16_t b = *p++;
-		*c++ = *p++;
-		*c++ = *p++;
-		*c++ = b;
-		break;
-	}
+		case 1:
+		case 2: {
+			uint16_t b = *p++;
+			*c++ = *p++;
+			*c++ = *p++;
+			*c++ = b;
+			break;
+		}
 #elif HWVER == 0x0002
-	case 0:
-		*c++ = *p++;
-		uint16_t b = *p++;
-		*c++ = *p++;
-		*c++ = b;
-		break;
-	case 1:
-		*c++ = colours[1][0];
-		*c++ = colours[2][1];
-		*c++ = colours[1][1];
-		break;
-	case 2:
-		*c++ = colours[1][2];
-		*c++ = colours[2][2];
-		*c++ = colours[2][0];
-		break;
+		case 0:
+			*c++ = *p++;
+			uint16_t b = *p++;
+			*c++ = *p++;
+			*c++ = b;
+			break;
+		case 1:
+			*c++ = colours[1][0];
+			*c++ = colours[2][1];
+			*c++ = colours[1][1];
+			break;
+		case 2:
+			*c++ = colours[1][2];
+			*c++ = colours[2][2];
+			*c++ = colours[2][0];
+			break;
 #endif
-	default:
-		*c++ = *p++;
-		*c++ = *p++;
-		*c++ = *p++;
-		break;
+		default:
+			*c++ = *p++;
+			*c++ = *p++;
+			*c++ = *p++;
+			break;
+		}
 	}
 }
 
@@ -687,13 +685,15 @@ static void led_start()
 static void *handler(void *inst, uint32_t msg, void *data)
 {
 	UNUSED(inst);
-	UNUSED(data);
+
 	if (msg == HASH("init")) {
 		led_init();
 		return 0;
 	} else if (msg == HASH("start")) {
 		led_start();
 		return 0;
+	} else if (msg == HASH("get")) {
+		led_get(data);
 	}
 	return 0;
 }

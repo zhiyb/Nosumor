@@ -63,7 +63,6 @@ static inline void dbgsystem(char *cmd)
 #define dbgprintf(...)	((void)0)
 #define dbgbkpt()	((void)0)
 #define panic()		do { \
-	printf("\nPanicked  at %d: %s()\n", __LINE__, __PRETTY_FUNCTION__); \
 	fflush(stdout); \
 	__BKPT(0); \
 } while (1)

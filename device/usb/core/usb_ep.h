@@ -13,7 +13,13 @@ typedef struct {
 } usb_ep_data_t;
 
 typedef struct {
-	void (*tmp)();
+	const char *name;
+	uint32_t id;
+	struct {
+		uint32_t type;
+		uint32_t pkt_size;
+	};
+	void (*activate)();
 } usb_ep_t;
 
 #define EP_ANY	0x10
@@ -24,14 +30,22 @@ typedef struct {
 // = cb: Endpoint event callbacks
 #define USB_EP(ep, dir) \
 	static usb_ep_data_t CONCAT(_reserve_usb_ep_data_ ## dir ## _, ep) \
-		SECTION(".usb_ep_data." #dir "." STRING(ep) ".1") USED = {ep, 0, 0, 0}; \
+		SECTION(".usb_ep_data." #dir "." STRING(ep) ".1") USED = {ep, 1, 0, 0}; \
 	static const usb_ep_t CONCAT(_reserve_usb_ep_text_ ## dir ## _, ep) \
 		SECTION(".usb_ep_text." #dir "." STRING(ep) ".1") USED
+// Endpoint module name
+#define USB_EP_MODULE_PREFIX	"_usb_ep_module."
+#define USB_EP_MODULE_ID(name)	HASH(USB_EP_MODULE_PREFIX name)
+#ifdef DEBUG
+#define USB_EP_MODULE(name)	#name, USB_EP_MODULE_ID(#name)
+#else
+#define USB_EP_MODULE(name)	USB_EP_MODULE_ID(#name)
+#endif
 // Reserve/unreserve the endpoint
 #define USB_EP_RESERVE(ep, dir, v) \
 	CONCAT(_reserve_usb_ep_data_ ## dir ## _, ep).resv = v
 
-void usb_ep_reserve();
+void usb_ep_active(USB_OTG_GlobalTypeDef *base);
 
 #if 0
 #include <stm32f7xx.h>

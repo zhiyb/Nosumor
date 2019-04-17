@@ -57,4 +57,6 @@ uint32_t hash_check();
 #define _STRING(x)	#x
 #define STRING(x)	_STRING(x)
 
+#define FUNC(f)		if (f) f
+
 #endif // DEFINES_H

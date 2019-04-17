@@ -19,7 +19,9 @@ extern const module_t *module_init;
 
 void module_load();
 const module_t *module_find(uint32_t id);
-const module_t *module_find_next(const module_t *p);
+const module_t *module_find_next(const module_t *pm);
+void module_dispatcher_enqueue(const module_t *pm, uint32_t msg, void *data);
+void module_dispatcher_process();
 
 // Module ID specific hash
 #define MODULE_PREFIX		"_module."

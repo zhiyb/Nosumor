@@ -152,26 +152,35 @@ int main()
 	const void *pkey = MODULE_FIND("keyboard");
 	void **info = MODULE_MSG(pkey, "info", 0);
 	uint32_t keys = *((uint32_t *)info++);
-	static uint32_t keyprev = 0;
-	uint32_t keystatus;
+	uint32_t *masks = (uint32_t *)info;
+	static uint32_t key_prev = 0;
+	uint32_t key_status;
 
 	//uint32_t tick = 0, tick256 = 0;
 loop:	// Process time consuming tasks
 
 	// Keyboard status report
-	keystatus = (uint32_t)MODULE_MSG(pkey, "status", 0);
-	if (keystatus != keyprev) {
-		keyprev = keystatus;
+	key_status = (uint32_t)MODULE_MSG(pkey, "status", 0);
+	uint32_t key_press = key_status & ~key_prev;
+	if (key_status != key_prev) {
+		key_prev = key_status;
 		printf(ESC_DEBUG "[KEY]");
 		for (uint32_t i = 0; i != keys; i++) {
-			uint32_t mask = *((uint32_t *)info + i);
+			uint32_t mask = masks[i];
 			const char *name = *((const char **)info + i + keys);
-			uint32_t pressed = keystatus & mask;
+			uint32_t pressed = key_status & mask;
 			printf(" %s%s", pressed ? ESC_RED : ESC_GREEN, name);
 		}
 		putchar('\n');
 	}
 
+	if (key_press & masks[3])
+		module_dispatcher_enqueue(MODULE_FIND("usb.core"), HASH("connect"), (void *)1);
+	else if (key_press & masks[4])
+		module_dispatcher_enqueue(MODULE_FIND("usb.core"), HASH("connect"), (void *)0);
+
+	// Module message dispatcher
+	module_dispatcher_process();
 #if 0
 	usb_process(&usb);
 	usb_msc_process(&usb, usb_msc);
@@ -286,9 +295,10 @@ loop:	// Process time consuming tasks
 	}
 #endif
 #endif
-
+#if 0	// TODO what if an interrupt happened just before __WFE(), and enqueued an event?
 #ifndef DEBUG
 	__WFE();
+#endif
 #endif
 	goto loop;
 	return 0;

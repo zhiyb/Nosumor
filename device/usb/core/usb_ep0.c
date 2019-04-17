@@ -1,28 +1,36 @@
+#include <module.h>
+#include <debug.h>
 #include "usb_ep.h"
 #include "usb_ep0.h"
 
-#if 0
-#include <malloc.h>
-#include <string.h>
-#include "../debug.h"
-#include "usb_ep0.h"
-#include "usb_ep.h"
-#include "usb_ram.h"
-#include "usb_macros.h"
-#include "usb_structs.h"
-#endif
+#define MAX_SETUP_CNT	3u
+#define MAX_PKT_CNT	1u
+#define MAX_SIZE	64
+
+extern const module_t *module_usb_core_hs;
+
+static uint8_t buff_out[2][MAX_SIZE];
+
+static void activate();
 
 USB_EP(0x00, IN) = {
+	USB_EP_MODULE(usb.core),
+	{EP_CONTROL, MAX_SIZE},
+	0,
 };
 
 USB_EP(0x00, OUT) = {
+	USB_EP_MODULE(usb.core),
+	{EP_CONTROL, MAX_SIZE},
+	activate,
 };
 
-#if 0
-#define MAX_SETUP_CNT	3u
-#define MAX_PKT_CNT	1u
-#define MAX_SIZE	64ul
+static void activate()
+{
+	dbgbkpt();
+}
 
+#if 0
 #define DSTS_ENUMSPD_HS_PHY_30MHZ_OR_60MHZ     (0 << 1)
 #define DSTS_ENUMSPD_FS_PHY_30MHZ_OR_60MHZ     (1 << 1)
 #define DSTS_ENUMSPD_LS_PHY_6MHZ               (2 << 1)
@@ -43,12 +51,6 @@ typedef struct {
 	uint16_t size;
 } epout_data_t;
 #endif
-
-void usb_ep0_reserve()
-{
-	USB_EP_RESERVE(0x00, IN, 1);
-	USB_EP_RESERVE(0x00, OUT, 1);
-}
 
 #if 0
 static void epin_init(usb_t *usb, uint32_t n)

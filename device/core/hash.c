@@ -1,9 +1,12 @@
 #include <defines.h>
-#include <module.h>
 #include <debug.h>
 
-#define C(name)		{HASH(name), name}
-#define CM(name)	{MODULE_ID(name), MODULE_PREFIX name}
+#define MODULE_PREFIX		"_module."
+#define USB_EP_MODULE_PREFIX	"_usb_ep_module."
+
+#define C(name)		{HASH(#name), #name}
+#define C_M(name)	{HASH(MODULE_PREFIX #name), MODULE_PREFIX #name}
+#define C_UEM(name)	{HASH(USB_EP_MODULE_PREFIX #name), USB_EP_MODULE_PREFIX #name}
 
 #ifdef DEBUG
 
@@ -11,9 +14,12 @@ static const struct {
 	uint32_t v;
 	const char *s;
 } hash[] = {
-	C("init"), C("start"), C("active"), C("config"), C("stdio"), C("info"), C("status"),
-	C("tick.get"), C("tick.delay"),
-	CM("init"), CM("uart"), CM("led"), CM("keyboard"),
+	C(init), C(start), C(active), C(config), C(stdio), C(info), C(get), C(set),
+	C(status), C(connect), C(disconnect),
+	C(tick.get), C(tick.delay),
+	C(IN), C(OUT),
+	C_M(init), C_M(uart), C_M(led), C_M(keyboard), C_M(usb.core),
+	C_UEM(usb.core), C_UEM(usb.keyboard), C_UEM(usb.mouse), C_UEM(usb.joystick),
 };
 
 // For checking string hash collision

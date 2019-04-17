@@ -11,6 +11,9 @@
 // Loop iteration
 #define LIST_ITERATE(name, decl, ptr) \
 	for (decl = __start_list_ ## name; (ptr) != __stop_list_ ## name; (ptr)++)
+// Access an item by index
+#define LIST_AT(name, i) \
+	(*(__start_list_ ## name + (i)))
 // Index of an item
 #define LIST_INDEX(name, p) \
 	(&(p) - __start_list_ ## name)
