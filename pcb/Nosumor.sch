@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE eagle SYSTEM "eagle.dtd">
-<eagle version="9.3.2">
+<eagle version="9.4.0">
 <drawing>
 <settings>
 <setting alwaysvectorfont="no"/>
@@ -1719,10 +1719,10 @@ Range: 6.0 MHz to 125 MHz</description>
 <wire x1="-1.7" y1="-1.9" x2="-1.7" y2="1.9" width="0" layer="20"/>
 </package>
 <package name="1105">
-<smd name="CA" x="-1.35" y="0" dx="0.6" dy="0.85" layer="1"/>
-<smd name="G" x="-0.45" y="0" dx="0.6" dy="0.85" layer="1"/>
-<smd name="B" x="0.45" y="0" dx="0.6" dy="0.85" layer="1"/>
-<smd name="R" x="1.35" y="0" dx="0.6" dy="0.85" layer="1"/>
+<smd name="R" x="-1.35" y="0" dx="0.6" dy="0.85" layer="1"/>
+<smd name="B" x="-0.45" y="0" dx="0.6" dy="0.85" layer="1"/>
+<smd name="G" x="0.45" y="0" dx="0.6" dy="0.85" layer="1"/>
+<smd name="CA" x="1.35" y="0" dx="0.6" dy="0.85" layer="1"/>
 <wire x1="1.35" y1="-0.7" x2="1.35" y2="-1" width="0.127" layer="21"/>
 <wire x1="1.35" y1="-1" x2="-1.35" y2="-1" width="0.127" layer="21"/>
 <wire x1="-1.35" y1="-1" x2="-1.35" y2="-0.7" width="0.127" layer="21"/>
@@ -8938,7 +8938,8 @@ Source: AVX .. aphvc.pdf</description>
 <wire x1="172.72" y1="45.72" x2="172.72" y2="88.9" width="2.54" layer="90"/>
 <wire x1="172.72" y1="0" x2="304.8" y2="0" width="2.54" layer="90"/>
 <text x="302.26" y="2.54" size="2.54" layer="97" align="bottom-right">Designer:  Norman Zhi
-Date:  2019-03-12</text>
+Revision:               1.2
+Date:  2019-04-25</text>
 <text x="294.64" y="22.86" size="6.4516" layer="97" align="bottom-right">osu! USB Supplemental Box</text>
 </plain>
 <instances>
@@ -11007,10 +11008,10 @@ Date:  2019-03-12</text>
 <pinref part="R3" gate="G$1" pin="1"/>
 <wire x1="22.86" y1="146.05" x2="22.86" y2="142.24" width="0.1524" layer="91"/>
 <wire x1="22.86" y1="142.24" x2="27.94" y2="142.24" width="0.1524" layer="91"/>
-<pinref part="U2" gate="G$1" pin="ACBUS3"/>
-<wire x1="27.94" y1="142.24" x2="27.94" y2="154.94" width="0.1524" layer="91"/>
-<wire x1="27.94" y1="154.94" x2="43.18" y2="154.94" width="0.1524" layer="91"/>
+<wire x1="27.94" y1="142.24" x2="27.94" y2="157.48" width="0.1524" layer="91"/>
 <label x="27.94" y="142.24" size="1.778" layer="255" rot="MR270"/>
+<pinref part="U2" gate="G$1" pin="ACBUS2"/>
+<wire x1="43.18" y1="157.48" x2="27.94" y2="157.48" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="RGB_G" class="0">
@@ -11644,27 +11645,6 @@ Date:  2019-03-12</text>
 </nets>
 </sheet>
 </sheets>
-<errors>
-<approved hash="104,1,-121.92,-60.96,IC1PWR,VDD,+3V3,,,"/>
-<approved hash="104,1,-121.92,-96.52,IC1PWR,VSS,GND,,,"/>
-<approved hash="104,1,-116.84,-60.96,IC1PWR,VDD,+3V3,,,"/>
-<approved hash="104,1,-116.84,-96.52,IC1PWR,VSS,GND,,,"/>
-<approved hash="104,1,-111.76,-60.96,IC1PWR,VDD,+3V3,,,"/>
-<approved hash="104,1,-106.68,-60.96,IC1PWR,VDD,+3V3,,,"/>
-<approved hash="104,1,-111.76,-96.52,IC1PWR,VSS,GND,,,"/>
-<approved hash="104,1,-106.68,-96.52,IC1PWR,VSS,GND,,,"/>
-<approved hash="104,1,-43.18,-73.66,IC1,VDDA,+3V3,,,"/>
-<approved hash="104,1,-43.18,-76.2,IC1,VSSA,GND,,,"/>
-<approved hash="104,1,-43.18,-71.12,IC1,VBAT,+3V3,,,"/>
-<approved hash="104,1,-43.18,-91.44,IC1,VCAP1,N$29,,,"/>
-<approved hash="106,1,-157.48,78.74,NRST_N,,,,,"/>
-<approved hash="113,1,5.5245,36.6818,J2,,,,,"/>
-<approved hash="113,1,-132.08,59.69,U1,,,,,"/>
-<approved hash="113,1,-40.5088,20.0829,JP1,,,,,"/>
-<approved hash="113,1,-76.2,-87.3845,BOOT,,,,,"/>
-<approved hash="113,1,154.591,21.9795,J4,,,,,"/>
-<approved hash="113,1,-66.3889,77.0805,J1,,,,,"/>
-</errors>
 </schematic>
 </drawing>
 <compatibility>
