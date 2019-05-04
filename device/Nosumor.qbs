@@ -7,7 +7,7 @@ Project {
     property string device: "STM32F722"
     property bool cmsis_dsp: false
     property bool bootloader: false
-    property int hwver: 0x0100
+    property int hwver: 0x0102
     property string hwver_str: ("0000" + hwver.toString(16)).slice(-4)
 
     references: [

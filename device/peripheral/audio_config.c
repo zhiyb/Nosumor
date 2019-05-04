@@ -57,6 +57,127 @@ void audio_init_reset(void *i2c)
 void audio_init_config()
 {
 	static const uint8_t cmd[] = {
+#if HWVER >= 0x0101
+		// ##### Power and Analog Configuration ###########################
+		0x00, 0x01,		// Select Page 1
+		0x01, 0x08,		// Disable weak AVDD to DVDD connection
+		0x3a, 0x7c,		// Drive unused inputs to common mode
+		0x02, 0x00,		// Enable Master Analog Power Control
+		0x7b, 0x01,		// REF charging time = 40ms
+		0x7c, 0x06,		// 8/8 CP Sizing (Setup A), Div = 6, 333kHz
+		0x01, 0x0a,		// CP powered, source = int 8MHz OSC
+		0x0a, 0x00,		// Full chip CM = 0.9V (Setup A)
+		0x03, 0x00,		// PTM_P3, High Performance (Setup A)
+		0x04, 0x00,		// PTM_P3, High Performance (Setup A)
+
+		// ##### Clock and Interface Configuration ######################
+		// --------------------------------------------------------------
+		// AVDD = DVDD = 1.8 V
+		// MCLK = 19.2 MHz (from MCO1)
+		//
+		// R = 1, J.D = 5.12, P = 1
+		// D != 0: 512 kHz <= PLL_CLKIN / P <= 20 MHz
+		// PLL_CLKIN = MCLK = 19.2 MHz
+		// AVDD = 1.8 V, PLL mode = 0: 80 MHz <= PLL_CLK <= 132 MHz
+		// PLL_CLK = PLL_CLKIN * R * J.D / P = 98.304 MHz
+		//
+		// NDAC = 2, MDAC = 8, DOSR = 32
+		// DVDD >= 1.65 V, NDAC and NADC are even: CODEC_CLKIN <= 137 MHz
+		// CODEC_CLKIN = PLL_CLK = 98.304 MHz
+		// DVDD >= 1.65 V: DAC_CLK <= 55.296 MHz
+		// DAC_CLK = CODEC_CLKIN / NDAC = 49.152 MHz
+		// DVDD >= 1.65 V: DAC_MOD_CLK <= 6.758 MHz
+		// DAC_MOD_CLK = DAC_CLK / MDAC = 6.144 MHz
+		// DAC_fs <= 0.192 MHz
+		// DAC_fs = DAC_MOD_CLK / DOSR = 192 kHz
+		//
+		// ADC same as DAC
+		//
+		// N = 4
+		// BDIV_CLKIN = DAC_CLK = 49.152 MHz
+		// BCLK = 2 * 32 * fs
+		// BCLK = BDIV_CLKIN / N = 12.288 MHz
+		//
+		// 32-bit I2S, master mode
+		// --------------------------------------------------------------
+		0x00, 0x00,		// Select Page 0
+		0x04, 0x03,		// MCLK => PLL => CODEC, low PLL clock range
+		0x06, 0x05,		// PLL J = 5
+		0x07, 1200u >> 8u,	// PLL D = .1200
+		0x08, 1200u & 0xffu,	//
+		0x05, 0x91,		// PLL enabled, P = 1, R = 1
+		0x0b, 0x82,		// DAC NDAC = 2
+		0x0c, 0x88,		// DAC MDAC = 8
+		0x0d, 0,		// DAC DOSR = 32
+		0x0e, 32,
+		0x12, 0x84,		// ADC NADC = 2
+		0x13, 0x84,		// ADC MADC = 8
+		0x14, 32,		// ADC DOSR = 32
+		0x1d, 0x00,		// No loopback, DAC_CLK => BCLK
+		0x1e, 0x84,		// Enable BCLK N, N = 4
+
+		0x1b, 0x3c,		// I2S, 32 bits, master, no high-Z
+		//0x1d, 0x20,		// DIN-DOUT loopback
+		//0x1d, 0x10,		// ADC-DAC loopback
+		0x20, 0x00,		// Using primary interface inputs
+		0x21, 0x00,		// Using primary interface outputs
+		0x35, 0x12,		// Bus keeper disabled, DOUT from codec
+		0x36, 0x02,		// DIN enabled
+
+		// ####### Signal Processing Settings #############################
+		0x00, 0x00,		// Select Page 0
+		0x3c, 17,		// DAC using PRB_P17
+		0x3d, 16,		// ADC using PRB_R16
+
+		// ######## Output Channel Configuration ##########################
+		0x00, 0x01,		// Select Page 1
+		0x0c, 0x08,		// Route LDAC to HPL
+		0x0d, 0x08,		// Route RDAC to HPR
+		0x00, 0x00,		// Select Page 0
+		0x40, 0x0c,		// DAC muted, independent volume
+		0x3f, 0xd6,		// Power up LDAC/RDAC, no soft stepping
+		0x00, 0x01,		// Select Page 1
+		0x7d, 0x13,		// GCHP Mode, OC for all, HP Sizing (Setup A)
+		0x10, 0x3a,		// Unmute HPL driver, -6dB Gain
+		0x11, 0x3a,		// Unmute HPR driver, -6dB Gain
+		0x09, 0x30,		// Power up HPL/HPR drivers
+		// 0x02, xxxxx1xx # Wait for offset correction to finish
+		//0x00, 0x00,		// Select Page 0
+		//0x40, 0x00,		// Unmute LDAC/RDAC
+
+	#if 0
+		// ######## Output Channel Configuration ##########################
+		0x00, 0x00,		// Select Page 0
+		0x3f, 0xd4,		// DAC on, data path settings
+		0x40, 0x0c,		// DAC muted, independent volume
+		0x43, 0x80,		// Headset detection enabled
+		0x44, 0x0f,		// DRC disabled
+		0x47, 0x00,		// Left beep disabled
+		0x48, 0x00,		// Right beep disabled
+		0x51, 0x80,		// ADC on
+		0x52, 0x00,		// ADC not muted, volume fine = 0dB
+		0x53, 6 * 2,		// ADC volume coarse = 6dB
+		0x56, 0x80,		// AGC enabled, AGC = -5.5dB
+		//0x56, 0x00,		// AGC disabled
+		//0x57, 0x00,		// AGC settings
+		0x58, 33 * 2,		// AGC max = 33dB
+		0x74, 0x00,		// DAC volume control pin disabled
+
+		0x00, 0x01,		// Page 1
+		0x1f, 0xd4,		// Headphone drivers on, 1.65V
+		0x20, 0xc6,		// Speaker amplifiers on
+		0x23, 0x44,		// DAC to HP
+		0x24, 0x8f,		// HPL analog volume = -7.5dB
+		0x25, 0x8f,		// HPR analog volume = -7.5dB
+		0x26, 0x80,		// SPL analog volume = 0dB
+		0x27, 0x80,		// SPR analog volume = 0dB
+		0x2c, 0x18,		// DAC high current, HP as headphone
+		0x2e, 0x00,		// MICBIAS powered down
+		//0x2f, 0x00,		// MIC PGA 0dB
+		0x30, 0x10,		// MIC1RP selected for MIC PGA
+		0x31, 0x40,		// CM selected fvoidor MIC PGA
+	#endif
+#else
 		0x00, 0x00,		// Page 0
 #if HWVER == 0x0002
 		0x33, 0x04,		// GPIO1 in input mode
@@ -64,10 +185,10 @@ void audio_init_config()
 #else
 		0x04, 0x03,		// MCLK => PLL => CODEC
 #endif
-		0x05, 0x91,		// PLL enabled, P = 1, R = 1
 		0x06, 0x05,		// PLL J = 5
 		0x07, 1200u >> 8u,	// PLL D = .1200
 		0x08, 1200u & 0xffu,	//
+		0x05, 0x91,		// PLL enabled, P = 1, R = 1
 		0x1b, 0x3c,		// I2S, 32 bits, master, no high-z
 		//0x1d, 0x20,		// DIN-DOUT loopback
 		//0x1d, 0x10,		// ADC-DAC loopback
@@ -114,6 +235,7 @@ void audio_init_config()
 		//0x2f, 0x00,		// MIC PGA 0dB
 		0x30, 0x10,		// MIC1RP selected for MIC PGA
 		0x31, 0x40,		// CM selected fvoidor MIC PGA
+#endif
 	}, *p = cmd;
 
 	cfg.dac = 0x0c;		// DAC muted, independent volume
@@ -156,6 +278,27 @@ void audio_config_update()
 	cmd40[2] = c.ch.vol[1];		// DAC right volume
 	i2c_write_nb(base, I2C_ADDR, 0x40, cmd40, sizeof(cmd40), 1);
 
+#if HWVER >= 0x0101
+#if 0
+	// Page 1
+	i2c_write_reg_nb(base, I2C_ADDR, 0x00, 0x01);
+	// Starting from register 0x10
+	static uint8_t cmd24[4] SECTION(.dtcm);
+	// HPL analog volume
+	cmd24[0] = (c.hp.atten[0] & 0x80) ? c.hp.atten[0] : 0x40,
+	// HPR analog volume
+	cmd24[1] = (c.hp.atten[1] & 0x80) ? c.hp.atten[1] : 0x40,
+	// LOL analog volume
+	cmd24[2] = (c.sp.atten[0] & 0x80) ? c.sp.atten[0] : 0x40,
+	// LOR analog volume
+	cmd24[3] = (c.sp.atten[1] & 0x80) ? c.sp.atten[1] : 0x40,
+	cmd24[4] = c.hp.gain[0],	// HPL driver
+	cmd24[5] = c.hp.gain[1],	// HPR driver
+	cmd24[6] = c.sp.gain[0],	// SPL driver
+	cmd24[7] = c.sp.gain[1],	// SPR driver
+	i2c_write_nb(base, I2C_ADDR, 0x10, cmd24, sizeof(cmd24), 1);
+#endif
+#else
 	// Page 1
 	i2c_write_reg_nb(base, I2C_ADDR, 0x00, 0x01);
 	// Starting from register 0x24
@@ -173,6 +316,7 @@ void audio_config_update()
 	cmd24[6] = c.sp.gain[0],	// SPL driver
 	cmd24[7] = c.sp.gain[1],	// SPR driver
 	i2c_write_nb(base, I2C_ADDR, 0x24, cmd24, sizeof(cmd24), 1);
+#endif
 }
 
 // Enable/disable codec
@@ -429,14 +573,18 @@ void audio_usb_config(usb_t *usb, usb_audio_t *audio)
 	usb_audio2_register_fu(audio, FU_Headphone, &fu, FU_DAC, fu_mute, s);
 	s = usb_desc_add_string(usb, 0, LANG_EN_US, "Headphone driver");
 	usb_audio2_register_fu(audio, FU_HeadphoneDriver, &fu, FU_Headphone, fu_mute, s);
+#if HWVER < 0x0101
 	s = usb_desc_add_string(usb, 0, LANG_EN_US, "Speaker analog attenuation");
 	usb_audio2_register_fu(audio, FU_Speaker, &fu, FU_DAC, fu_mute, s);
 	s = usb_desc_add_string(usb, 0, LANG_EN_US, "Speaker driver");
 	usb_audio2_register_fu(audio, FU_SpeakerDriver, &fu, FU_Speaker, fu_mute, s);
+#endif
 
 	// Output terminal
+#if HWVER < 0x0101
 	static const audio_ot_t ot_speaker;
 	usb_audio2_register_ot(audio, OT_Speaker, &ot_speaker, Speaker, 0u, FU_SpeakerDriver, CX_In, 0u, 0u);
+#endif
 	static const audio_ot_t ot_hp;
 	usb_audio2_register_ot(audio, OT_Headphones, &ot_hp, Headphones, 0u, FU_HeadphoneDriver, CX_In, 0u, 0u);
 }

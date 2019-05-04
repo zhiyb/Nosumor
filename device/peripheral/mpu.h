@@ -1,6 +1,19 @@
 #ifndef MPU_H
 #define MPU_H
 
+// Axes orientation
+//             |
+//        +----Z--------+
+//       /     |       /|
+//      *-------------* |
+//      |             | |
+//      |  **     **  | |
+// --X--|  **  O  **  | |
+//      |     /       | |
+//      |    / * * *  |-+
+//      |   Y         |/
+//      *--/----------*
+
 #include <stdint.h>
 #include <usb/hid/usb_hid.h>
 

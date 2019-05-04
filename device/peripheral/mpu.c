@@ -174,6 +174,27 @@ static void data_callback(struct i2c_t *i2c,
 	data.cnt += cnt;
 
 	// Axes orientation correction
+	// Quaternion rotation through an angle of θ around a unit vector
+	// q = cos(θ/2) + (xi + yj + zk) * sin(θ/2)
+#if HWVER >= 0x0101
+	// -y, -z, x
+	// Rotate 120 degree around (1.0, -1.0, -1.0)
+	// Quaternion values: (0.5, 0.5, -0.5, -0.5)
+	quat[0] = quat[0] / 2;
+	quat[1] = quat[1] / 2;
+	quat[2] = -quat[2] / 2;
+	quat[3] = -quat[3] / 2;
+	// Quaternion multiplication
+	// a1b1 - a2b2 - a3b3 - a4b4
+	// a1b2 + a2b1 + a3b4 - a4b3
+	// a1b3 - a2b4 + a3b1 + a4b2
+	// a1b4 + a2b3 - a3b2 + a4b1
+	data.quat[0] = quat[0] - quat[1] - quat[2] - quat[3];
+	data.quat[1] = quat[0] + quat[1] + quat[2] - quat[3];
+	data.quat[2] = quat[0] - quat[1] + quat[2] + quat[3];
+	data.quat[3] = quat[0] + quat[1] - quat[2] + quat[3];
+#else
+	// y, z, x
 	// Rotate 120 degree around (1.0, 1.0, 1.0)
 	// Quaternion values: (0.5, 0.5, 0.5, 0.5)
 	quat[0] = quat[0] / 2;
@@ -189,6 +210,7 @@ static void data_callback(struct i2c_t *i2c,
 	data.quat[1] = quat[0] + quat[1] + quat[2] - quat[3];
 	data.quat[2] = quat[0] - quat[1] + quat[2] + quat[3];
 	data.quat[3] = quat[0] + quat[1] - quat[2] + quat[3];
+#endif
 
 	// Update average values
 	data.avg.accel[0] = data.sum.accel[0] >> AVG_N;
@@ -271,10 +293,17 @@ static void compass_callback(struct i2c_t *i2c,
 	}
 
 	// Axes orientation correction
+#if HWVER >= 0x0101
+	// -x, z, y
+	data.compass[0] = -compass[0];
+	data.compass[1] = compass[2];
+	data.compass[2] = compass[1];
+#else
 	// x, -z, y
 	data.compass[0] = compass[0];
 	data.compass[1] = -compass[2];
 	data.compass[2] = compass[1];
+#endif
 }
 
 static void cnt_callback(struct i2c_t *i2c,
