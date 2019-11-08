@@ -1,0 +1,9 @@
+[submodule "device/CMSIS"]
+	path = device/CMSIS
+	url = https://github.com/zhiyb/CMSIS-ST.git
+[submodule "host/hidapi"]
+	path = host/hidapi
+	url = https://github.com/signal11/hidapi.git
+[submodule "host/spdlog"]
+	path = host/spdlog
+	url = https://github.com/gabime/spdlog.git

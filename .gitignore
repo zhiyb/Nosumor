@@ -1,0 +1,4 @@
+build-*
+*.qbs.user
+*.autosave
+~$*
