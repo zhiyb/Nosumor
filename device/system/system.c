@@ -182,8 +182,9 @@ void Reset_Handler(void)
 	// Initialise DMA for memory copy
 	RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN_Msk;
 	// Memory-to-memory, single 32-bit trasnfer, auto increment, transfer complete interrupt
-	DMA2_Stream0->CR = (0b10 << DMA_SxCR_DIR_Pos) | (0b10 << DMA_SxCR_MSIZE_Pos) | (0b10 << DMA_SxCR_PSIZE_Pos)
-				| DMA_SxCR_MINC_Msk | DMA_SxCR_PINC_Msk | DMA_SxCR_TCIE_Msk;
+	DMA2_Stream0->CR = (0b10 << DMA_SxCR_DIR_Pos) | (0b10 << DMA_SxCR_MSIZE_Pos) |
+			(0b10 << DMA_SxCR_PSIZE_Pos) | DMA_SxCR_TCIE_Msk |
+			DMA_SxCR_MINC_Msk | DMA_SxCR_PINC_Msk;
 	// DMA FIFO half full threshold
 	DMA2_Stream0->FCR = 0b01 << DMA_SxFCR_FTH_Pos;
 	// Send event on interrupt pending

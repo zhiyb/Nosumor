@@ -21,7 +21,7 @@ extern void flushCache();
 	__BKPT(0); \
 } while (0)
 #define panic()		do { \
-	printf("\nPanicked at %s:%d: %s()\n", __FILE__, __LINE__, __PRETTY_FUNCTION__); \
+	printf("\nPanicked at %s:%u: %s()\n", __FILE__, __LINE__, __PRETTY_FUNCTION__); \
 	dbgbkpt(); \
 } while (1)
 

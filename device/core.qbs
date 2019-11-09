@@ -66,9 +66,17 @@ StaticLibrary {
         "system/systick.h",
         "system/systick.c",
         "system/irq.h",
+        "system/dma.txt",
         "peripheral/led.h",
         "peripheral/led.c",
         "peripheral/keyboard.h",
         "peripheral/keyboard.c",
+        "usb/usb.h",
+        "usb/usb_core.c",
+        "usb/usb_core.h",
+        "usb/usb_macros.h",
+        "usb/usb_hw.c",
+        "usb/usb_hw.h",
+        "usb/usb_hw_macros.h",
     ]
 }
