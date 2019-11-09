@@ -1,0 +1,15 @@
+#ifndef IRQ_H
+#define IRQ_H
+
+#define NVIC_PRIORITY_GROUPING	3	// 4+4 bits
+
+#define NVIC_PRIORITY_PVD	0, 0
+
+#define NVIC_PRIORITY_USB_H	1
+#define NVIC_PRIORITY_USB	2
+#define NVIC_PRIORITY_SYSTICK	3
+#define NVIC_PRIORITY_KEYBOARD	4
+#define NVIC_PRIORITY_MMC	5
+#define NVIC_PRIORITY_I2C	6
+
+#endif // IRQ_H
