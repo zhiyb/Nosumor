@@ -3,29 +3,26 @@
 
 #include <macros.h>
 
-// Note, gcc assumes symbols in different sections always have different addresses,
-// so we can't use address comparison for checking end of array or array length.
-// An array termination item is used for this purpose.
-
-// Create a link time array
-#define LIST(name, type, term) \
-	static type __list_start_ ## name[] SECTION(".list." #name ".0.start") USED = {}; \
-	static type __list_end_ ## name[] SECTION(".list." #name ".9.end") USED = {(term)}
 // Reference a link time array
-#define LIST_EXTERN(name, type) \
-	static type __list_start_ ## name[] SECTION(".list." #name ".0.start") USED = {}
+#define LIST(name, type) \
+	extern type __start_list_ ## name; \
+	extern type __stop_list_ ## name; \
+	static type __reserve_list_ ## name[] SECTION("list_" #name) USED = {}
 // Add an item to the array
 #define LIST_ITEM(name, type) \
-	static type CONCAT(__list_item_ ## name ## _, __LINE__) SECTION(".list." #name ".5.item") USED
+	static type CONCAT(__item_list_ ## name ## _, __LINE__) SECTION("list_" #name) USED
 
+// List size
+#define LIST_SIZE(name) \
+	(&__stop_list_ ## name - &__start_list_ ## name)
 // Loop iteration
-#define LIST_ITERATE(name, type, ptr, term) \
-	for (type *(ptr) = __list_start_ ## name; *(ptr) != (term); (ptr)++)
+#define LIST_ITERATE(name, type, ptr) \
+	for (type *(ptr) = &__start_list_ ## name; (ptr) != &__stop_list_ ## name; (ptr)++)
 // Access an item by index
 #define LIST_AT(name, i) \
-	(*(__list_start_ ## name + (i)))
+	(*(__start_list_ ## name + (i)))
 // Index of an item
 #define LIST_INDEX(name, p) \
-	(&(p) - __list_start_ ## name)
+	(&(p) - __start_list_ ## name)
 
 #endif // LIST_H

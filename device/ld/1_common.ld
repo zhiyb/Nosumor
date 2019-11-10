@@ -49,9 +49,6 @@ SECTIONS
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
 
     . = ALIGN(4);
-    KEEP(*(SORT(.list.*)))  /* Link time list support */
-
-    . = ALIGN(4);
   } >TEXT AT >LOAD
 
   .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >TEXT

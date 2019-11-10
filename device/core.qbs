@@ -73,6 +73,8 @@ StaticLibrary {
         "peripheral/led.c",
         "peripheral/keyboard.h",
         "peripheral/keyboard.c",
+        "usb/ep0/usb_ep0.c",
+        "usb/ep0/usb_ep0.h",
         "usb/usb.h",
         "usb/usb_core.c",
         "usb/usb_core.h",

@@ -5,7 +5,7 @@
 #include <system/irq.h>
 #include "systick.h"
 
-LIST(systick, systick_handler_t, 0);
+LIST(systick, systick_handler_t);
 
 static volatile uint32_t cnt;
 
@@ -38,6 +38,5 @@ void systick_delay(uint32_t cycles)
 void SysTick_Handler()
 {
 	uint32_t c = ++cnt;
-	LIST_ITERATE(systick, systick_handler_t, p, 0)
-		(*p)(c);
+	LIST_ITERATE(systick, systick_handler_t, p) (*p)(c);
 }

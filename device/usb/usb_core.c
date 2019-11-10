@@ -6,8 +6,13 @@
 #include "usb_hw.h"
 #include "usb_core.h"
 
+LIST(usb_init, usb_basic_handler_t);
+LIST(usb_reset, usb_basic_handler_t);
+LIST(usb_enum, usb_enum_handler_t);
+
 void usb_init()
 {
+	LIST_ITERATE(usb_init, usb_basic_handler_t, p) (*p)();
 }
 
 uint32_t usb_connected()
@@ -24,15 +29,14 @@ void usb_connect(uint32_t e)
 
 void usb_core_reset()
 {
+	LIST_ITERATE(usb_reset, usb_basic_handler_t, p) (*p)();
 }
 
 void usb_core_enumeration(uint32_t spd)
 {
-	if (spd != ENUM_HS) {
-		dbgprintf(ESC_WARNING "%lu\tusb_core: Unsupported enumeration speed: %lu\n",
-			  systick_cnt(), spd);
-		usb_connect(0);
-		return;
-	}
-	USB_TODO();
+#if DEBUG >= 5
+	if (LIST_SIZE(usb_enum) == 0)
+		USB_TODO();
+#endif
+	LIST_ITERATE(usb_enum, usb_enum_handler_t, p) (*p)(spd);
 }

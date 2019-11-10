@@ -6,15 +6,17 @@
 #include <peripheral/keyboard.h>
 #include <usb/usb.h>
 
-LIST(init, basic_handler_t, 0);
-LIST(idle, basic_handler_t, 0);
+LIST(init, basic_handler_t);
+LIST(idle, basic_handler_t);
+
+const int __item_init[1] SECTION("list_init") = {123};
 
 static inline void init()
 {
 	printf(ESC_BOOT "%lu\tboot: " VARIANT " build @ " __DATE__ " " __TIME__ "\n", systick_cnt());
 	printf(ESC_INIT "%lu\tboot: Initialising peripherals\n", systick_cnt());
-	LIST_ITERATE(init, basic_handler_t, p, 0) (*p)();
-	printf(ESC_INIT "%lu\tboot: Initialising systems\n", systick_cnt());
+	LIST_ITERATE(init, basic_handler_t, p) (*p)();
+	printf(ESC_INIT "%lu\tboot: Initialising USB systems\n", systick_cnt());
 	usb_init();
 	printf(ESC_INIT "%lu\tboot: Soft connect USB port\n", systick_cnt());
 #if !DEBUG
@@ -42,7 +44,7 @@ int main()
 {
 	init();
 	for (;;) {
-		LIST_ITERATE(idle, basic_handler_t, p, 0) (*p)();
+		LIST_ITERATE(idle, basic_handler_t, p) (*p)();
 		__WFI();
 	}
 	panic();
