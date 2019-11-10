@@ -21,9 +21,9 @@ extern uint8_t __bss_end__;
 extern uint8_t __data_load__;
 extern uint8_t __data_start__;
 extern uint8_t __data_end__;
-extern uint8_t __iram_load__;
-extern uint8_t __iram_start__;
-extern uint8_t __iram_end__;
+extern uint8_t __itcm_load__;
+extern uint8_t __itcm_start__;
+extern uint8_t __itcm_end__;
 
 // stdout buffer
 static char stdout_buf[STDOUT_BUFFER_SIZE];
@@ -63,13 +63,6 @@ int fio_read(int file, char *ptr, int len)
 {
 	errno = ENOSYS;
 	return -1;
-}
-
-__attribute__((weak)) void flushCache()
-{
-	fflush(stdout);
-	system_debug_process();
-	SCB_CleanInvalidateDCache();
 }
 
 static inline void debug_uart_init()
@@ -175,7 +168,6 @@ void Reset_Handler(void)
 	SCB_EnableICache();
 	SCB_EnableDCache();
 	NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUPING);
-	// Initialise peripherals
 	systick_init(1000);
 	debug_uart_init();
 
@@ -192,7 +184,7 @@ void Reset_Handler(void)
 
 	// Initialise data from flash to SRAM using DMA
 	memcpy(&__data_start__, &__data_load__, &__data_end__ - &__data_start__);
-	memcpy(&__iram_start__, &__iram_load__, &__iram_end__ - &__iram_start__);
+	memcpy(&__itcm_start__, &__itcm_load__, &__itcm_end__ - &__itcm_start__);
 
 	// Deinitialise DMA
 	RCC->AHB1ENR &= ~RCC_AHB1ENR_DMA2EN_Msk;
@@ -285,4 +277,13 @@ void system_debug_process()
 		debug_uart_putchar(c);
 		i_stdout_read = (i_stdout_read + 1) & (STDOUT_BUFFER_SIZE - 1);
 	}
+}
+
+IDLE_HANDLER(&system_debug_process);
+
+void flushCache()
+{
+	fflush(stdout);		// Note, this is not possible from ITCM
+	system_debug_process();
+	SCB_CleanInvalidateDCache();
 }

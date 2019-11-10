@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 
-void usb_hw_init();
 uint32_t usb_hw_connected();
 void usb_hw_connect(uint32_t e);
 

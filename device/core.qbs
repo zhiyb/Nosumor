@@ -46,6 +46,7 @@ StaticLibrary {
     Export {
         Depends {name: "cpp"}
         Depends {name: "CMSIS"}
+        Parameters {cpp.linkWholeArchive: true}
         cpp.includePaths: product.cpp.includePaths
         cpp.defines: product.cpp.defines
         cpp.driverFlags: product.cpp.driverFlags
@@ -54,6 +55,7 @@ StaticLibrary {
 
     files: [
         "common/escape.h",
+        "common/list.h",
         "common/macros.h",
         "common/debug.h",
         "common/device.h",

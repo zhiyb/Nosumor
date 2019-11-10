@@ -1,7 +1,7 @@
 /* Specify the memory areas */
 MEMORY
 {
-    IRAM(xrw)   : ORIGIN = 0x00000000, LENGTH = 16k
+    ITCM(xrw)   : ORIGIN = 0x00000000, LENGTH = 16k
     DTCM(xrw)   : ORIGIN = 0x20000000, LENGTH = 64k
     RAM(xrw)    : ORIGIN = 0x20010000, LENGTH = 176k
     DMARAM(xrw) : ORIGIN = 0x2003c000, LENGTH = 16k

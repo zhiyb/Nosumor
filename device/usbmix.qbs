@@ -2,7 +2,7 @@ import qbs
 
 Project {
     name: "USBMix_" + hwver_str
-    minimumQbsVersion: "1.7.1"
+    minimumQbsVersion: "1.9"
 
     property string device: "STM32F722"
     property bool cmsis_dsp: false

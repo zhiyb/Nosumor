@@ -1,5 +1,6 @@
 #include <debug.h>
 #include <macros.h>
+#include <list.h>
 #include <system/systick.h>
 #include "usb_macros.h"
 #include "usb_hw.h"
@@ -7,7 +8,6 @@
 
 void usb_init()
 {
-	usb_hw_init();
 }
 
 uint32_t usb_connected()
@@ -24,7 +24,6 @@ void usb_connect(uint32_t e)
 
 void usb_core_reset()
 {
-	;
 }
 
 void usb_core_enumeration(uint32_t spd)

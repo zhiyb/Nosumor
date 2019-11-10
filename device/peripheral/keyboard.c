@@ -29,7 +29,7 @@ static volatile uint32_t status, debouncing, glitch, timeout[KEYBOARD_KEYS];
 static uint32_t keyboard_gpio_status();
 static void keyboard_tick(uint32_t tick);
 
-void keyboard_init()
+static void keyboard_init()
 {
 	// Initialise GPIOs
 #if HWVER >= 0x0100
@@ -92,10 +92,9 @@ void keyboard_init()
 	NVIC_SetPriority(EXTI15_10_IRQn,
 			 NVIC_EncodePriority(pg, NVIC_PRIORITY_KEYBOARD, 2));
 	NVIC_EnableIRQ(EXTI15_10_IRQn);
-
-	// Register debouncing tick
-	systick_register_handler(&keyboard_tick);
 }
+
+INIT_HANDLER(&keyboard_init);
 
 static uint32_t keyboard_gpio_status()
 {
@@ -177,7 +176,11 @@ static void keyboard_tick(uint32_t tick)
 	glitch |= err;
 }
 
-void debug_keyboard()
+// Register debouncing tick as systick handler
+SYSTICK_HANDLER(&keyboard_tick);
+
+#if DEBUG
+static void debug_keyboard()
 {
 #if DEBUG >= 5
 	static uint32_t _status = 0;
@@ -192,16 +195,17 @@ void debug_keyboard()
 	}
 #endif
 
-#if DEBUG
 	if (glitch) {
 		printf(ESC_ERROR "%lu\tkeyboard: Glitch %08lx\n",
 			systick_cnt(), glitch);
 		glitch = 0;
 	}
-#endif
 
 #if DEBUG >= 5
 	if ((status ^ (keyboard_masks[2] | keyboard_masks[3])) == 0)
 		dbgbkpt();
 #endif
 }
+
+IDLE_HANDLER(&debug_keyboard);
+#endif

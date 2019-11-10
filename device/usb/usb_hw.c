@@ -172,13 +172,15 @@ static inline void usb_hw_init_device()
 			USB_OTG_GINTMSK_OEPINT_Msk | USB_OTG_GINTMSK_IEPINT_Msk;
 }
 
-void usb_hw_init()
+static void usb_hw_init()
 {
 	usb_hw_init_gpio();
 	usb_hw_init_hs();
 	//usb_hs_irq_init(usb);
 	usb_hw_init_device();
 }
+
+INIT_HANDLER(&usb_hw_init);
 
 void usb_hw_connect(uint32_t e)
 {

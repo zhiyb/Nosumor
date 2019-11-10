@@ -22,7 +22,7 @@ I2C_TX	I2C_TX	DMA1_Stream7(1)
 
 RGB	TM5_CH4	DMA1_Stream1(6)
 
-#elif HWVER <= 0x0002
+#elif HWVER == 0x0002
 
 SDMMC	SDMMC1	DMA2_Stream3(4)
 

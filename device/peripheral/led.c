@@ -2,6 +2,7 @@
 #include <debug.h>
 #include <macros.h>
 #include <system/clocks.h>
+#include <system/systick.h>
 #include "led.h"
 
 typedef uint32_t colour_t;
@@ -539,7 +540,7 @@ static void base_psc_init()
 	TIM4->CR1 |= TIM_CR1_CEN_Msk;
 }
 
-void led_init()
+static void led_init()
 {
 	static const uint16_t clr[LED_NUM][3] = {
 		// Bottom-left, RGB
@@ -548,7 +549,7 @@ void led_init()
 		{0, 0x3ff, 0},
 		// Top-right, RGB
 		{0, 0, 0x3ff},
-#if LED_NUM == 4
+#if LED_NUM >= 4
 		// Bottom-right, RGB
 		{0x3ff, 0x3ff, 0},
 #endif
@@ -561,6 +562,8 @@ void led_init()
 	base_rgb_init();
 	base_psc_init();
 }
+
+INIT_HANDLER(&led_init);
 
 void led_set(uint32_t i, const uint16_t *c)
 {

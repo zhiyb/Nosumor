@@ -2,6 +2,12 @@
 #define DEVICE_H
 
 #include <stm32f7xx.h>
+#include <list.h>
+
+// Common system level lists
+typedef void (*const basic_handler_t)();
+#define INIT_HANDLER(func)	LIST_ITEM(init, basic_handler_t) = func
+#define IDLE_HANDLER(func)	LIST_ITEM(idle, basic_handler_t) = func
 
 #define FIELD(r, f)		(((r) & (f##_Msk)) >> (f##_Pos))
 

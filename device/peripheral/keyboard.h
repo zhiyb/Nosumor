@@ -27,10 +27,7 @@ extern "C" {
 extern const uint32_t keyboard_masks[KEYBOARD_KEYS];
 extern const char keyboard_names[KEYBOARD_KEYS][8];
 
-void keyboard_init();
 uint32_t keyboard_status();
-
-void debug_keyboard();
 
 #ifdef __cplusplus
 }

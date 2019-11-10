@@ -9,7 +9,6 @@
 #define LED_NUM	4
 #endif
 
-void led_init();
 void led_set(uint32_t i, const uint16_t *c);
 
 #endif // LED_H

@@ -34,8 +34,8 @@ SECTIONS
     *(.glue_7t)        /* glue thumb to arm code */
     *(.eh_frame)
 
-    KEEP (*(.init))
-    KEEP (*(.fini))
+    KEEP(*(.init))
+    KEEP(*(.fini))
 
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
@@ -47,6 +47,10 @@ SECTIONS
     . = ALIGN(4);
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
+
+    . = ALIGN(4);
+    KEEP(*(SORT(.list.*)))  /* Link time list support */
+
     . = ALIGN(4);
   } >TEXT AT >LOAD
 
@@ -60,21 +64,21 @@ SECTIONS
   .preinit_array     :
   {
     PROVIDE_HIDDEN (__preinit_array_start = .);
-    KEEP (*(.preinit_array*))
+    KEEP(*(.preinit_array*))
     PROVIDE_HIDDEN (__preinit_array_end = .);
   } >TEXT AT >LOAD
   .init_array :
   {
     PROVIDE_HIDDEN (__init_array_start = .);
-    KEEP (*(SORT(.init_array.*)))
-    KEEP (*(.init_array*))
+    KEEP(*(SORT(.init_array.*)))
+    KEEP(*(.init_array*))
     PROVIDE_HIDDEN (__init_array_end = .);
   } >TEXT AT >LOAD
   .fini_array :
   {
     PROVIDE_HIDDEN (__fini_array_start = .);
-    KEEP (*(SORT(.fini_array.*)))
-    KEEP (*(.fini_array*))
+    KEEP(*(SORT(.fini_array.*)))
+    KEEP(*(.fini_array*))
     PROVIDE_HIDDEN (__fini_array_end = .);
   } >TEXT AT >LOAD
 
@@ -113,18 +117,18 @@ SECTIONS
 
   /* Code segments in ITCM RAM */
   . = ALIGN(4);
-  __iram_load__ = LOADADDR(.iram);
+  __itcm_load__ = LOADADDR(.itcm);
 
-  .iram :
+  .itcm :
   {
     . = ALIGN(4);
-    __iram_start__ = .;
-    *(.iram)
-    *(.iram*)
+    __itcm_start__ = .;
+    *(.itcm)
+    *(.itcm*)
 
     . = ALIGN(4);
-    __iram_end__ = .;
-  } >IRAM AT >LOAD
+    __itcm_end__ = .;
+  } >ITCM AT >LOAD
 
   /* Special RAM sections */
   .dtcm (NOLOAD) :
