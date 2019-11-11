@@ -7,7 +7,31 @@
 #include "usb_core.h"
 #include "usb_hw.h"
 
-#define USB	USB_OTG_HS
+#define USB		USB_OTG_HS
+#define USB_EP_NUM	8
+#define USB_RAM_SIZE	(4 * 1024)
+#define DMA_RAM_SIZE	(8 * 1024)
+
+#define EP_CONF_IN	1
+#define EP_CONF_OUT	0
+
+struct {
+	uint16_t top, num;
+} fifo = {0};
+
+struct {
+	uint32_t num;
+	struct {
+		uint32_t type;
+		uint32_t size;
+	} conf[USB_EP_NUM];
+} ep[2];
+
+uint8_t ram[DMA_RAM_SIZE] SECTION(".dmaram");
+void *pram;
+
+// size in 32-bit words, returns FIFO number
+static uint32_t usb_hw_fifo_alloc(uint32_t size);
 
 static inline void usb_hw_init_gpio()
 {
@@ -194,6 +218,184 @@ uint32_t usb_hw_connected()
 	return !(dev->DCTL & USB_OTG_DCTL_SDIS_Msk);
 }
 
+static void usb_hw_reset()
+{
+	USB_OTG_DeviceTypeDef *dev = DEV(USB);
+	// Disable endpoint interrupts
+	dev->DAINTMSK = 0;
+
+	pram = &ram[0];
+
+	fifo.top = 0;
+	fifo.num = 0;
+
+	// Allocate half of FIFO RAM to Rx
+#if DEBUG
+	if (usb_hw_fifo_alloc(USB_RAM_SIZE / 4 / 2) != (uint32_t)-1)
+		panic();
+#else
+	usb_hw_fifo_alloc(USB_RAM_SIZE / 2);
+#endif
+
+	ep[EP_CONF_IN].num = 0;
+	ep[EP_CONF_OUT].num = 0;
+}
+
+USB_RESET_HANDLER(&usb_hw_reset);
+
+static uint32_t usb_hw_fifo_alloc(uint32_t size)
+{
+	uint32_t num  = fifo.num;
+	uint32_t addr = fifo.top;
+	fifo.num += 1;
+	fifo.top += size;
+#if DEBUG
+	if (fifo.top > USB_RAM_SIZE / 4)
+		panic();
+#endif
+	switch (num) {
+	case 0:		// Rx FIFO
+		USB->GRXFSIZ = size << USB_OTG_GRXFSIZ_RXFD_Pos;
+		break;
+	case 1:		// Tx endpoint 0
+		USB->DIEPTXF0_HNPTXFSIZ = DIEPTXF(addr, size);
+		break;
+	default:	// Other Tx endpoints
+		USB->DIEPTXF[num - 2] = DIEPTXF(addr, size);
+	}
+	printf(ESC_DEBUG "%lu\tusb_hw: FIFO RAM allocated %lu, %u bytes\n",
+			systick_cnt(), num, fifo.top);
+	return num - 1;
+}
+
+static void usb_hw_ep0_alloc(uint32_t dir, uint32_t size)
+{
+	USB_OTG_DeviceTypeDef *dev = DEV(USB);
+	uint32_t epsize = 0b00;
+	switch (size) {
+	case 64:
+		epsize = 0b00;
+		break;
+	case 32:
+		epsize = 0b01;
+		break;
+	case 16:
+		epsize = 0b10;
+		break;
+	case 8:
+		epsize = 0b11;
+		break;
+#if DEBUG
+	default:
+		panic();
+#endif
+	}
+	if (dir == EP_DIR_IN) {
+		USB_OTG_INEndpointTypeDef *epin = EP_IN(USB, 0);
+		uint32_t fifo = usb_hw_fifo_alloc(size / 4);
+#if DEBUG
+		if (fifo != 0)
+			dbgbkpt();
+#endif
+		epin->DIEPCTL = (fifo << USB_OTG_DIEPCTL_TXFNUM_Pos) | (epsize << USB_OTG_DIEPCTL_MPSIZ_Pos);
+	} else {
+#if DEBUG
+		USB_OTG_INEndpointTypeDef *epin = EP_IN(USB, 0);
+		USB_OTG_OUTEndpointTypeDef *epout = EP_OUT(USB, 0);
+		if ((epin->DIEPCTL & USB_OTG_DIEPCTL_MPSIZ_Msk) >> USB_OTG_DIEPCTL_MPSIZ_Pos != epsize)
+			panic();
+#endif
+	}
+}
+
+uint32_t usb_hw_ep_alloc(uint32_t dir, uint32_t type, uint32_t size)
+{
+	USB_OTG_DeviceTypeDef *dev = DEV(USB);
+	uint32_t epnum = 0;
+	if (dir == EP_DIR_IN) {
+		USB_OTG_INEndpointTypeDef *epin = EP_IN(USB, epnum);
+		epnum = ep[EP_CONF_IN].num++;
+		if (epnum == 0) {
+#if DEBUG
+			if (type != EP_CONTROL)
+				dbgbkpt();
+#endif
+			usb_hw_ep0_alloc(dir, size);
+		} else {
+			uint32_t fifo = usb_hw_fifo_alloc((size + 3) / 4);
+			epin->DIEPCTL = (fifo << USB_OTG_DIEPCTL_TXFNUM_Pos) |
+					DIEPCTL_EP_TYP(type) | (size << USB_OTG_DIEPCTL_MPSIZ_Pos);
+		}
+		ep[EP_CONF_IN].conf[epnum].type = type;
+		ep[EP_CONF_IN].conf[epnum].size = size;
+		// Clear interrupts
+		epin->DIEPINT = USB_OTG_DIEPINT_XFRC_Msk;
+		// Unmask interrupts
+		dev->DAINTMSK |= DAINTMSK_IN(epnum);
+		printf(ESC_DEBUG "%lu\tusb_hw: Endpoint " ESC_WRITE "IN %lu"
+				ESC_DEBUG " allocated\n", systick_cnt(), epnum);
+	} else if (dir == EP_DIR_OUT) {
+		USB_OTG_OUTEndpointTypeDef *epout = EP_OUT(USB, epnum);
+		epnum = ep[EP_CONF_OUT].num++;
+		if (epnum == 0) {
+#if DEBUG
+			if (type != EP_CONTROL)
+				dbgbkpt();
+#endif
+			usb_hw_ep0_alloc(dir, size);
+		} else {
+			epout->DOEPCTL = DIEPCTL_EP_TYP(type) | (size << USB_OTG_DIEPCTL_MPSIZ_Pos);
+		}
+		ep[EP_CONF_OUT].conf[epnum].type = type;
+		ep[EP_CONF_OUT].conf[epnum].size = size;
+		// Clear interrupts
+		epout->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk | USB_OTG_DOEPINT_STUP_Msk |
+				USB_OTG_DOEPINT_OTEPSPR_Msk;
+		// Unmask interrupts
+		dev->DAINTMSK |= DAINTMSK_OUT(epnum);
+		printf(ESC_DEBUG "%lu\tusb_hw: Endpoint " ESC_READ "OUT %lu"
+				ESC_DEBUG " allocated\n", systick_cnt(), epnum);
+#if DEBUG
+	} else {
+		panic();
+#endif
+	}
+	return epnum;
+}
+
+void *usb_hw_ram_alloc(uint32_t size)
+{
+	void *p = pram;
+	pram += size;
+	if (pram - (void *)&ram[0] > DMA_RAM_SIZE) {
+		usb_connect(0);
+		panic();
+		return 0;
+	}
+	printf(ESC_DEBUG "%lu\tusb_hw: DMA RAM allocated %u bytes\n",
+			systick_cnt(), pram - (void *)&ram[0]);
+	return p;
+}
+
+void usb_hw_ep_out(uint32_t epnum, void *p, uint32_t setup, uint32_t pkt, uint32_t size)
+{
+	USB_OTG_DeviceTypeDef *dev = DEV(USB);
+	USB_OTG_OUTEndpointTypeDef *epout = EP_OUT(USB, epnum);
+	uint32_t epsize = ep[EP_CONF_OUT].conf[epnum].size;
+	// Set transfer size to maximum packet size to be interrupted at the end of each packet
+	if (size == 0)
+		size = epsize;
+	// Setup frame PID for ISOCHRONOUS
+	if (ep[EP_CONF_OUT].conf[epnum].type == EP_ISOCHRONOUS)
+		USB_TODO();
+	epout->DOEPDMA = (uint32_t)p;
+	epout->DOEPTSIZ = (setup << USB_OTG_DOEPINT_STUP_Pos) | (pkt << USB_OTG_DOEPTSIZ_PKTCNT_Pos) | size;
+	epout->DOEPCTL = (epout->DOEPCTL & (USB_OTG_DOEPCTL_MPSIZ_Msk | USB_OTG_DOEPCTL_EPTYP_Msk)) |
+			USB_OTG_DOEPCTL_USBAEP_Msk | USB_OTG_DOEPCTL_EPENA_Msk | USB_OTG_DOEPCTL_CNAK_Msk;
+	// Clear global NAK
+	//dev->DCTL |= USB_OTG_DCTL_CGONAK_Msk;
+}
+
 void OTG_HS_IRQHandler()
 {
 	USB_OTG_DeviceTypeDef *dev = DEV(USB);
@@ -219,11 +421,11 @@ void OTG_HS_IRQHandler()
 #endif
 
 	// IN endpoint events
-	if (ists & (USB_OTG_GINTSTS_OEPINT_Msk | USB_OTG_GINTSTS_IEPINT_Msk)) {
+	if (ists & USB_OTG_GINTSTS_IEPINT_Msk) {
 	}
 
 	// OUT endpoint events
-	if (ists & (USB_OTG_GINTSTS_OEPINT_Msk | USB_OTG_GINTSTS_IEPINT_Msk)) {
+	if (ists & USB_OTG_GINTSTS_OEPINT_Msk) {
 	}
 
 #if 0
@@ -261,6 +463,8 @@ void OTG_HS_IRQHandler()
 	}
 
 	// Unimplemented interrupt
-	if (!processed)
+	if (!processed) {
 		dbgprintf(ESC_WARNING "%lu\tusb_hw: Unknown interrupt: 0x%08lx\n", systick_cnt(), ists);
+		USB_TODO();
+	}
 }

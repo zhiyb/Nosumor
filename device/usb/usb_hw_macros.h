@@ -23,7 +23,8 @@
 #define DIEPTXF(a, d)	(((d) << USB_OTG_DIEPTXF_INEPTXFD_Pos) | ((a) << USB_OTG_DIEPTXF_INEPTXSA_Pos))
 
 // Value conversion from registers
-#define DIEPCTL_EP_TYP(reg)	((reg & USB_OTG_DIEPCTL_EPTYP_Msk) >> USB_OTG_DIEPCTL_EPTYP_Pos)
-#define DSTS_ENUM_SPD(reg)	((reg & USB_OTG_DSTS_ENUMSPD_Msk) >> USB_OTG_DSTS_ENUMSPD_Pos)
+#define DIEPCTL_EP_TYP(typ)	(((typ) << USB_OTG_DIEPCTL_EPTYP_Pos) & USB_OTG_DIEPCTL_EPTYP_Msk)
+#define EP_TYP_DIEPCTL(reg)	(((reg) & USB_OTG_DIEPCTL_EPTYP_Msk) >> USB_OTG_DIEPCTL_EPTYP_Pos)
+#define DSTS_ENUM_SPD(reg)	(((reg) & USB_OTG_DSTS_ENUMSPD_Msk) >> USB_OTG_DSTS_ENUMSPD_Pos)
 
 #endif // USB_HW_MACROS_H
