@@ -24,6 +24,8 @@ extern uint8_t __data_end__;
 extern uint8_t __itcm_load__;
 extern uint8_t __itcm_start__;
 extern uint8_t __itcm_end__;
+extern uint8_t __dmaram_start__;
+extern uint8_t __dmaram_end__;
 
 // stdout buffer
 static char stdout_buf[STDOUT_BUFFER_SIZE];
@@ -165,8 +167,6 @@ void Reset_Handler(void)
 
 	// System initialisation
 	rcc_init();
-	SCB_EnableICache();
-	SCB_EnableDCache();
 	NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUPING);
 	systick_init(1000);
 	debug_uart_init();
@@ -194,6 +194,19 @@ void Reset_Handler(void)
 	uint32_t *p = (uint32_t *)&__bss_start__;
 	while (p != (uint32_t *)&__bss_end__)
 		*p++ = 0;
+
+	// MPU region definition
+	const ARM_MPU_Region_t mpu_regions[] = {
+		// Disable write cache on DMA RAM
+		{.RBAR = ARM_MPU_RBAR(0, (uint32_t)&__dmaram_start__),
+		 .RASR = ARM_MPU_RASR(1, ARM_MPU_AP_PRIV, 0b000, 1, 0, 1, 0x00, ARM_MPU_REGION_SIZE_16KB)},
+	};
+
+	// Initialise MPU and cache
+	ARM_MPU_Load(mpu_regions, sizeof(mpu_regions) / sizeof(ARM_MPU_Region_t));
+	ARM_MPU_Enable(MPU_CTRL_PRIVDEFENA_Msk);		// Fallback to default mapping
+	SCB_EnableICache();
+	SCB_EnableDCache();
 
 	// Start program
 	(&_main)();

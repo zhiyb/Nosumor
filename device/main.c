@@ -9,8 +9,6 @@
 LIST(init, basic_handler_t);
 LIST(idle, basic_handler_t);
 
-const int __item_init[1] SECTION("list_init") = {123};
-
 static inline void init()
 {
 	printf(ESC_BOOT "%lu\tboot: " VARIANT " build @ " __DATE__ " " __TIME__ "\n", systick_cnt());

@@ -609,6 +609,8 @@ void led_set(uint32_t i, const uint16_t *c)
 		*p++ = *c++;
 		break;
 	}
+
+	//SCB_CleanDCache_by_Addr(&colours[i][0], 3 * sizeof(colour_t));
 }
 
 void led_get(uint32_t i, uint16_t *c)

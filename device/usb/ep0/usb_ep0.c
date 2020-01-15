@@ -9,16 +9,21 @@
 #define EP0_RX_SIZE	64
 #define EP0_TX_SIZE	2048
 
-typedef enum {BUF_FREE = 0, BUF_VALID} buf_state_t;
+typedef enum {BUF_FREE = 0, BUF_ACTIVE, BUF_SETUP, BUF_STATUS} buf_state_t;
 
 struct buf_t {
 	void *p;
+	volatile uint32_t size;
 	volatile buf_state_t state;
 } brx[2], btx;
 
-volatile uint32_t brx_process, brx_queue;
+uint32_t brx_process;
+volatile uint32_t brx_queue;
 
 static void usb_ep0_out();
+static void usb_ep0_irq_stup();
+static void usb_ep0_irq_stsp();
+static void usb_ep0_irq_xfrc(void *p, uint32_t size);
 
 static void usb_ep0_enumeration(uint32_t spd)
 {
@@ -55,25 +60,69 @@ static void usb_ep0_enumeration(uint32_t spd)
 	btx.p = usb_hw_ram_alloc(EP0_TX_SIZE);
 	btx.state = BUF_FREE;
 
-	// Start Rx
+	// Register interrupt handler
+	usb_hw_ep_out_irq(epoutnum, &usb_ep0_irq_stup, &usb_ep0_irq_stsp, &usb_ep0_irq_xfrc);
+
+	// Start OUT
 	usb_ep0_out();
 }
 
 USB_ENUM_HANDLER(&usb_ep0_enumeration);
 
+static void usb_ep0_irq_stup(void *p, uint32_t size)
+{
+	uint32_t rx = brx_queue;
+	struct buf_t *buf = &brx[rx];
+	buf->state = BUF_SETUP;
+	buf->size = size;
+	brx_queue = rx = !rx;
+	buf = &brx[rx];
+	if (buf->state == BUF_FREE)
+		usb_ep0_out();
+}
+
+static void usb_ep0_irq_stsp(void *p, uint32_t size)
+{
+	USB_TODO();
+	uint32_t rx = brx_queue;
+	struct buf_t *buf = &brx[rx];
+	buf->state = BUF_STATUS;
+	buf->size = size;
+	brx_queue = rx = !rx;
+	buf = &brx[rx];
+	if (buf->state == BUF_FREE)
+		usb_ep0_out();
+}
+
+static void usb_ep0_irq_xfrc(void *p, uint32_t size)
+{
+}
+
 static void usb_ep0_out()
 {
 	struct buf_t *buf = &brx[brx_queue];
+#ifdef DEBUG
 	if (buf->state != BUF_FREE)
-		return;
+		panic();
+#endif
 	usb_hw_ep_out(0, buf->p, 1, 1, 0);
-	brx_queue = !brx_queue;
+	buf->state = BUF_ACTIVE;
 }
 
 static void usb_ep0_process()
 {
-	if (brx[brx_process].state == BUF_VALID) {
+	struct buf_t *buf = &brx[brx_process];
+	buf_state_t state = buf->state;
+	if (state == BUF_SETUP || state == BUF_STATUS) {
 		USB_TODO();
+		buf->state = BUF_FREE;
+		brx_process = !brx_process;
+		__disable_irq();
+		state = brx[brx_queue].state;
+		__enable_irq();
+		// Restart OUT if it is currently NAK
+		if (state == BUF_FREE)
+			usb_ep0_out();
 	}
 }
 

@@ -141,10 +141,12 @@ SECTIONS
   .dmaram (NOLOAD) :
   {
     . = ALIGN(4);
+    __dmaram_start__ = .;
     *(.dmaram)
     *(.dmaram*)
 
     . = ALIGN(4);
+    __dmaram_end__ = .;
   } >DMARAM
 
   /* Remove information from the standard libraries */
