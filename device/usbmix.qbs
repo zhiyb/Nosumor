@@ -8,7 +8,9 @@ Project {
     property bool cmsis_dsp: false
     property bool bootloader: false
     property int hwver: 0x0103
+    property int swver: 0x0001
     property string hwver_str: ("0000" + hwver.toString(16)).slice(-4)
+    property string swver_str: ("0000" + swver.toString(16)).slice(-4)
 
     references: [
         "CMSIS",

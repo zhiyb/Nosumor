@@ -43,14 +43,29 @@ typedef void (*const usb_enum_handler_t)(uint32_t spd);
 #define LANG_EN_GB	0x0809
 
 #if DEBUG
+#include <debug.h>
+#include <system/systick.h>
+#include <usb/usb.h>
+
 #define USB_TODO()	do { \
 		dbgprintf(ESC_WARNING "%lu\tusb_core: TODO @ " ESC_DATA "%s:%u: %s()\n", \
 			systick_cnt(), __FILE__, __LINE__, __PRETTY_FUNCTION__); \
 		usb_connect(0); \
 		dbgbkpt(); \
 	} while (0)
+#define USB_ERROR()	do { \
+		dbgprintf(ESC_ERROR "%lu\tusb_core: ERROR @ " ESC_DATA "%s:%u: %s()\n", \
+			systick_cnt(), __FILE__, __LINE__, __PRETTY_FUNCTION__); \
+		usb_connect(0); \
+		dbgbkpt(); \
+	} while (0)
 #else
 #define USB_TODO()	((void)0)
+#define USB_ERROR()	do { \
+		dbgprintf(ESC_ERROR "%lu\tusb_core: ERROR @ " ESC_DATA "%s:%u\n", \
+			systick_cnt(), __FILE__, __LINE__); \
+		usb_connect(0); \
+	} while (0)
 #endif
 
 #endif // USB_MACROS_H

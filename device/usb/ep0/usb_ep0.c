@@ -5,15 +5,17 @@
 #include <usb/usb_hw.h>
 #include <usb/usb_macros.h>
 #include "usb_ep0.h"
+#include "usb_ep0_setup.h"
 
 #define EP0_RX_SIZE	64
 #define EP0_TX_SIZE	2048
 
-typedef enum {BUF_FREE = 0, BUF_ACTIVE, BUF_SETUP, BUF_STATUS} buf_state_t;
+typedef enum {BufFree = 0, BufActive, BufData, BufSetup, BufStatus} buf_state_t;
 
 struct buf_t {
 	void *p;
 	volatile uint32_t size;
+	uint32_t xfrsize;
 	volatile buf_state_t state;
 } brx[2], btx;
 
@@ -52,13 +54,13 @@ static void usb_ep0_enumeration(uint32_t spd)
 
 	// Allocate memories for endpoint 0
 	brx[0].p = usb_hw_ram_alloc(EP0_RX_SIZE);
-	brx[0].state = BUF_FREE;
+	brx[0].state = BufFree;
 	brx[1].p = usb_hw_ram_alloc(EP0_RX_SIZE);
-	brx[1].state = BUF_FREE;
+	brx[1].state = BufFree;
 	brx_process = 0;
 	brx_queue = 0;
 	btx.p = usb_hw_ram_alloc(EP0_TX_SIZE);
-	btx.state = BUF_FREE;
+	btx.state = BufFree;
 
 	// Register interrupt handler
 	usb_hw_ep_out_irq(epoutnum, &usb_ep0_irq_stup, &usb_ep0_irq_stsp, &usb_ep0_irq_xfrc);
@@ -73,11 +75,11 @@ static void usb_ep0_irq_stup(void *p, uint32_t size)
 {
 	uint32_t rx = brx_queue;
 	struct buf_t *buf = &brx[rx];
-	buf->state = BUF_SETUP;
+	buf->state = BufSetup;
 	buf->size = size;
 	brx_queue = rx = !rx;
 	buf = &brx[rx];
-	if (buf->state == BUF_FREE)
+	if (buf->state == BufFree)
 		usb_ep0_out();
 }
 
@@ -86,11 +88,11 @@ static void usb_ep0_irq_stsp(void *p, uint32_t size)
 	USB_TODO();
 	uint32_t rx = brx_queue;
 	struct buf_t *buf = &brx[rx];
-	buf->state = BUF_STATUS;
+	buf->state = BufStatus;
 	buf->size = size;
 	brx_queue = rx = !rx;
 	buf = &brx[rx];
-	if (buf->state == BUF_FREE)
+	if (buf->state == BufFree)
 		usb_ep0_out();
 }
 
@@ -102,26 +104,69 @@ static void usb_ep0_out()
 {
 	struct buf_t *buf = &brx[brx_queue];
 #ifdef DEBUG
-	if (buf->state != BUF_FREE)
-		panic();
+	if (buf->state != BufFree)
+		USB_ERROR();
 #endif
 	usb_hw_ep_out(0, buf->p, 1, 1, 0);
-	buf->state = BUF_ACTIVE;
+	buf->state = BufActive;
+}
+
+void *usb_ep0_in_buf(uint32_t *size)
+{
+	while (btx.state != BufFree)
+		__WFI();
+	if (size)
+		*size = EP0_TX_SIZE;
+	btx.state = BufData;
+	return btx.p;
+}
+
+static void usb_ep0_in_irq(void *p, uint32_t size)
+{
+#ifdef DEBUG
+	if (btx.state != BufActive)
+		USB_ERROR();
+#endif
+	btx.size += size;
+	if (btx.size == btx.xfrsize && size != usb_hw_ep_max_size(EP_DIR_IN, 0)) {
+		btx.state = BufFree;
+		dbgprintf(ESC_DEBUG "%lu\tusb_ep0: " ESC_WRITE "EP 0 IN"
+			  ESC_DEBUG " transferred %lu bytes\n",
+				systick_cnt(), size);
+		return;
+	}
+	USB_TODO();
+	usb_hw_ep_in(0, btx.p + btx.size, btx.xfrsize - btx.size, usb_ep0_in_irq);
+}
+
+void usb_ep0_in(uint32_t size)
+{
+	if (btx.state != BufData)
+		USB_ERROR();
+	btx.state = BufActive;
+	btx.xfrsize = size;
+	btx.size = 0;
+
+	uint32_t max_size = usb_hw_ep_max_size(EP_DIR_IN, 0);
+	usb_hw_ep_in(0, btx.p, size >= max_size ? max_size : size, usb_ep0_in_irq);
 }
 
 static void usb_ep0_process()
 {
 	struct buf_t *buf = &brx[brx_process];
 	buf_state_t state = buf->state;
-	if (state == BUF_SETUP || state == BUF_STATUS) {
-		USB_TODO();
-		buf->state = BUF_FREE;
+	if (state == BufSetup || state == BufStatus) {
+		if (state == BufSetup)
+			usb_ep0_setup(buf->p, buf->size);
+		else
+			USB_TODO();
+		buf->state = BufFree;
 		brx_process = !brx_process;
 		__disable_irq();
 		state = brx[brx_queue].state;
 		__enable_irq();
 		// Restart OUT if it is currently NAK
-		if (state == BUF_FREE)
+		if (state == BufFree)
 			usb_ep0_out();
 	}
 }

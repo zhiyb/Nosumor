@@ -5,7 +5,7 @@ StaticLibrary {
     Depends {name: "CMSIS"}
 
     cpp.defines: {
-        var flags = ["HWVER=" + project.hwver];
+        var flags = ["HWVER=" + project.hwver, "SWVER=" + project.swver];
         if (project.bootloader)
             flags.push("BOOTLOADER");
         return flags;
@@ -54,6 +54,8 @@ StaticLibrary {
     }
 
     files: [
+        "common/common.c",
+        "common/common.h",
         "common/escape.h",
         "common/list.h",
         "common/macros.h",
@@ -75,9 +77,13 @@ StaticLibrary {
         "peripheral/keyboard.c",
         "usb/ep0/usb_ep0.c",
         "usb/ep0/usb_ep0.h",
+        "usb/ep0/usb_ep0_setup.c",
+        "usb/ep0/usb_ep0_setup.h",
         "usb/usb.h",
         "usb/usb_core.c",
         "usb/usb_core.h",
+        "usb/usb_desc.c",
+        "usb/usb_desc.h",
         "usb/usb_macros.h",
         "usb/usb_hw.c",
         "usb/usb_hw.h",

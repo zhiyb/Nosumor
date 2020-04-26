@@ -8,7 +8,11 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/times.h>
+
+#include <device.h>
+#include <debug.h>
 #include <system/system.h>
+#include <system/systick.h>
 
 /* Variables */
 #undef errno
@@ -72,15 +76,29 @@ caddr_t _sbrk(int incr)
 	return (caddr_t) prev_heap_end;
 }
 
-size_t heap_usage()
+size_t heap_size()
 {
 	return heap_end - &__heap_start__;
 }
 
-size_t heap_size()
+size_t heap_max_size()
 {
 	return &__heap_end__ - &__heap_start__;
 }
+
+#ifdef DEBUG
+static void heap_debug()
+{
+	static size_t psize = 0;
+	size_t hsize = heap_size();
+	if (psize == hsize)
+		return;
+	psize = hsize;
+	dbgprintf(ESC_DEBUG "%lu\tcore: HEAP RAM allocated %u bytes\n", systick_cnt(), hsize);
+}
+
+IDLE_HANDLER(&heap_debug);
+#endif
 
 int _close(int file)
 {
