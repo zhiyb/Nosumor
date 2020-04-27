@@ -17,6 +17,8 @@
 //#define DESC_DEBUG			10u
 #define DESC_INTERFACE_ASSOCIATION	11u
 
+// Device descriptor
+
 typedef struct PACKED {
 	uint8_t bLength;
 	uint8_t bDescriptorType;
@@ -34,46 +36,156 @@ typedef struct PACKED {
 	uint8_t bNumConfigurations;
 } desc_dev_t;
 
+LIST(usb_desc_string, usb_desc_string_t);
+
+static char uid[25] = {0};
+
+USB_DESC_STRING(desc_str_manufacturer) = {0, LANG_EN_US, USB_MANUFACTURER};
+USB_DESC_STRING(desc_str_product) = {0, LANG_EN_US, USB_PRODUCT_NAME};
+USB_DESC_STRING(desc_str_serial) = {0, LANG_EN_US, uid};
+
 static const desc_dev_t desc_dev = {
 	18u, DESC_DEVICE, 0x0200u, 0xefu, 0x02u, 0x01u, 64u,
 	USB_VID, USB_PID, USB_RELEASE, 0u, 0u, 0u, 1u
 };
 
-static void usb_get_descriptor_device(usb_desc_t *desc)
+static void usb_desc_device(usb_desc_t *pdesc)
 {
 #ifdef DEBUG
-	if (!desc->size || !desc->p)
-		panic();
+	if (!pdesc->size || !pdesc->p)
+		USB_ERROR();
 #endif
-	desc_dev_t *pd = (desc_dev_t *)desc->p;
+	desc_dev_t *pd = (desc_dev_t *)pdesc->p;
 	memcpy(pd, &desc_dev, desc_dev.bLength);
 	pd->bMaxPacketSize0 = usb_hw_ep_max_size(EP_DIR_IN, 0);
-	pd->iManufacturer = usb_desc_add_string(0, LANG_EN_US, USB_MANUFACTURER);
-	pd->iProduct = usb_desc_add_string(0, LANG_EN_US, USB_PRODUCT_NAME);
+	pd->iManufacturer = USB_DESC_STRING_INDEX(desc_str_manufacturer);
+	pd->iProduct = USB_DESC_STRING_INDEX(desc_str_product);
 
 	// Construct serial number from UID
-	char uid[25];
-	uid_str(uid);
 	// Valid serial number characters are [0-9A-F]
-	pd->iSerialNumber = usb_desc_add_string(0, LANG_EN_US, uid);
+	if (uid[0] == 0)
+		uid_str(uid);
+	pd->iSerialNumber = USB_DESC_STRING_INDEX(desc_str_serial);
 #ifdef DEBUG
-	if (pd->bLength > desc->size)
-		panic();
+	if (pd->bLength > pdesc->size)
+		USB_ERROR();
 #endif
-	desc->size = pd->bLength;
+	pdesc->size = pd->bLength;
 }
 
-typedef struct desc_string_list_t {
-	struct desc_string_list_t *next;
-	uint32_t lang;
-	usb_desc_t desc;
-} desc_string_list_t;
+// Configration descriptor
 
-struct {
-	usb_desc_t lang;
-	uint32_t nstring;
-	desc_string_list_t **string;
-} desc = {0};
+typedef struct PACKED {
+	uint8_t bLength;
+	uint8_t bDescriptorType;
+	uint16_t wTotalLength;
+	uint8_t bNumInterfaces;
+	uint8_t bConfigurationValue;
+	uint8_t iConfiguration;
+	uint8_t bmAttributes;
+	uint8_t bMaxPower;
+} desc_config_t;
+
+enum {ConfigAttributeSelfPowered = 1u << 6u,
+	ConfigAttributeRemoteWakeup = 1u << 5u};
+
+static const desc_config_t desc_config = {
+	9u, DESC_CONFIGURATION, 9u,
+	0u, 1u, 0u, 0x80 | ConfigAttributeRemoteWakeup, 250,
+};
+
+LIST(usb_desc_config, usb_desc_handler_t);
+
+static void usb_desc_config(usb_desc_t *pdesc)
+{
+#ifdef DEBUG
+	if (!pdesc->size || !pdesc->p)
+		USB_ERROR();
+#endif
+	// Use buffer on stack for unaligned access
+	union {
+		desc_config_t desc;
+		uint8_t raw[pdesc->size];
+	} conf;
+	conf.desc = desc_config;
+	usb_desc_t desc;
+	desc.p = &conf;
+	desc.size = pdesc->size;
+	LIST_ITERATE(usb_desc_config, usb_desc_handler_t, p) {
+		(*p)(&desc);
+		conf.desc.bNumInterfaces += 1;
+	}
+#ifdef DEBUG
+	if (conf.desc.wTotalLength > pdesc->size)
+		USB_ERROR();
+#endif
+	memcpy(pdesc->p, &conf, conf.desc.wTotalLength);
+	pdesc->size = conf.desc.wTotalLength;
+}
+
+// Interface descriptor
+
+typedef struct PACKED {
+	uint8_t bLength;
+	uint8_t bDescriptorType;
+	uint8_t bInterfaceNumber;
+	uint8_t bAlternateSetting;
+	uint8_t bNumEndpoints;
+	uint8_t bInterfaceClass;
+	uint8_t bInterfaceSubClass;
+	uint8_t bInterfaceProtocol;
+	uint8_t iInterface;
+} desc_interface_t;
+
+void usb_desc_add_interface(usb_desc_t *pdesc, uint8_t bAlternateSetting, uint8_t bNumEndpoints,
+			    uint8_t bInterfaceClass, uint8_t bInterfaceSubClass,
+			    uint8_t bInterfaceProtocol, uint8_t iInterface)
+{
+	static const uint8_t bLength = 9u;
+	desc_config_t *pc = (desc_config_t *)pdesc->p;
+	const desc_interface_t desc = {
+		bLength, DESC_INTERFACE, pc->bNumInterfaces, bAlternateSetting, bNumEndpoints,
+		bInterfaceClass, bInterfaceSubClass, bInterfaceProtocol, iInterface
+	};
+	usb_desc_add(pdesc, &desc, bLength);
+}
+
+// Endpoint descriptor
+
+typedef struct PACKED {
+	uint8_t bLength;
+	uint8_t bDescriptorType;
+	uint8_t bEndpointAddress;
+	uint8_t bmAttributes;
+	uint16_t wMaxPacketSize;
+	uint8_t bInterval;
+} desc_ep_t;
+
+void usb_desc_add_endpoint(usb_desc_t *pdesc, uint8_t bEndpointAddress, uint8_t bmAttributes,
+			   uint16_t wMaxPacketSize, uint8_t bInterval)
+{
+	static const uint8_t bLength = 7u;
+	const desc_ep_t desc = {
+		bLength, DESC_ENDPOINT, bEndpointAddress, bmAttributes, wMaxPacketSize, bInterval
+	};
+	usb_desc_add(pdesc, &desc, bLength);
+}
+
+// Custom descriptor
+
+void usb_desc_add(usb_desc_t *pdesc, const void *p, uint32_t bLength)
+{
+#ifdef DEBUG
+	if (pdesc->size < bLength)
+		USB_ERROR();
+#endif
+	desc_config_t *pc = (desc_config_t *)pdesc->p;
+	memcpy(pdesc->p + pc->wTotalLength, p, bLength);
+	pc->wTotalLength += bLength;
+	pdesc->size -= bLength;
+}
+
+// String descriptor
 
 typedef struct PACKED {
 	uint8_t bLength;
@@ -83,86 +195,88 @@ typedef struct PACKED {
 
 static const desc_string_t desc_string = {2u, DESC_STRING};
 
-uint32_t usb_desc_add_string(uint16_t id, uint16_t lang, const char *str)
+static void usb_desc_string(usb_desc_t *pdesc, uint8_t index, uint16_t lang)
 {
-	// Update language list
-	if (!desc.lang.size) {
-		// New language list
-		desc_string_t *pl = (desc_string_t *)malloc(desc_string.bLength + 2);
-		if (!pl)
-			panic();
-		memcpy(pl, &desc_string, desc_string.bLength);
-		pl->wPayload[0] = lang;
-		pl->bLength += 2;
-		desc.lang.p = pl;
-		desc.lang.size = pl->bLength;
+	// Language list or out-of-range
+	if (index == 0) {
+		union {
+			desc_string_t desc;
+			uint16_t raw[33];
+		} lang;
+		lang.desc = desc_string;
+		lang.desc.wPayload[0] = 0;
+		LIST_ITERATE(usb_desc_string, usb_desc_string_t, pstr) {
+			usb_desc_string_t *ps = pstr;
+			do {
+				uint16_t *plang = &lang.raw[1];
+				while (*plang != 0)
+					if (*plang == ps->lang)
+						break;
+#ifdef DEBUG
+				if (plang == &lang.raw[32])
+					USB_ERROR();
+#endif
+				if (*plang == 0) {
+					*plang++ = ps->lang;
+					*plang = 0;
+				}
+				ps = ps->next;
+			} while (ps != 0);
+		}
+		uint16_t nlang = 0;
+		for (uint16_t *plang = &lang.raw[1]; *plang != 0; plang++)
+			nlang++;
+		lang.desc.bLength += 2 * nlang;
+		memcpy(pdesc->p, &lang, lang.desc.bLength);
+		pdesc->size = lang.desc.bLength;
+	} else if (index <= LIST_SIZE(usb_desc_string)) {
+		usb_desc_string_t *ps = &LIST_AT(usb_desc_string, index);
+		do {
+			if (ps->lang == lang)
+				break;
+			ps = ps->next;
+		} while (ps != 0);
+		if (ps == 0)
+			ps = &LIST_AT(usb_desc_string, index);
+
+		uint16_t len = strlen(ps->p);
+		union {
+			desc_string_t desc;
+			uint8_t raw[desc_string.bLength + len * 2];
+		} desc;
+		desc.desc = desc_string;
+		desc.desc.bLength += len * 2;
+		while (len--)	// Unicode conversion?
+			desc.desc.wPayload[len] = ps->p[len];
+
+#ifdef DEBUG
+		if (pdesc->size < desc.desc.bLength)
+			USB_ERROR();
+#endif
+		memcpy(pdesc->p, &desc, desc.desc.bLength);
+		pdesc->size = desc.desc.bLength;
 	} else {
-		// Append only if not exists
-		desc_string_t *pl = (desc_string_t *)desc.lang.p;
-		for (uint8_t len = 0; len != pl->bLength - desc_string.bLength; len += 2)
-			if (pl->wPayload[len] == lang)
-				goto add;
-		pl = (desc_string_t *)realloc(pl, pl->bLength + 2);
-		pl->wPayload[(pl->bLength - desc_string.bLength) >> 1] = lang;
-		pl->bLength += 2;
-		desc.lang.p = pl;
-		desc.lang.size = pl->bLength;
+		// Default empty descriptor
+		pdesc->size = 0;
+		USB_TODO();
 	}
-
-add:	// Add string to string lists
-	if (id > desc.nstring)
-		id = 0;
-
-	// Find string list entry
-	desc_string_list_t **psl;
-	if (id == 0) {	// Append new string entry
-		desc.string = (desc_string_list_t **)realloc(desc.string, sizeof(desc_string_list_t *) * (desc.nstring + 1u));
-		psl = &desc.string[desc.nstring++];
-		id = desc.nstring;
-		*psl = 0;
-	} else
-		psl = &desc.string[id - 1u];
-
-	// Iterate to end of string list
-	// TODO: Duplication check
-	for (; *psl != 0; psl = &(*psl)->next);
-	// Add new string entry
-	*psl = (desc_string_list_t *)malloc(sizeof(desc_string_list_t));
-	if (!psl)
-		panic();
-	(*psl)->next = 0;
-	(*psl)->lang = lang;
-	// Allocate string descriptor
-	uint32_t len = strlen(str);
-	desc_string_t *ps = (desc_string_t *)malloc(desc_string.bLength + (len << 1u));
-	if (!ps)
-		panic();
-	memcpy(ps, &desc_string, desc_string.bLength);
-	ps->bLength += (len << 1u);
-	while (len--)	// Unicode conversion?
-		ps->wPayload[len] = str[len];
-	(*psl)->desc.p = ps;
-	(*psl)->desc.size = ps->bLength;
-	return id;
 }
 
-void usb_get_descriptor(usb_setup_t pkt, usb_desc_t *desc)
+void usb_get_descriptor(usb_desc_t *pdesc, usb_setup_t pkt)
 {
 	switch (pkt.bType) {
 	case DESC_DEVICE:
-		usb_get_descriptor_device(desc);
+		usb_desc_device(pdesc);
 		break;
 	case DESC_CONFIGURATION:
-		USB_TODO();
-		//desc = usb_desc_config(usb);
+		usb_desc_config(pdesc);
 		break;
 	case DESC_DEVICE_QUALIFIER:
 		USB_TODO();
 		//desc = usb_desc_device_qualifier(usb);
 		break;
 	case DESC_STRING:
-		USB_TODO();
-		//desc = usb_desc_string(usb, pkt.bIndex, pkt.wIndex);
+		usb_desc_string(pdesc, pkt.bIndex, pkt.wIndex);
 		break;
 	default:
 		USB_TODO();

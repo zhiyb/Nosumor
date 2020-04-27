@@ -5,19 +5,19 @@
 #include <macros.h>
 
 typedef union PACKED {
-	struct {
+	struct PACKED {
 		uint8_t bmRequestType;
 		uint8_t bRequest;
-		union {
+		union PACKED {
 			uint16_t wValue;
-			struct {
+			struct PACKED {
 				uint8_t bIndex;
 				uint8_t bType;
 			};
 		};
-		union {
+		union PACKED {
 			uint16_t wIndex;
-			struct {
+			struct PACKED {
 				uint8_t bID;
 				uint8_t bEntityID;
 			};

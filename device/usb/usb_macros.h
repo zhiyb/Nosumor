@@ -6,10 +6,12 @@
 
 // Common USB static lists
 typedef void (*const usb_basic_handler_t)();
-#define USB_INIT_HANDLER(func)	LIST_ITEM(usb_init, usb_basic_handler_t) = func
-#define USB_RESET_HANDLER(func)	LIST_ITEM(usb_reset, usb_basic_handler_t) = func
+#define USB_INIT_HANDLER(func)		LIST_ITEM(usb_init, usb_basic_handler_t) = func
+#define USB_RESET_HANDLER(func)		LIST_ITEM(usb_reset, usb_basic_handler_t) = func
 typedef void (*const usb_enum_handler_t)(uint32_t spd);
-#define USB_ENUM_HANDLER(func)	LIST_ITEM(usb_enum, usb_enum_handler_t) = func
+#define USB_ENUM_HANDLER(func)		LIST_ITEM(usb_enum, usb_enum_handler_t) = func
+typedef void (*const usb_config_handler_t)(uint8_t config);
+#define USB_CONFIG_HANDLER(func)	LIST_ITEM(usb_config, usb_config_handler_t) = func
 
 // Enumeration speed
 #define ENUM_HS		0b00

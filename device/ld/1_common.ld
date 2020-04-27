@@ -2,8 +2,8 @@
 ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
-__stack_end__ = 0x2003c000;     /* end of RAM */
-__heap_end__  = 0x20010000;     /* end of DTCM */
+__stack_end__ = 0x20010000;     /* end of DTCM */
+__heap_size__ = 16 * 1024;      /* Heap size 16k */
 
 /* Flash disk regions */
 __progi_start__	= ORIGIN(PROGI);
@@ -112,6 +112,18 @@ SECTIONS
     __bss_end__ = .;
   } >RAM
 
+  /* Heap section */
+  . = ALIGN(4);
+  .heap :
+  {
+    . = ALIGN(4);
+    __heap_start__ = .;
+    /* Reserve space */
+    . += __heap_size__;
+    . = ALIGN(4);
+    __heap_end__ = .;
+  } >RAM
+
   /* Code segments in ITCM RAM */
   . = ALIGN(4);
   __itcm_load__ = LOADADDR(.itcm);
@@ -133,9 +145,6 @@ SECTIONS
     . = ALIGN(4);
     *(.dtcm)
     *(.dtcm*)
-
-    . = ALIGN(4);
-    __heap_start__ = .;
   } >DTCM
 
   .dmaram (NOLOAD) :

@@ -42,6 +42,8 @@
 #define FEATURE_DEVICE_REMOTE_WAKEUP	1u
 #define FEATURE_TEST_MODE		2u
 
+LIST(usb_config, usb_config_handler_t);
+
 static void usb_setup_standard_device(usb_setup_t pkt)
 {
 	switch (pkt.bmRequestType & DIR_Msk) {
@@ -50,7 +52,7 @@ static void usb_setup_standard_device(usb_setup_t pkt)
 		case GET_DESCRIPTOR: {
 			usb_desc_t desc;
 			desc.p = usb_ep0_in_buf(&desc.size);
-			usb_get_descriptor(pkt, &desc);
+			usb_get_descriptor(&desc, pkt);
 			if (desc.size != 0)
 				usb_ep0_in(desc.size > pkt.wLength ? pkt.wLength : desc.size);
 			else
@@ -75,21 +77,13 @@ static void usb_setup_standard_device(usb_setup_t pkt)
 		switch (pkt.bRequest) {
 		case SET_ADDRESS:
 			usb_hw_set_addr(pkt.wValue);
-			usb_ep0_in_buf(0);
-			usb_ep0_in(0);
+			usb_ep0_in_null();
 			break;
 		case SET_CONFIGURATION:
 			if (pkt.wValue == 1) {
 				// Initialise endpoints
-				USB_TODO();
-				/*for (int i = 1; i != USB_EPIN_CNT; i++)
-					FUNC(usb->epin[i].init)(usb, i);
-				for (int i = 1; i != USB_EPOUT_CNT; i++)
-					FUNC(usb->epout[i].init)(usb, i);
-				// Enable endpoints
-				for (usb_if_t **ip = &usb->usbif; *ip != 0; ip = &(*ip)->next)
-					FUNC((*ip)->enable)(usb, (*ip)->data);
-				usb_ep_in_transfer(usb->base, ep, 0, 0);*/
+				LIST_ITERATE(usb_config, usb_config_handler_t, pfunc) (*pfunc)(pkt.wValue);
+				usb_ep0_in_null();
 			} else {
 				//usb_ep_in_stall(usb->base, ep);
 				USB_TODO();

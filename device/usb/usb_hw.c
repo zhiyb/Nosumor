@@ -15,12 +15,14 @@
 #define EP_CONF_IN	1
 #define EP_CONF_OUT	0
 
+// Extra transfer type
+#define EP_UNUSED	0xff
+
 struct {
 	uint16_t top, num;
 } fifo = {0};
 
 struct {
-	uint32_t num;
 	struct {
 		uint32_t type;
 		uint32_t maxsize;
@@ -33,7 +35,6 @@ struct {
 } ep_in = {0};
 
 struct {
-	uint32_t num;
 	struct {
 		uint32_t type;
 		uint32_t maxsize;
@@ -242,8 +243,10 @@ static void usb_hw_reset()
 	// Disable endpoint interrupts
 	dev->DAINTMSK = 0;
 	usb_hw_set_addr(0);
-	ep_in.num = 0;
-	ep_out.num = 0;
+	for (int ep = 0; ep < USB_EP_NUM; ep++) {
+		ep_in.ep[ep].type = EP_UNUSED;
+		ep_out.ep[ep].type = EP_UNUSED;
+	}
 
 	pram = &ram[0];
 
@@ -332,26 +335,32 @@ static void usb_hw_ep0_alloc(uint32_t dir, uint32_t size)
 	}
 }
 
-uint32_t usb_hw_ep_alloc(uint32_t dir, uint32_t type, uint32_t size)
+uint32_t usb_hw_ep_alloc(usb_ep_type_t eptype, uint32_t dir, uint32_t type, uint32_t maxsize)
 {
 	USB_OTG_DeviceTypeDef *dev = DEV(USB);
 	uint32_t epnum = 0;
 	if (dir == EP_DIR_IN) {
+		if (eptype == UsbEp0)
+			epnum = 0;
+		else if (eptype == UsbEpFast)
+			epnum = 1;
+		else
+			epnum = 2;
+		for (; ep_in.ep[epnum].type != EP_UNUSED; epnum++);
 		USB_OTG_INEndpointTypeDef *epin = EP_IN(USB, epnum);
-		epnum = ep_in.num++;
 		if (epnum == 0) {
 #if DEBUG
 			if (type != EP_CONTROL)
 				dbgbkpt();
 #endif
-			usb_hw_ep0_alloc(dir, size);
+			usb_hw_ep0_alloc(dir, maxsize);
 		} else {
-			uint32_t fifo = usb_hw_fifo_alloc((size + 3) / 4);
+			uint32_t fifo = usb_hw_fifo_alloc((maxsize + 3) / 4);
 			epin->DIEPCTL = (fifo << USB_OTG_DIEPCTL_TXFNUM_Pos) |
-					DIEPCTL_EP_TYP(type) | (size << USB_OTG_DIEPCTL_MPSIZ_Pos);
+					DIEPCTL_EP_TYP(type) | (maxsize << USB_OTG_DIEPCTL_MPSIZ_Pos);
 		}
 		ep_in.ep[epnum].type = type;
-		ep_in.ep[epnum].maxsize = size;
+		ep_in.ep[epnum].maxsize = maxsize;
 		// Clear interrupts
 		epin->DIEPINT = USB_OTG_DIEPINT_XFRC_Msk;
 		// Unmask interrupts
@@ -359,19 +368,25 @@ uint32_t usb_hw_ep_alloc(uint32_t dir, uint32_t type, uint32_t size)
 		dbgprintf(ESC_DEBUG "%lu\tusb_hw: Endpoint " ESC_WRITE "IN %lu"
 				ESC_DEBUG " allocated\n", systick_cnt(), epnum);
 	} else if (dir == EP_DIR_OUT) {
+		if (eptype == UsbEp0)
+			epnum = 0;
+		else if (eptype == UsbEpFast)
+			epnum = 1;
+		else
+			epnum = 2;
+		for (; ep_out.ep[epnum].type != EP_UNUSED; epnum++);
 		USB_OTG_OUTEndpointTypeDef *epout = EP_OUT(USB, epnum);
-		epnum = ep_out.num++;
 		if (epnum == 0) {
 #if DEBUG
 			if (type != EP_CONTROL)
 				dbgbkpt();
 #endif
-			usb_hw_ep0_alloc(dir, size);
+			usb_hw_ep0_alloc(dir, maxsize);
 		} else {
-			epout->DOEPCTL = DIEPCTL_EP_TYP(type) | (size << USB_OTG_DIEPCTL_MPSIZ_Pos);
+			epout->DOEPCTL = DIEPCTL_EP_TYP(type) | (maxsize << USB_OTG_DIEPCTL_MPSIZ_Pos);
 		}
 		ep_out.ep[epnum].type = type;
-		ep_out.ep[epnum].maxsize = size;
+		ep_out.ep[epnum].maxsize = maxsize;
 		ep_out.ep[epnum].xfrsize = 0;
 		// Clear interrupts
 		epout->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk | USB_OTG_DOEPINT_STUP_Msk |
@@ -441,7 +456,6 @@ void usb_hw_ep_out(uint32_t epnum, void *p, uint32_t setup, uint32_t pkt, uint32
 
 void usb_hw_ep_in(uint32_t epnum, void *p, uint32_t size, usb_ep_irq_xfrc_handler_t xfrc)
 {
-	USB_OTG_DeviceTypeDef *dev = DEV(USB);
 	USB_OTG_INEndpointTypeDef *epin = EP_IN(USB, epnum);
 	uint32_t maxsize = ep_in.ep[epnum].maxsize;
 #ifdef DEBUG
@@ -463,6 +477,25 @@ void usb_hw_ep_in(uint32_t epnum, void *p, uint32_t size, usb_ep_irq_xfrc_handle
 	epin->DIEPCTL = ((epin->DIEPCTL) & (USB_OTG_DIEPCTL_TXFNUM_Msk | USB_OTG_DIEPCTL_MPSIZ_Msk |
 			USB_OTG_DIEPCTL_EPTYP_Msk)) | USB_OTG_DIEPCTL_CNAK_Msk |
 			USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_USBAEP_Msk;
+#ifdef DEBUG
+	dbgprintf(ESC_DEBUG "%lu\tusb_hw: " ESC_WRITE "EP %lu IN"
+		  ESC_DEBUG " transferred %lu bytes\n",
+			systick_cnt(), epnum, size);
+#endif
+}
+
+void usb_hw_ep_in_nak(uint32_t epnum)
+{
+	USB_OTG_INEndpointTypeDef *epin = EP_IN(USB, epnum);
+#ifdef DEBUG
+	if (epin->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk)
+		USB_ERROR();
+#endif
+	epin->DIEPCTL = ((epin->DIEPCTL) & (USB_OTG_DIEPCTL_TXFNUM_Msk | USB_OTG_DIEPCTL_MPSIZ_Msk |
+			USB_OTG_DIEPCTL_EPTYP_Msk)) | USB_OTG_DIEPCTL_SNAK_Msk | USB_OTG_DIEPCTL_USBAEP_Msk;
+#ifdef DEBUG
+	dbgprintf(ESC_DEBUG "%lu\tusb_hw: " ESC_WRITE "EP %lu IN" ESC_DEBUG " NAK\n", systick_cnt(), epnum);
+#endif
 }
 
 void OTG_HS_IRQHandler()
@@ -547,6 +580,11 @@ void OTG_HS_IRQHandler()
 			if (epint & USB_OTG_DOEPINT_XFRC_Msk) {
 				if (ep_out.ep[i].func.xfrc)
 					(*ep_out.ep[i].func.xfrc)(epdma, xfrsize);
+#if 0
+				dbgprintf(ESC_DEBUG "%lu\tusb_hw: " ESC_READ "EP %lu OUT"
+					  ESC_DEBUG " transferred %lu bytes\n",
+					  systick_cnt(), i, xfrsize);
+#endif
 				ep->DOEPINT = USB_OTG_DOEPINT_XFRC_Msk;
 				processed = 1;
 			}

@@ -45,8 +45,8 @@ static void usb_ep0_enumeration(uint32_t spd)
 	}
 
 	// Try to allocate endpoint 0
-	uint32_t epinnum = usb_hw_ep_alloc(EP_DIR_IN, EP_CONTROL, size);
-	uint32_t epoutnum = usb_hw_ep_alloc(EP_DIR_OUT, EP_CONTROL, size);
+	uint32_t epinnum = usb_hw_ep_alloc(UsbEp0, EP_DIR_IN, EP_CONTROL, size);
+	uint32_t epoutnum = usb_hw_ep_alloc(UsbEp0, EP_DIR_OUT, EP_CONTROL, size);
 #if DEBUG
 	if (epinnum != 0 || epoutnum != 0)
 		panic();
@@ -130,9 +130,6 @@ static void usb_ep0_in_irq(void *p, uint32_t size)
 	btx.size += size;
 	if (btx.size == btx.xfrsize && size != usb_hw_ep_max_size(EP_DIR_IN, 0)) {
 		btx.state = BufFree;
-		dbgprintf(ESC_DEBUG "%lu\tusb_ep0: " ESC_WRITE "EP 0 IN"
-			  ESC_DEBUG " transferred %lu bytes\n",
-				systick_cnt(), size);
 		return;
 	}
 	USB_TODO();
@@ -149,6 +146,12 @@ void usb_ep0_in(uint32_t size)
 
 	uint32_t max_size = usb_hw_ep_max_size(EP_DIR_IN, 0);
 	usb_hw_ep_in(0, btx.p, size >= max_size ? max_size : size, usb_ep0_in_irq);
+}
+
+void usb_ep0_in_null()
+{
+	usb_ep0_in_buf(0);
+	usb_ep0_in(0);
 }
 
 static void usb_ep0_process()

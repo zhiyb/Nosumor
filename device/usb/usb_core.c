@@ -5,6 +5,7 @@
 #include "usb_macros.h"
 #include "usb_hw.h"
 #include "usb_core.h"
+#include "usb_desc.h"
 
 LIST(usb_init, usb_basic_handler_t);
 LIST(usb_reset, usb_basic_handler_t);
