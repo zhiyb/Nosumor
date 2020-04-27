@@ -230,7 +230,7 @@ void debug_handler()
 	NVIC_SystemReset();
 }
 
-#if DEBUG >= 1
+#if DEBUG
 #ifndef BOOTLOADER
 void HardFault_Handler()
 {

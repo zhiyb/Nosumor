@@ -86,7 +86,7 @@ size_t heap_max_size()
 	return &__heap_end__ - &__heap_start__;
 }
 
-#ifdef DEBUG
+#if DEBUG >= 5
 static void heap_debug()
 {
 	static size_t psize = 0;

@@ -254,9 +254,9 @@ static void usb_hw_reset()
 	fifo.num = 0;
 
 	// Allocate half of FIFO RAM to Rx
-#if DEBUG
+#if DEBUG >= 5
 	if (usb_hw_fifo_alloc(USB_RAM_SIZE / 4 / 2) != (uint32_t)-1)
-		panic();
+		USB_ERROR();
 #else
 	usb_hw_fifo_alloc(USB_RAM_SIZE / 2);
 #endif
@@ -270,9 +270,9 @@ static uint32_t usb_hw_fifo_alloc(uint32_t size)
 	uint32_t addr = fifo.top;
 	fifo.num += 1;
 	fifo.top += size;
-#if DEBUG
+#if DEBUG >= 5
 	if (fifo.top > USB_RAM_SIZE / 4)
-		panic();
+		USB_ERROR();
 #endif
 	switch (num) {
 	case 0:		// Rx FIFO
@@ -312,25 +312,25 @@ static void usb_hw_ep0_alloc(uint32_t dir, uint32_t size)
 	case 8:
 		epsize = 0b11;
 		break;
-#if DEBUG
+#if DEBUG >= 5
 	default:
-		panic();
+		USB_ERROR();
 #endif
 	}
 	if (dir == EP_DIR_IN) {
 		USB_OTG_INEndpointTypeDef *epin = EP_IN(USB, 0);
 		uint32_t fifo = usb_hw_fifo_alloc(size / 4);
-#if DEBUG
+#if DEBUG >= 5
 		if (fifo != 0)
-			dbgbkpt();
+			USB_ERROR();
 #endif
 		epin->DIEPCTL = (fifo << USB_OTG_DIEPCTL_TXFNUM_Pos) | (epsize << USB_OTG_DIEPCTL_MPSIZ_Pos);
 	} else {
-#if DEBUG
+#if DEBUG >= 5
 		USB_OTG_INEndpointTypeDef *epin = EP_IN(USB, 0);
-		USB_OTG_OUTEndpointTypeDef *epout = EP_OUT(USB, 0);
+		//USB_OTG_OUTEndpointTypeDef *epout = EP_OUT(USB, 0);
 		if ((epin->DIEPCTL & USB_OTG_DIEPCTL_MPSIZ_Msk) >> USB_OTG_DIEPCTL_MPSIZ_Pos != epsize)
-			panic();
+			USB_ERROR();
 #endif
 	}
 }
@@ -349,9 +349,9 @@ uint32_t usb_hw_ep_alloc(usb_ep_type_t eptype, uint32_t dir, uint32_t type, uint
 		for (; ep_in.ep[epnum].type != EP_UNUSED; epnum++);
 		USB_OTG_INEndpointTypeDef *epin = EP_IN(USB, epnum);
 		if (epnum == 0) {
-#if DEBUG
+#if DEBUG >= 5
 			if (type != EP_CONTROL)
-				dbgbkpt();
+				USB_ERROR();
 #endif
 			usb_hw_ep0_alloc(dir, maxsize);
 		} else {
@@ -377,9 +377,9 @@ uint32_t usb_hw_ep_alloc(usb_ep_type_t eptype, uint32_t dir, uint32_t type, uint
 		for (; ep_out.ep[epnum].type != EP_UNUSED; epnum++);
 		USB_OTG_OUTEndpointTypeDef *epout = EP_OUT(USB, epnum);
 		if (epnum == 0) {
-#if DEBUG
+#if DEBUG >= 5
 			if (type != EP_CONTROL)
-				dbgbkpt();
+				USB_ERROR();
 #endif
 			usb_hw_ep0_alloc(dir, maxsize);
 		} else {
@@ -395,9 +395,9 @@ uint32_t usb_hw_ep_alloc(usb_ep_type_t eptype, uint32_t dir, uint32_t type, uint
 		dev->DAINTMSK |= DAINTMSK_OUT(epnum);
 		dbgprintf(ESC_DEBUG "%lu\tusb_hw: Endpoint " ESC_READ "OUT %lu"
 				ESC_DEBUG " allocated\n", systick_cnt(), epnum);
-#if DEBUG
+#if DEBUG >= 5
 	} else {
-		panic();
+		USB_ERROR();
 #endif
 	}
 	return epnum;
@@ -458,14 +458,14 @@ void usb_hw_ep_in(uint32_t epnum, void *p, uint32_t size, usb_ep_irq_xfrc_handle
 {
 	USB_OTG_INEndpointTypeDef *epin = EP_IN(USB, epnum);
 	uint32_t maxsize = ep_in.ep[epnum].maxsize;
-#ifdef DEBUG
+#if DEBUG
 	if (size > maxsize)
 		USB_ERROR();
 #endif
 	uint32_t pcnt = 1;
 	if (size != 0)
 		pcnt = (size + maxsize - 1) / maxsize;
-#ifdef DEBUG
+#if DEBUG
 	if (epin->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk)
 		USB_ERROR();
 #endif
@@ -477,24 +477,23 @@ void usb_hw_ep_in(uint32_t epnum, void *p, uint32_t size, usb_ep_irq_xfrc_handle
 	epin->DIEPCTL = ((epin->DIEPCTL) & (USB_OTG_DIEPCTL_TXFNUM_Msk | USB_OTG_DIEPCTL_MPSIZ_Msk |
 			USB_OTG_DIEPCTL_EPTYP_Msk)) | USB_OTG_DIEPCTL_CNAK_Msk |
 			USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_USBAEP_Msk;
-#ifdef DEBUG
-	dbgprintf(ESC_DEBUG "%lu\tusb_hw: " ESC_WRITE "EP %lu IN"
-		  ESC_DEBUG " transferred %lu bytes\n",
-			systick_cnt(), epnum, size);
+#if DEBUG >= 5
+	printf(ESC_DEBUG "%lu\tusb_hw: " ESC_WRITE "EP %lu IN" ESC_DEBUG " transferred %lu bytes\n",
+	       systick_cnt(), epnum, size);
 #endif
 }
 
 void usb_hw_ep_in_nak(uint32_t epnum)
 {
 	USB_OTG_INEndpointTypeDef *epin = EP_IN(USB, epnum);
-#ifdef DEBUG
+#if DEBUG
 	if (epin->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk)
 		USB_ERROR();
 #endif
 	epin->DIEPCTL = ((epin->DIEPCTL) & (USB_OTG_DIEPCTL_TXFNUM_Msk | USB_OTG_DIEPCTL_MPSIZ_Msk |
 			USB_OTG_DIEPCTL_EPTYP_Msk)) | USB_OTG_DIEPCTL_SNAK_Msk | USB_OTG_DIEPCTL_USBAEP_Msk;
-#ifdef DEBUG
-	dbgprintf(ESC_DEBUG "%lu\tusb_hw: " ESC_WRITE "EP %lu IN" ESC_DEBUG " NAK\n", systick_cnt(), epnum);
+#if DEBUG >= 5
+	printf(ESC_DEBUG "%lu\tusb_hw: " ESC_WRITE "EP %lu IN" ESC_DEBUG " NAK\n", systick_cnt(), epnum);
 #endif
 }
 

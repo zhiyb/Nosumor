@@ -78,7 +78,7 @@ USB_CONFIG_HANDLER(&usb_hid_config);
 static void usb_hid_ep_out()
 {
 	struct buf_t *buf = &data.epout.buf[data.epout.buf_queue];
-#ifdef DEBUG
+#if DEBUG
 	if (buf->state != BufFree)
 		USB_ERROR();
 #endif

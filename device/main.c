@@ -17,12 +17,13 @@ static inline void init()
 	printf(ESC_INIT "%lu\tboot: Initialising USB systems\n", systick_cnt());
 	usb_init();
 	printf(ESC_INIT "%lu\tboot: Soft connect USB port\n", systick_cnt());
-#if !DEBUG
+#if DEBUG < 2
 	usb_connect(1);
 #endif
 	printf(ESC_INIT "%lu\tboot: Initialisation done\n", systick_cnt());
 }
 
+#if DEBUG >= 2
 static void debug()
 {
 	static uint32_t _status = 0;
@@ -37,6 +38,7 @@ static void debug()
 }
 
 IDLE_HANDLER(&debug);
+#endif
 
 int main()
 {

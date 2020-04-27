@@ -47,7 +47,7 @@ static void usb_ep0_enumeration(uint32_t spd)
 	// Try to allocate endpoint 0
 	uint32_t epinnum = usb_hw_ep_alloc(UsbEp0, EP_DIR_IN, EP_CONTROL, size);
 	uint32_t epoutnum = usb_hw_ep_alloc(UsbEp0, EP_DIR_OUT, EP_CONTROL, size);
-#if DEBUG
+#if DEBUG >= 5
 	if (epinnum != 0 || epoutnum != 0)
 		panic();
 #endif
@@ -103,7 +103,7 @@ static void usb_ep0_irq_xfrc(void *p, uint32_t size)
 static void usb_ep0_out()
 {
 	struct buf_t *buf = &brx[brx_queue];
-#ifdef DEBUG
+#if DEBUG
 	if (buf->state != BufFree)
 		USB_ERROR();
 #endif
@@ -123,7 +123,7 @@ void *usb_ep0_in_buf(uint32_t *size)
 
 static void usb_ep0_in_irq(void *p, uint32_t size)
 {
-#ifdef DEBUG
+#if DEBUG
 	if (btx.state != BufActive)
 		USB_ERROR();
 #endif

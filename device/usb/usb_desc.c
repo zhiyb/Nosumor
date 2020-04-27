@@ -51,7 +51,7 @@ static const desc_dev_t desc_dev = {
 
 static void usb_desc_device(usb_desc_t *pdesc)
 {
-#ifdef DEBUG
+#if DEBUG >= 5
 	if (!pdesc->size || !pdesc->p)
 		USB_ERROR();
 #endif
@@ -66,7 +66,7 @@ static void usb_desc_device(usb_desc_t *pdesc)
 	if (uid[0] == 0)
 		uid_str(uid);
 	pd->iSerialNumber = USB_DESC_STRING_INDEX(desc_str_serial);
-#ifdef DEBUG
+#if DEBUG >= 5
 	if (pd->bLength > pdesc->size)
 		USB_ERROR();
 #endif
@@ -98,7 +98,7 @@ LIST(usb_desc_config, usb_desc_handler_t);
 
 static void usb_desc_config(usb_desc_t *pdesc)
 {
-#ifdef DEBUG
+#if DEBUG >= 5
 	if (!pdesc->size || !pdesc->p)
 		USB_ERROR();
 #endif
@@ -115,7 +115,7 @@ static void usb_desc_config(usb_desc_t *pdesc)
 		(*p)(&desc);
 		conf.desc.bNumInterfaces += 1;
 	}
-#ifdef DEBUG
+#if DEBUG >= 5
 	if (conf.desc.wTotalLength > pdesc->size)
 		USB_ERROR();
 #endif
@@ -175,7 +175,7 @@ void usb_desc_add_endpoint(usb_desc_t *pdesc, uint8_t bEndpointAddress, uint8_t 
 
 void usb_desc_add(usb_desc_t *pdesc, const void *p, uint32_t bLength)
 {
-#ifdef DEBUG
+#if DEBUG >= 5
 	if (pdesc->size < bLength)
 		USB_ERROR();
 #endif
@@ -212,7 +212,7 @@ static void usb_desc_string(usb_desc_t *pdesc, uint8_t index, uint16_t lang)
 				while (*plang != 0)
 					if (*plang == ps->lang)
 						break;
-#ifdef DEBUG
+#if DEBUG >= 5
 				if (plang == &lang.raw[32])
 					USB_ERROR();
 #endif
@@ -249,7 +249,7 @@ static void usb_desc_string(usb_desc_t *pdesc, uint8_t index, uint16_t lang)
 		while (len--)	// Unicode conversion?
 			desc.desc.wPayload[len] = ps->p[len];
 
-#ifdef DEBUG
+#if DEBUG >= 5
 		if (pdesc->size < desc.desc.bLength)
 			USB_ERROR();
 #endif

@@ -48,7 +48,7 @@ static const uint8_t desc_report[] = {
 
 static void usb_hid_keyboard_desc(usb_hid_desc_t *pdesc)
 {
-#ifdef DEBUG
+#if DEBUG >= 5
 	if (pdesc->size < pdesc->len + sizeof(desc_report))
 		USB_ERROR();
 #endif
