@@ -148,10 +148,13 @@ void usb_ep0_in(uint32_t size)
 	usb_hw_ep_in(0, btx.p, size >= max_size ? max_size : size, usb_ep0_in_irq);
 }
 
-void usb_ep0_in_null()
+void usb_ep0_in_stall()
 {
-	usb_ep0_in_buf(0);
-	usb_ep0_in(0);
+#if DEBUG
+	if (btx.state != BufFree && btx.state != BufData)
+		USB_ERROR();
+#endif
+	USB_TODO();
 }
 
 static void usb_ep0_process()

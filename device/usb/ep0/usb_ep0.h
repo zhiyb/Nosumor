@@ -5,6 +5,6 @@
 
 void *usb_ep0_in_buf(uint32_t *size);
 void usb_ep0_in(uint32_t size);
-void usb_ep0_in_null();
+void usb_ep0_in_stall();
 
 #endif // USB_EP0_H

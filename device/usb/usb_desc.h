@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include <list.h>
-#include <usb/ep0/usb_ep0_setup.h>
 
 typedef enum {UsbDescDevice, UsbDescConfiguration, UsbDescDeviceQualifier, UsbDescString} usb_desc_type_t;
 
@@ -17,13 +16,7 @@ typedef struct usb_const_desc_t {
 	const void *p;
 } usb_const_desc_t;
 
-#if 0
-typedef struct usb_desc_string_list_t {
-	struct usb_desc_string_list_t *next;
-	usb_desc_t desc;
-	uint32_t lang;
-} usb_desc_string_list_t;
-#endif
+#include <usb/ep0/usb_ep0_setup.h>
 
 void usb_get_descriptor(usb_desc_t *pdesc, usb_setup_t pkt);
 
@@ -45,7 +38,7 @@ typedef const struct usb_desc_string_t {
 #define USB_DESC_STRING_INDEX(name)	LIST_INDEX(usb_desc_string, name);
 
 // Configuration descriptor append
-void usb_desc_add_interface(usb_desc_t *pdesc, uint8_t bAlternateSetting, uint8_t bNumEndpoints,
+uint8_t usb_desc_add_interface(usb_desc_t *pdesc, uint8_t bAlternateSetting, uint8_t bNumEndpoints,
 			    uint8_t bInterfaceClass, uint8_t bInterfaceSubClass,
 			    uint8_t bInterfaceProtocol, uint8_t iInterface);
 void usb_desc_add_endpoint(usb_desc_t *pdesc, uint8_t bEndpointAddress, uint8_t bmAttributes,

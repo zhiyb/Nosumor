@@ -7,6 +7,7 @@
 // Common USB static lists
 typedef void (*const usb_basic_handler_t)();
 #define USB_INIT_HANDLER(func)		LIST_ITEM(usb_init, usb_basic_handler_t) = func
+#define USB_SUSP_HANDLER(func)		LIST_ITEM(usb_susp, usb_basic_handler_t) = func
 #define USB_RESET_HANDLER(func)		LIST_ITEM(usb_reset, usb_basic_handler_t) = func
 typedef void (*const usb_enum_handler_t)(uint32_t spd);
 #define USB_ENUM_HANDLER(func)		LIST_ITEM(usb_enum, usb_enum_handler_t) = func

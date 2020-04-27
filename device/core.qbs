@@ -80,6 +80,7 @@ StaticLibrary {
         "usb/ep0/usb_ep0_setup.c",
         "usb/ep0/usb_ep0_setup.h",
         "usb/hid/keyboard/usb_hid_keyboard.c",
+        "usb/hid/keyboard/usb_hid_keyboard.h",
         "usb/hid/usb_hid.c",
         "usb/hid/usb_hid.h",
         "usb/usb.h",

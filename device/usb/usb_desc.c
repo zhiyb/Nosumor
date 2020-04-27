@@ -111,10 +111,7 @@ static void usb_desc_config(usb_desc_t *pdesc)
 	usb_desc_t desc;
 	desc.p = &conf;
 	desc.size = pdesc->size;
-	LIST_ITERATE(usb_desc_config, usb_desc_handler_t, p) {
-		(*p)(&desc);
-		conf.desc.bNumInterfaces += 1;
-	}
+	LIST_ITERATE(usb_desc_config, usb_desc_handler_t, pfunc) (*pfunc)(&desc);
 #if DEBUG >= 5
 	if (conf.desc.wTotalLength > pdesc->size)
 		USB_ERROR();
@@ -137,17 +134,20 @@ typedef struct PACKED {
 	uint8_t iInterface;
 } desc_interface_t;
 
-void usb_desc_add_interface(usb_desc_t *pdesc, uint8_t bAlternateSetting, uint8_t bNumEndpoints,
+uint8_t usb_desc_add_interface(usb_desc_t *pdesc, uint8_t bAlternateSetting, uint8_t bNumEndpoints,
 			    uint8_t bInterfaceClass, uint8_t bInterfaceSubClass,
 			    uint8_t bInterfaceProtocol, uint8_t iInterface)
 {
 	static const uint8_t bLength = 9u;
 	desc_config_t *pc = (desc_config_t *)pdesc->p;
+	uint8_t bNumInterfaces = pc->bNumInterfaces;
 	const desc_interface_t desc = {
-		bLength, DESC_INTERFACE, pc->bNumInterfaces, bAlternateSetting, bNumEndpoints,
+		bLength, DESC_INTERFACE, bNumInterfaces, bAlternateSetting, bNumEndpoints,
 		bInterfaceClass, bInterfaceSubClass, bInterfaceProtocol, iInterface
 	};
 	usb_desc_add(pdesc, &desc, bLength);
+	pc->bNumInterfaces = bNumInterfaces + 1;
+	return bNumInterfaces;
 }
 
 // Endpoint descriptor

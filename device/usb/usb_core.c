@@ -8,8 +8,6 @@
 #include "usb_desc.h"
 
 LIST(usb_init, usb_basic_handler_t);
-LIST(usb_reset, usb_basic_handler_t);
-LIST(usb_enum, usb_enum_handler_t);
 
 void usb_init()
 {
@@ -28,16 +26,6 @@ void usb_connect(uint32_t e)
 		usb_connected() ? ESC_ENABLE : ESC_DISABLE "dis");
 }
 
-void usb_core_reset()
-{
-	LIST_ITERATE(usb_reset, usb_basic_handler_t, p) (*p)();
-}
-
 void usb_core_enumeration(uint32_t spd)
 {
-#if DEBUG >= 5
-	if (LIST_SIZE(usb_enum) == 0)
-		USB_TODO();
-#endif
-	LIST_ITERATE(usb_enum, usb_enum_handler_t, p) (*p)(spd);
 }

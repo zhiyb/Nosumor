@@ -18,6 +18,10 @@
 // Extra transfer type
 #define EP_UNUSED	0xff
 
+LIST(usb_reset, usb_basic_handler_t);
+LIST(usb_susp, usb_basic_handler_t);
+LIST(usb_enum, usb_enum_handler_t);
+
 struct {
 	uint16_t top, num;
 } fifo = {0};
@@ -229,6 +233,10 @@ void usb_hw_connect(uint32_t e)
 {
 	USB_OTG_DeviceTypeDef *dev = DEV(USB);
 	dev->DCTL = e ? 0 : USB_OTG_DCTL_SDIS_Msk;
+
+	// Call suspend on disconnect
+	if (!e)
+		LIST_ITERATE(usb_susp, usb_basic_handler_t, p) (*p)();
 }
 
 uint32_t usb_hw_connected()
@@ -243,6 +251,30 @@ static void usb_hw_reset()
 	// Disable endpoint interrupts
 	dev->DAINTMSK = 0;
 	usb_hw_set_addr(0);
+#if 0	// This doesn't work, probably because USBAEP is not set
+	// Disable active endpoints
+	for (int ep = 1; ep < USB_EP_NUM; ep++) {
+		USB_OTG_INEndpointTypeDef *epin = EP_IN(USB, ep);
+		USB_OTG_OUTEndpointTypeDef *epout = EP_OUT(USB, ep);
+		if (epin->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk) {
+#if DEBUG
+			printf(ESC_DEBUG "%lu\tusb_hw: " ESC_WRITE "EP %u IN" ESC_DEBUG " reset\n", systick_cnt(), ep);
+#endif
+			epin->DIEPCTL = ((epin->DIEPCTL) & (USB_OTG_DIEPCTL_TXFNUM_Msk | USB_OTG_DIEPCTL_MPSIZ_Msk |
+					USB_OTG_DIEPCTL_EPTYP_Msk)) | USB_OTG_DIEPCTL_EPDIS_Msk;
+		}
+		if (epout->DOEPCTL & USB_OTG_DOEPCTL_EPENA_Msk) {
+#if DEBUG
+			printf(ESC_DEBUG "%lu\tusb_hw: " ESC_READ "EP %u OUT" ESC_DEBUG " reset\n", systick_cnt(), ep);
+#endif
+			epout->DOEPCTL = (epout->DOEPCTL & (USB_OTG_DOEPCTL_MPSIZ_Msk | USB_OTG_DOEPCTL_EPTYP_Msk)) |
+					USB_OTG_DOEPCTL_EPDIS_Msk;
+		}
+		while (epin->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk);
+		while (epout->DOEPCTL & USB_OTG_DOEPCTL_EPENA_Msk);
+	}
+#endif
+	// Reset endpoint status
 	for (int ep = 0; ep < USB_EP_NUM; ep++) {
 		ep_in.ep[ep].type = EP_UNUSED;
 		ep_out.ep[ep].type = EP_UNUSED;
@@ -284,8 +316,10 @@ static uint32_t usb_hw_fifo_alloc(uint32_t size)
 	default:	// Other Tx endpoints
 		USB->DIEPTXF[num - 2] = DIEPTXF(addr, size);
 	}
-	dbgprintf(ESC_DEBUG "%lu\tusb_hw: FIFO RAM allocated %lu, %u bytes\n",
+#if DEBUG
+	printf(ESC_DEBUG "%lu\tusb_hw: FIFO RAM allocated %lu, %u bytes\n",
 			systick_cnt(), num, fifo.top);
+#endif
 	return num - 1;
 }
 
@@ -393,8 +427,10 @@ uint32_t usb_hw_ep_alloc(usb_ep_type_t eptype, uint32_t dir, uint32_t type, uint
 				USB_OTG_DOEPINT_OTEPSPR_Msk;
 		// Unmask interrupts
 		dev->DAINTMSK |= DAINTMSK_OUT(epnum);
-		dbgprintf(ESC_DEBUG "%lu\tusb_hw: Endpoint " ESC_READ "OUT %lu"
+#if DEBUG
+		printf(ESC_DEBUG "%lu\tusb_hw: Endpoint " ESC_READ "OUT %lu"
 				ESC_DEBUG " allocated\n", systick_cnt(), epnum);
+#endif
 #if DEBUG >= 5
 	} else {
 		USB_ERROR();
@@ -414,12 +450,13 @@ uint32_t usb_hw_ep_max_size(uint32_t dir, uint32_t epnum)
 void *usb_hw_ram_alloc(uint32_t size)
 {
 	void *p = pram;
+	// Align to 4-byte boundary
+	size = (size + 3) / 4 * 4;
 	pram += size;
-	if (pram - (void *)&ram[0] > DMA_RAM_SIZE) {
-		usb_connect(0);
-		panic();
-		return 0;
-	}
+#if DEBUG
+	if (pram - (void *)&ram[0] > DMA_RAM_SIZE)
+		USB_ERROR();
+#endif
 	dbgprintf(ESC_DEBUG "%lu\tusb_hw: DMA RAM allocated %u bytes\n",
 			systick_cnt(), pram - (void *)&ram[0]);
 	return p;
@@ -465,9 +502,11 @@ void usb_hw_ep_in(uint32_t epnum, void *p, uint32_t size, usb_ep_irq_xfrc_handle
 	uint32_t pcnt = 1;
 	if (size != 0)
 		pcnt = (size + maxsize - 1) / maxsize;
+#if 0	// Apparently this is normal after USB reset
 #if DEBUG
 	if (epin->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk)
 		USB_ERROR();
+#endif
 #endif
 	ep_in.ep[epnum].p = p;
 	ep_in.ep[epnum].xfrsize = size;
@@ -477,7 +516,7 @@ void usb_hw_ep_in(uint32_t epnum, void *p, uint32_t size, usb_ep_irq_xfrc_handle
 	epin->DIEPCTL = ((epin->DIEPCTL) & (USB_OTG_DIEPCTL_TXFNUM_Msk | USB_OTG_DIEPCTL_MPSIZ_Msk |
 			USB_OTG_DIEPCTL_EPTYP_Msk)) | USB_OTG_DIEPCTL_CNAK_Msk |
 			USB_OTG_DIEPCTL_EPENA_Msk | USB_OTG_DIEPCTL_USBAEP_Msk;
-#if DEBUG >= 5
+#if DEBUG >= 6
 	printf(ESC_DEBUG "%lu\tusb_hw: " ESC_WRITE "EP %lu IN" ESC_DEBUG " transferred %lu bytes\n",
 	       systick_cnt(), epnum, size);
 #endif
@@ -486,9 +525,11 @@ void usb_hw_ep_in(uint32_t epnum, void *p, uint32_t size, usb_ep_irq_xfrc_handle
 void usb_hw_ep_in_nak(uint32_t epnum)
 {
 	USB_OTG_INEndpointTypeDef *epin = EP_IN(USB, epnum);
+#if 0	// Apparently this is normal after USB reset
 #if DEBUG
 	if (epin->DIEPCTL & USB_OTG_DIEPCTL_EPENA_Msk)
 		USB_ERROR();
+#endif
 #endif
 	epin->DIEPCTL = ((epin->DIEPCTL) & (USB_OTG_DIEPCTL_TXFNUM_Msk | USB_OTG_DIEPCTL_MPSIZ_Msk |
 			USB_OTG_DIEPCTL_EPTYP_Msk)) | USB_OTG_DIEPCTL_SNAK_Msk | USB_OTG_DIEPCTL_USBAEP_Msk;
@@ -579,7 +620,7 @@ void OTG_HS_IRQHandler()
 			if (epint & USB_OTG_DOEPINT_XFRC_Msk) {
 				if (ep_out.ep[i].func.xfrc)
 					(*ep_out.ep[i].func.xfrc)(epdma, xfrsize);
-#if 0
+#if DEBUG >= 6
 				dbgprintf(ESC_DEBUG "%lu\tusb_hw: " ESC_READ "EP %lu OUT"
 					  ESC_DEBUG " transferred %lu bytes\n",
 					  systick_cnt(), i, xfrsize);
@@ -602,12 +643,12 @@ void OTG_HS_IRQHandler()
 	// USB mode mismatch event
 	if (ists & USB_OTG_GINTSTS_MMIS_Msk) {
 		// Disconnect and panic
-		usb_hw_connect(0);
-		panic();
+		USB_ERROR();
 	}
 
 	// USB suspend
 	if (ists & (USB_OTG_GINTSTS_USBSUSP_Msk)) {
+		LIST_ITERATE(usb_susp, usb_basic_handler_t, p) (*p)();
 		USB->GINTSTS = USB_OTG_GINTSTS_USBSUSP_Msk;
 		// Ignored for now
 		processed = 1;
@@ -615,14 +656,25 @@ void OTG_HS_IRQHandler()
 
 	// USB reset
 	if (ists & USB_OTG_GINTSTS_USBRST_Msk) {
-		usb_core_reset();
+#if DEBUG
+		printf(ESC_DEBUG "%lu\tusb_hw: USB reset\n", systick_cnt());
+#endif
+		LIST_ITERATE(usb_reset, usb_basic_handler_t, p) (*p)();
 		USB->GINTSTS = USB_OTG_GINTSTS_USBRST_Msk;
 		processed = 1;
 	}
 
 	// USB emulation done
 	if (ists & USB_OTG_GINTSTS_ENUMDNE_Msk) {
-		usb_core_enumeration(DSTS_ENUM_SPD(dev->DSTS));
+#if DEBUG >= 5
+		if (LIST_SIZE(usb_enum) == 0)
+			USB_TODO();
+#endif
+		uint32_t spd = DSTS_ENUM_SPD(dev->DSTS);
+#if DEBUG
+		printf(ESC_DEBUG "%lu\tusb_hw: USB enumerate %lu\n", systick_cnt(), spd);
+#endif
+		LIST_ITERATE(usb_enum, usb_enum_handler_t, p) (*p)(spd);
 		USB->GINTSTS = USB_OTG_GINTSTS_ENUMDNE_Msk;
 		processed = 1;
 	}

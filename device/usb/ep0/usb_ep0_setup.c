@@ -8,11 +8,7 @@
 #include "usb_ep0_setup.h"
 #include "usb_ep0.h"
 
-#define TYPE_Pos	5u
-#define TYPE_Msk	(3ul << TYPE_Pos)
-#define TYPE_STD	(0ul << TYPE_Pos)
-#define TYPE_CLASS	(1ul << TYPE_Pos)
-#define TYPE_VENDOR	(2ul << TYPE_Pos)
+#define USB_MAX_IFACE	8
 
 #define RCPT_Pos	0u
 #define RCPT_Msk	(0x1ful << RCPT_Pos)
@@ -20,11 +16,6 @@
 #define RCPT_INTERFACE	(1ul << RCPT_Pos)
 #define RCPT_ENDPOINT	(2ul << RCPT_Pos)
 #define RCPT_OTHER	(3ul << RCPT_Pos)
-
-#define DIR_Pos		7u
-#define DIR_Msk		(1ul << DIR_Pos)
-#define DIR_H2D		(0ul << DIR_Pos)
-#define DIR_D2H		(1ul << DIR_Pos)
 
 #define GET_STATUS		0u
 #define CLEAR_FEATURE		1u
@@ -44,10 +35,24 @@
 
 LIST(usb_config, usb_config_handler_t);
 
-static void usb_setup_standard_device(usb_setup_t pkt)
+static struct {
+	struct {
+		usb_ep0_iface_setup_t setup;
+	} iface[USB_MAX_IFACE];
+} data;
+
+void usb_setup_data_reset()
 {
-	switch (pkt.bmRequestType & DIR_Msk) {
-	case DIR_D2H:
+	for (int i = 0; i < USB_MAX_IFACE; i++)
+		data.iface[i].setup = 0;
+}
+
+USB_RESET_HANDLER(&usb_setup_data_reset);
+
+static void usb_setup_device_standard(usb_setup_t pkt)
+{
+	switch (pkt.bmRequestType & USB_SETUP_TYPE_DIR_Msk) {
+	case USB_SETUP_TYPE_DIR_D2H:
 		switch (pkt.bRequest) {
 		case GET_DESCRIPTOR: {
 			usb_desc_t desc;
@@ -73,17 +78,22 @@ static void usb_setup_standard_device(usb_setup_t pkt)
 			USB_TODO();
 		}
 		break;
-	case DIR_H2D:
+	case USB_SETUP_TYPE_DIR_H2D:
 		switch (pkt.bRequest) {
 		case SET_ADDRESS:
+#if DEBUG
+			printf(ESC_DEBUG "%lu\tusb_ep0: USB set address %u\n", systick_cnt(), pkt.wValue);
+#endif
 			usb_hw_set_addr(pkt.wValue);
-			usb_ep0_in_null();
+			usb_ep0_in_buf(0);
+			usb_ep0_in(0);
 			break;
 		case SET_CONFIGURATION:
 			if (pkt.wValue == 1) {
 				// Initialise endpoints
 				LIST_ITERATE(usb_config, usb_config_handler_t, pfunc) (*pfunc)(pkt.wValue);
-				usb_ep0_in_null();
+				usb_ep0_in_buf(0);
+				usb_ep0_in(0);
 			} else {
 				//usb_ep_in_stall(usb->base, ep);
 				USB_TODO();
@@ -100,6 +110,27 @@ static void usb_setup_standard_device(usb_setup_t pkt)
 	}
 }
 
+void usb_ep0_iface_register(uint8_t iface, usb_ep0_iface_setup_t setup)
+{
+	data.iface[iface].setup = setup;
+}
+
+static void usb_setup_interface(usb_setup_t pkt)
+{
+	usb_desc_t desc;
+	desc.p = usb_ep0_in_buf(&desc.size);
+	if (data.iface[pkt.wIndex].setup) {
+		(*data.iface[pkt.wIndex].setup)(pkt, &desc);
+	} else {
+		USB_TODO();
+		desc.size = (uint32_t)-1;
+	}
+	if (desc.size == (uint32_t)-1)
+		usb_ep0_in_stall();
+	else
+		usb_ep0_in(desc.size);
+}
+
 void usb_ep0_setup(void *p, uint32_t size)
 {
 	usb_setup_t pkt = *(usb_setup_t *)p;
@@ -107,39 +138,24 @@ void usb_ep0_setup(void *p, uint32_t size)
 		USB_TODO();
 
 	// Process setup packet
-	switch (pkt.bmRequestType & TYPE_Msk) {
-	case TYPE_STD:
-		switch (pkt.bmRequestType & RCPT_Msk) {
-		case RCPT_DEVICE:
-			usb_setup_standard_device(pkt);
-			break;
-		case RCPT_INTERFACE:
+	switch (pkt.bmRequestType & RCPT_Msk) {
+	case RCPT_DEVICE:
+		if ((pkt.bmRequestType & USB_SETUP_TYPE_TYPE_Msk) == USB_SETUP_TYPE_TYPE_STD) {
+			usb_setup_device_standard(pkt);
+		} else {
 			USB_TODO();
-			//usb_setup_standard_interface(usb, n, pkt);
-			break;
-		case RCPT_ENDPOINT:
-			USB_TODO();
-			//usb_setup_standard_endpoint(usb, n, pkt);
-			break;
-		default:
-			//usb_ep_in_stall(usb->base, n);
-			USB_TODO();
+			usb_ep0_in_stall();
 		}
 		break;
-	case TYPE_CLASS:
-		switch (pkt.bmRequestType & RCPT_Msk) {
-		case RCPT_INTERFACE:
-			USB_TODO();
-			//usb_setup_class_interface(usb, n, pkt);
-			break;
-		default:
-			//usb_ep_in_stall(usb->base, n);
-			USB_TODO();
-		}
+	case RCPT_INTERFACE:
+		usb_setup_interface(pkt);
+		break;
+	case RCPT_ENDPOINT:
+		USB_TODO();
+		usb_ep0_in_stall();
 		break;
 	default:
-		//usb_ep_in_stall(usb->base, n);
 		USB_TODO();
-		break;
+		usb_ep0_in_stall();
 	}
 }

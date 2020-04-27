@@ -3,6 +3,7 @@
 #include <debug.h>
 #include <system/irq.h>
 #include <system/systick.h>
+#include <usb/hid/keyboard/usb_hid_keyboard.h>
 #include "keyboard.h"
 
 // Debouncing time (SysTick counts)
@@ -24,10 +25,25 @@ const char keyboard_names[KEYBOARD_KEYS][8] = {
 	"Left", "Right", "K1", "K2", "K3",
 };
 
-static volatile uint32_t status, debouncing, glitch, timeout[KEYBOARD_KEYS];
+uint8_t keyboard_keycodes[KEYBOARD_KEYS] = {
+	// z,    x,    c,    ~,  ESC
+	0x1d, 0x1b, 0x06, 0x35, 0x29,
+};
+
+static struct {
+	volatile uint32_t status;
+	volatile uint32_t debouncing;
+	volatile uint32_t glitch;
+	volatile uint32_t timeout[KEYBOARD_KEYS];
+	struct {
+		volatile uint32_t locked;
+		volatile uint32_t pending;
+	} hid;
+} data;
 
 static uint32_t keyboard_gpio_status();
 static void keyboard_tick(uint32_t tick);
+static inline void keyboard_hid_update(uint32_t status);
 
 static void keyboard_init()
 {
@@ -72,8 +88,8 @@ static void keyboard_init()
 	EXTI->PR = KEYBOARD_Msk;
 	// Unmask interrupts
 	EXTI->IMR |= KEYBOARD_Msk;
-	status = keyboard_gpio_status();
-	debouncing = 0ul;
+	data.status = keyboard_gpio_status();
+	data.debouncing = 0ul;
 
 	// Enable NVIC interrupts
 	uint32_t pg = NVIC_GetPriorityGrouping();
@@ -113,7 +129,7 @@ static uint32_t keyboard_gpio_status()
 
 uint32_t keyboard_status()
 {
-	return status;
+	return data.status;
 }
 
 static void keyboard_irq()
@@ -129,18 +145,35 @@ static void keyboard_irq()
 	EXTI->RTSR &= ~irq;
 	EXTI->FTSR &= ~irq;
 	EXTI->PR = irq;
+	data.status ^= irq;
+	uint32_t locked = data.hid.locked;
+	if (locked)
+		data.hid.pending = 1;
+	else
+		data.hid.locked = 1;
 	__enable_irq();
 
-	// IRQ should be different from here even if reentrant
-	status ^= irq;
+	// Send HID report if acquired HID lock or pending
+	if (!locked) {
+		for (uint32_t pending = 1; pending;) {
+			keyboard_hid_update(data.status);
+			__disable_irq();
+			pending = data.hid.pending;
+			if (pending)
+				data.hid.pending = 0;
+			else
+				data.hid.locked = 0;
+			__enable_irq();
+		}
+	}
 	// Timeout values for debouncing
 	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++)
 		if (irq & keyboard_masks[i])
-			timeout[i] = tout;
+			data.timeout[i] = tout;
 
 	__disable_irq();
 	// Debouncing start
-	debouncing |= irq;
+	data.debouncing |= irq;
 	__enable_irq();
 	// TODO keyboard_update(status);
 }
@@ -155,12 +188,12 @@ void EXTI15_10_IRQHandler() __attribute__((alias("keyboard_irq")));
 
 static void keyboard_tick(uint32_t tick)
 {
-	uint32_t db = debouncing;
+	uint32_t db = data.debouncing;
 	if (!db)
 		return;
 	uint32_t stat = keyboard_gpio_status(), mask = 0, tout = tick - KEYBOARD_DEBOUNCING;
 	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++)
-		if ((db & keyboard_masks[i]) && (int32_t)(tout - timeout[i]) >= 0)
+		if ((db & keyboard_masks[i]) && (int32_t)(tout - data.timeout[i]) >= 0)
 			mask |= keyboard_masks[i];
 	if (!mask)
 		return;
@@ -168,16 +201,26 @@ static void keyboard_tick(uint32_t tick)
 	__disable_irq();
 	EXTI->RTSR |= mask;
 	EXTI->FTSR |= mask;
-	debouncing &= ~mask;
+	data.debouncing &= ~mask;
 	// Trigger status update for mismatched keys
-	uint32_t err = (status ^ stat) & mask;
+	uint32_t err = (data.status ^ stat) & mask;
 	EXTI->SWIER = err;
 	__enable_irq();
-	glitch |= err;
+	data.glitch |= err;
 }
 
 // Register debouncing tick as systick handler
 SYSTICK_HANDLER(&keyboard_tick);
+
+static inline void keyboard_hid_update(uint32_t status)
+{
+	usb_hid_keyboard_report_t report = {0};
+	uint32_t key = 0;
+	for (uint32_t i = 0; i != KEYBOARD_KEYS; i++)
+		if (status & keyboard_masks[i])
+			report.key[key++] = keyboard_keycodes[i];
+	usb_hid_keyboard_report_update(&report);
+}
 
 #if DEBUG
 static void debug_keyboard()
@@ -195,13 +238,12 @@ static void debug_keyboard()
 	}
 #endif
 
-	if (glitch) {
-		printf(ESC_ERROR "%lu\tkeyboard: Glitch %08lx\n",
-			systick_cnt(), glitch);
-		glitch = 0;
+	if (data.glitch) {
+		printf(ESC_ERROR "%lu\tkeyboard: Glitch %08lx\n", systick_cnt(), data.glitch);
+		data.glitch = 0;
 	}
 
-#if DEBUG >= 5
+#if DEBUG >= 6
 	if ((status ^ (keyboard_masks[2] | keyboard_masks[3])) == 0)
 		dbgbkpt();
 #endif
