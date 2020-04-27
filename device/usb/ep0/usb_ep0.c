@@ -132,8 +132,11 @@ static void usb_ep0_in_irq(void *p, uint32_t size)
 		btx.state = BufFree;
 		return;
 	}
-	USB_TODO();
-	usb_hw_ep_in(0, btx.p + btx.size, btx.xfrsize - btx.size, usb_ep0_in_irq);
+
+	uint32_t max_size = usb_hw_ep_max_size(EP_DIR_IN, 0);
+	size = btx.xfrsize - btx.size;
+	size = size >= max_size ? max_size : size;
+	usb_hw_ep_in(0, btx.p + btx.size, size, usb_ep0_in_irq);
 }
 
 void usb_ep0_in(uint32_t size)

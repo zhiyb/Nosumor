@@ -5,9 +5,9 @@
 #include <usb/ep0/usb_ep0_setup.h>
 #include "usb_hid.h"
 
-#define HID_IN_MAX_SIZE		48u
+#define HID_IN_MAX_SIZE		64u
 #define HID_OUT_MAX_PKT		4u
-#define HID_OUT_MAX_SIZE	48u
+#define HID_OUT_MAX_SIZE	64u
 
 #define SETUP_STD_GET_DESCRIPTOR	6u
 #define SETUP_STD_SET_DESCRIPTOR	7u

@@ -4,7 +4,6 @@
 #include <system/systick.h>
 #include <system/irq.h>
 #include "usb_hw_macros.h"
-#include "usb_core.h"
 #include "usb_hw.h"
 
 #define USB		USB_OTG_HS

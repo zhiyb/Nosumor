@@ -4,8 +4,6 @@
 #include <system/systick.h>
 #include "usb_macros.h"
 #include "usb_hw.h"
-#include "usb_core.h"
-#include "usb_desc.h"
 
 LIST(usb_init, usb_basic_handler_t);
 
@@ -24,8 +22,4 @@ void usb_connect(uint32_t e)
 	usb_hw_connect(e);
 	dbgprintf(ESC_MSG "%lu\tusb_core: USB %sconnected\n", systick_cnt(),
 		usb_connected() ? ESC_ENABLE : ESC_DISABLE "dis");
-}
-
-void usb_core_enumeration(uint32_t spd)
-{
 }

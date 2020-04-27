@@ -94,10 +94,10 @@ static void usb_hid_keyboard_desc(usb_hid_desc_t *pdesc)
 	if (pdesc->size < pdesc->len + sizeof(desc_report))
 		USB_ERROR();
 #endif
-	memcpy(pdesc->p, desc_report, sizeof(desc_report));
+	uint8_t *p = pdesc->p + pdesc->len;
+	memcpy(p, desc_report, sizeof(desc_report));
 	// Update report ID
-	uint8_t id = USB_HID_DESC_HANDLER_ID(usb_hid_keyboard_desc_item);
-	*(uint8_t *)(pdesc->p + pdesc->len + 7) = id;
+	*(uint8_t *)(p + 7) = USB_HID_DESC_HANDLER_ID(usb_hid_keyboard_desc_item);
 	pdesc->len += sizeof(desc_report);
 }
 
