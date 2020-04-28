@@ -56,6 +56,7 @@ StaticLibrary {
     Group {
         name: "Memory test"
         //cpp.optimization: "fast"
+        cpp.commonCompilerFlags: ["-ffast-math", "-O3"]
         files: ["system/mem_test.c"]
     }
 
@@ -81,7 +82,6 @@ StaticLibrary {
         "peripheral/led.c",
         "peripheral/keyboard.h",
         "peripheral/keyboard.c",
-        "usb/audio2/usb_audio2.c",
         "usb/ep0/usb_ep0.c",
         "usb/ep0/usb_ep0.h",
         "usb/ep0/usb_ep0_setup.c",
