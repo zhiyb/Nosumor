@@ -8,7 +8,7 @@
 #include <system/systick.h>
 
 #define MEM_SIZE	(8 * 1024)
-#define MEM_REPEAT	10
+#define MEM_REPEAT	4
 
 #define ACCESS_R	1
 #define ACCESS_W	2
@@ -281,7 +281,7 @@ static void test()
 static void print_info()
 {
 	printf("Test size:\t%u bytes\n", MEM_SIZE);
-	printf("Test repeats:\t%u bytes\n", MEM_REPEAT);
+	printf("Test repeats:\t%u times\n", MEM_REPEAT);
 	printf("ITCM available:\t%lu bytes\n", itcm_size - (&__itcm_end__ - &__itcm_start__));
 	printf("DTCM available:\t%lu bytes\n", (uint32_t)stack_ptr - RAMDTCM_BASE);
 	putchar('\n');
