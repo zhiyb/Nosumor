@@ -1,5 +1,6 @@
 #include <device.h>
 #include <macros.h>
+#include "clocks.h"
 
 extern uint32_t SystemCoreClock;
 void SystemCoreClockUpdate(void);

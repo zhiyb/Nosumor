@@ -13,7 +13,7 @@ void systick_init(uint32_t hz)
 {
 	cnt = 0;
 	SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_TICKINT_Msk;
-	SysTick->LOAD = ((clkAHB() << 1) / hz + 1) >> 1;
+	SysTick->LOAD = (((clkAHB() << 1) / hz + 1) >> 1) - 1;
 	// Configure interrupt priority
 	uint32_t pg = NVIC_GetPriorityGrouping();
 	NVIC_SetPriority(SysTick_IRQn,
