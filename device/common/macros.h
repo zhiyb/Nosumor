@@ -32,8 +32,6 @@
 #define FLOOR(a, b)	((a) / (b))
 #define MIN(a, b)	((a) < (b) ? (a) : (b))
 
-#define ARRAY_SIZE(a)	(sizeof(a) / sizeof((a)[0]))
-
 #define UNUSED(x)       (void)(x)
 
 #define _CONCAT(a, b)   a ## b

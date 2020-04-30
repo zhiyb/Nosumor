@@ -53,9 +53,9 @@ static struct {
 	struct {
 		uint32_t num;
 		struct buf_t {
-			void *p;
-			volatile uint32_t xfrsize;
 			volatile buf_state_t state;
+			volatile uint32_t xfrsize;
+			void *p;
 		} buf[2];
 		volatile uint32_t buf_queue;
 	} epout;
@@ -157,6 +157,9 @@ static void usb_hid_desc_report(usb_hid_desc_t *pdesc)
 	LIST_ITERATE(usb_hid_desc, usb_hid_desc_handler_t, pfunc) (*pfunc)(pdesc);
 }
 
+USB_DESC_STRING_LIST();
+USB_DESC_STRING(desc_if) = {0, LANG_EN_US, "USB HID"};
+
 static void usb_hid_desc_config(usb_desc_t *pdesc)
 {
 	usb_hid_desc_t drep;
@@ -176,7 +179,7 @@ static void usb_hid_desc_config(usb_desc_t *pdesc)
 	// bInterfaceClass	3: HID class
 	// bInterfaceSubClass	1: Boot interface
 	// bInterfaceProtocol	0: None, 1: Keyboard, 2: Mouse
-	uint8_t iface = usb_desc_add_interface(pdesc, 0u, 2u, 3u, 1u, 0u, 0);
+	uint8_t iface = usb_desc_add_interface(pdesc, 0u, 2u, 3u, 1u, 0u, USB_DESC_STRING_INDEX(desc_if));
 	usb_ep0_iface_register(iface, &usb_hid_iface_setup);
 	usb_desc_add(pdesc, &desc, desc.bLength);
 	usb_desc_add_endpoint(pdesc, EP_DIR_IN | data.epin.num, EP_INTERRUPT, HID_IN_MAX_SIZE, 1u);

@@ -17,61 +17,73 @@
 #define RCPT_ENDPOINT	(2ul << RCPT_Pos)
 #define RCPT_OTHER	(3ul << RCPT_Pos)
 
-#define GET_STATUS		0u
-#define CLEAR_FEATURE		1u
-#define SET_FEATURE		3u
-#define SET_ADDRESS		5u
-#define GET_DESCRIPTOR		6u
-#define SET_DESCRIPTOR		7u
-#define GET_CONFIGURATION	8u
-#define SET_CONFIGURATION	9u
-#define GET_INTERFACE		10u
-#define SET_INTERFACE		11u
-#define SYNCH_FRAME		12u
-
-#define FEATURE_ENDPOINT_HALT		0u
-#define FEATURE_DEVICE_REMOTE_WAKEUP	1u
-#define FEATURE_TEST_MODE		2u
+#define STATUS_REMOTE_WAKEUP	0b10
+#define STATUS_SELF_POWERED	0b01
+#define STATUS_DEVICE		0
 
 LIST(usb_config, usb_config_handler_t);
 
 static struct {
 	struct {
-		usb_ep0_iface_setup_t setup;
+		usb_ep0_iface_setup_t fsetup;
 	} iface[USB_MAX_IFACE];
+	usb_setup_t setup;
+	usb_ep0_status_t fstatus;
 } data;
 
 void usb_setup_data_reset()
 {
 	for (int i = 0; i < USB_MAX_IFACE; i++)
-		data.iface[i].setup = 0;
+		data.iface[i].fsetup = 0;
+	data.fstatus = 0;
 }
 
 USB_RESET_HANDLER(&usb_setup_data_reset);
+
+void usb_ep0_status_register(usb_setup_t pkt, usb_ep0_status_t fstatus)
+{
+	data.setup = pkt;
+	data.fstatus = fstatus;
+#if DEBUG >= 6
+	printf(ESC_DEBUG "%lu\tusb_ep0: USB status stage registered %p\n", systick_cnt(), fstatus);
+#endif
+}
+
+static inline void usb_setup_get_descriptor(usb_setup_t pkt)
+{
+	usb_desc_t desc;
+	desc.p = usb_ep0_in_buf(&desc.size);
+	usb_get_descriptor(&desc, pkt);
+	if (desc.size != 0)
+		usb_ep0_in(desc.size > pkt.wLength ? pkt.wLength : desc.size);
+	else
+		USB_ERROR();
+}
+
+static inline void usb_setup_get_status(usb_setup_t pkt)
+{
+	if (pkt.wValue != 0 || pkt.wIndex != 0 || pkt.wLength != 2) {
+		//usb_ep_in_stall(usb->base, ep);
+		USB_ERROR();
+		return;
+	}
+
+	usb_desc_t desc;
+	desc.p = usb_ep0_in_buf(&desc.size);
+	*((uint16_t *)desc.p) = STATUS_DEVICE;
+	usb_ep0_in(pkt.wLength);
+}
 
 static void usb_setup_device_standard(usb_setup_t pkt)
 {
 	switch (pkt.bmRequestType & USB_SETUP_TYPE_DIR_Msk) {
 	case USB_SETUP_TYPE_DIR_D2H:
 		switch (pkt.bRequest) {
-		case GET_DESCRIPTOR: {
-			usb_desc_t desc;
-			desc.p = usb_ep0_in_buf(&desc.size);
-			usb_get_descriptor(&desc, pkt);
-			if (desc.size != 0)
-				usb_ep0_in(desc.size > pkt.wLength ? pkt.wLength : desc.size);
-			else
-				USB_ERROR();
+		case USB_SETUP_GET_DESCRIPTOR:
+			usb_setup_get_descriptor(pkt);
 			break;
-		}
-		case GET_STATUS:
-			if (pkt.wValue != 0 || pkt.wIndex != 0 || pkt.wLength != 2) {
-				//usb_ep_in_stall(usb->base, ep);
-				USB_TODO();
-				break;
-			}
-			USB_TODO();
-			//usb_ep_in_transfer(usb->base, ep, &usb->status, pkt.wLength);
+		case USB_SETUP_GET_STATUS:
+			usb_setup_get_status(pkt);
 			break;
 		default:
 			//usb_ep_in_stall(usb->base, ep);
@@ -80,7 +92,7 @@ static void usb_setup_device_standard(usb_setup_t pkt)
 		break;
 	case USB_SETUP_TYPE_DIR_H2D:
 		switch (pkt.bRequest) {
-		case SET_ADDRESS:
+		case USB_SETUP_SET_ADDRESS:
 #if DEBUG
 			printf(ESC_DEBUG "%lu\tusb_ep0: USB set address %u\n", systick_cnt(), pkt.wValue);
 #endif
@@ -88,7 +100,7 @@ static void usb_setup_device_standard(usb_setup_t pkt)
 			usb_ep0_in_buf(0);
 			usb_ep0_in(0);
 			break;
-		case SET_CONFIGURATION:
+		case USB_SETUP_SET_CONFIGURATION:
 			if (pkt.wValue == 1) {
 				// Initialise endpoints
 				LIST_ITERATE(usb_config, usb_config_handler_t, pfunc) (*pfunc)(pkt.wValue);
@@ -110,30 +122,32 @@ static void usb_setup_device_standard(usb_setup_t pkt)
 	}
 }
 
-void usb_ep0_iface_register(uint8_t iface, usb_ep0_iface_setup_t setup)
+void usb_ep0_iface_register(uint8_t iface, usb_ep0_iface_setup_t fsetup)
 {
-	data.iface[iface].setup = setup;
+	data.iface[iface].fsetup = fsetup;
 }
 
 static void usb_setup_interface(usb_setup_t pkt)
 {
 	usb_desc_t desc;
 	desc.p = usb_ep0_in_buf(&desc.size);
-	if (data.iface[pkt.wIndex].setup) {
-		(*data.iface[pkt.wIndex].setup)(pkt, &desc);
+	if (data.iface[pkt.bID].fsetup) {
+		(*data.iface[pkt.bID].fsetup)(pkt, &desc);
 	} else {
 		USB_TODO();
 		desc.size = (uint32_t)-1;
 	}
-	if (desc.size == (uint32_t)-1)
+	if (data.fstatus)
+		usb_ep0_in_free();
+	else if (desc.size == (uint32_t)-1)
 		usb_ep0_in_stall();
 	else
 		usb_ep0_in(desc.size);
 }
 
-void usb_ep0_setup(void *p, uint32_t size)
+void usb_ep0_setup(const void *p, uint32_t size)
 {
-	usb_setup_t pkt = *(usb_setup_t *)p;
+	usb_setup_t pkt = *(const usb_setup_t *)p;
 	if (size != 8)
 		USB_TODO();
 
@@ -156,6 +170,22 @@ void usb_ep0_setup(void *p, uint32_t size)
 		break;
 	default:
 		USB_TODO();
+		usb_ep0_in_stall();
+	}
+}
+
+void usb_ep0_status(const void *p, uint32_t size)
+{
+	if (!data.fstatus) {
+		usb_ep0_in_stall();
+		return;
+	}
+	size = (*data.fstatus)(data.setup, p, size);
+	data.fstatus = 0;
+	if (size == 0) {
+		usb_ep0_in_buf(0);
+		usb_ep0_in(0);
+	} else {
 		usb_ep0_in_stall();
 	}
 }

@@ -35,12 +35,15 @@ typedef const struct usb_desc_string_t {
 // String descriptor list declaration
 #define USB_DESC_STRING_LIST()		LIST(usb_desc_string, usb_desc_string_t)
 // String descriptor index (ID)
-#define USB_DESC_STRING_INDEX(name)	LIST_INDEX(usb_desc_string, name);
+#define USB_DESC_STRING_INDEX(name)	LIST_INDEX(usb_desc_string, name)
 
 // Configuration descriptor append
 uint8_t usb_desc_add_interface(usb_desc_t *pdesc, uint8_t bAlternateSetting, uint8_t bNumEndpoints,
 			    uint8_t bInterfaceClass, uint8_t bInterfaceSubClass,
 			    uint8_t bInterfaceProtocol, uint8_t iInterface);
+void usb_desc_add_interface_association(usb_desc_t *pdesc, uint8_t bInterfaceCount,
+					uint8_t bFunctionClass, uint8_t bFunctionSubClass,
+					uint8_t bFunctionProtocol, uint8_t iFunction);
 void usb_desc_add_endpoint(usb_desc_t *pdesc, uint8_t bEndpointAddress, uint8_t bmAttributes,
 			   uint16_t wMaxPacketSize, uint8_t bInterval);
 void usb_desc_add(usb_desc_t *pdesc, const void *p, uint32_t bLength);

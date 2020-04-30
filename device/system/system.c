@@ -182,7 +182,7 @@ void Reset_Handler(void)
 	// Send event on interrupt pending
 	SCB->SCR |= SCB_SCR_SEVONPEND_Msk;
 
-	// Initialise data from flash to SRAM using DMA
+	// TODO Initialise data from flash to SRAM using DMA
 	memcpy(&__data_start__, &__data_load__, &__data_end__ - &__data_start__);
 	memcpy(&__itcm_start__, &__itcm_load__, &__itcm_end__ - &__itcm_start__);
 

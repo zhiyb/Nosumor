@@ -36,7 +36,7 @@ typedef struct PACKED {
 	uint8_t bNumConfigurations;
 } desc_dev_t;
 
-LIST(usb_desc_string, usb_desc_string_t);
+USB_DESC_STRING_LIST();
 
 static char uid[25] = {0};
 
@@ -116,7 +116,9 @@ static void usb_desc_config(usb_desc_t *pdesc)
 	if (conf.desc.wTotalLength > pdesc->size)
 		USB_ERROR();
 #endif
-	memcpy(pdesc->p, &conf, conf.desc.wTotalLength);
+	uint32_t size = conf.desc.wTotalLength;
+	size = (size + 3) / 4 * 4;	// Aligned for DMA RAM
+	memcpy(pdesc->p, &conf, size);
 	pdesc->size = conf.desc.wTotalLength;
 }
 
@@ -140,14 +142,42 @@ uint8_t usb_desc_add_interface(usb_desc_t *pdesc, uint8_t bAlternateSetting, uin
 {
 	static const uint8_t bLength = 9u;
 	desc_config_t *pc = (desc_config_t *)pdesc->p;
-	uint8_t bNumInterfaces = pc->bNumInterfaces;
+	uint8_t bInterfaceNumber = pc->bNumInterfaces;
+	if (bAlternateSetting != 0)
+		bInterfaceNumber -= 1;
 	const desc_interface_t desc = {
-		bLength, DESC_INTERFACE, bNumInterfaces, bAlternateSetting, bNumEndpoints,
+		bLength, DESC_INTERFACE, bInterfaceNumber, bAlternateSetting, bNumEndpoints,
 		bInterfaceClass, bInterfaceSubClass, bInterfaceProtocol, iInterface
 	};
 	usb_desc_add(pdesc, &desc, bLength);
-	pc->bNumInterfaces = bNumInterfaces + 1;
-	return bNumInterfaces;
+	pc->bNumInterfaces = bInterfaceNumber + 1;
+	return bInterfaceNumber;
+}
+
+// Interface association descriptor
+
+typedef struct PACKED {
+	uint8_t bLength;
+	uint8_t bDescriptorType;
+	uint8_t bFirstInterface;
+	uint8_t bInterfaceCount;
+	uint8_t bFunctionClass;
+	uint8_t bFunctionSubClass;
+	uint8_t bFunctionProtocol;
+	uint8_t iFunction;
+} desc_interface_assoc_t;
+
+void usb_desc_add_interface_association(usb_desc_t *pdesc, uint8_t bInterfaceCount,
+					uint8_t bFunctionClass, uint8_t bFunctionSubClass,
+					uint8_t bFunctionProtocol, uint8_t iFunction)
+{
+	static const uint8_t bLength = 8u;
+	desc_config_t *pc = (desc_config_t *)pdesc->p;
+	const desc_interface_assoc_t desc = {
+		bLength, DESC_INTERFACE_ASSOCIATION, pc->bNumInterfaces, bInterfaceCount,
+		bFunctionClass, bFunctionSubClass, bFunctionProtocol, iFunction
+	};
+	usb_desc_add(pdesc, &desc, bLength);
 }
 
 // Endpoint descriptor

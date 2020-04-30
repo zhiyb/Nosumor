@@ -7,7 +7,7 @@
 #include <system/clocks.h>
 #include <system/systick.h>
 
-#define MEM_SIZE	(8 * 1024)
+#define MEM_SIZE	(12 * 1024)
 #define MEM_REPEAT	4
 
 #define ACCESS_R	1
@@ -22,7 +22,7 @@ static struct {
 	uint32_t addr;
 	uint32_t access;
 } region[] = {
-	{"ITCM",	RAMITCM_BASE + MEM_SIZE,	ACCESS_R | ACCESS_W},
+	{"ITCM",	RAMITCM_BASE + 4 * 1024,	ACCESS_R | ACCESS_W},
 	{"DTCM",	RAMDTCM_BASE,			ACCESS_R | ACCESS_W},
 	{"SRAM1",	SRAM1_BASE,			ACCESS_R | ACCESS_W},
 	{"SRAM2",	SRAM2_BASE,			ACCESS_R | ACCESS_W},
@@ -139,9 +139,6 @@ SECTION(".itcm") static int32_t copy_dmacpy(void *dst, void *src, uint32_t size)
 	// FIFO control, direct mode disabled, full FIFO threshold
 	DMA2_Stream0->FCR = DMA_SxFCR_DMDIS_Msk | (0b11 << DMA_SxFCR_FTH_Pos);
 
-	DMA_TypeDef *dma = DMA2;
-	DMA_Stream_TypeDef *stream = DMA2_Stream0;
-
 	// Test start
 	SCB_CleanInvalidateDCache();
 	SCB_InvalidateICache();
@@ -231,7 +228,7 @@ SECTION(".itcm") static int32_t copy_uint64cpy(void *dst, void *src, uint32_t si
 	return start - stop;
 }
 
-static void print_speed(int idst, int32_t stick)
+static void print_speed(int32_t stick)
 {
 	if (stick == 0) {
 		printf(" %12c", '-');
@@ -257,18 +254,18 @@ static void print_speed(int idst, int32_t stick)
 
 static void test()
 {
-	for (unsigned int icpy = 0; icpy < ARRAY_SIZE(copy); icpy++) {
+	for (unsigned int icpy = 0; icpy < ASIZE(copy); icpy++) {
 		printf("%12s", copy[icpy].name);
-		for (unsigned int isrc = 0; isrc < ARRAY_SIZE(region); isrc++)
+		for (unsigned int isrc = 0; isrc < ASIZE(region); isrc++)
 			printf(" %12s", region[isrc].name);
 		putchar('\n');
-		for (unsigned int idst = 0; idst < ARRAY_SIZE(region); idst++) {
+		for (unsigned int idst = 0; idst < ASIZE(region); idst++) {
 			if (!(region[idst].access & ACCESS_W))
 				continue;
 			printf("%12s", region[idst].name);
-			for (unsigned int isrc = 0; isrc < ARRAY_SIZE(region); isrc++) {
+			for (unsigned int isrc = 0; isrc < ASIZE(region); isrc++) {
 				flushCache();
-				print_speed(idst, (*copy[icpy].func)((void *)region[idst].addr,
+				print_speed((*copy[icpy].func)((void *)region[idst].addr,
 							       (void *)region[isrc].addr,
 							       MEM_SIZE));
 			}
@@ -286,14 +283,14 @@ static void print_info()
 	printf("DTCM available:\t%lu bytes\n", (uint32_t)stack_ptr - RAMDTCM_BASE);
 	putchar('\n');
 
-	for (unsigned int i = 0; i < ARRAY_SIZE(region); i++)
+	for (unsigned int i = 0; i < ASIZE(region); i++)
 		printf("Region %u: %12s %c%c %p\n", i, region[i].name,
 		       region[i].access & ACCESS_R ? 'r' : '-',
 		       region[i].access & ACCESS_W ? 'w' : '-',
 		       (void *)region[i].addr);
 	putchar('\n');
 
-	for (unsigned int i = 0; i < ARRAY_SIZE(copy); i++)
+	for (unsigned int i = 0; i < ASIZE(copy); i++)
 		printf("Function %u: %12s\n", i, copy[i].name);
 	putchar('\n');
 

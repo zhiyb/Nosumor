@@ -21,6 +21,8 @@ typedef void (*usb_ep_irq_xfrc_handler_t)(void *p, uint32_t size);	// Transfer c
 void usb_hw_ep_out_irq(uint32_t epnum, usb_ep_irq_stup_handler_t stup,
 		       usb_ep_irq_stsp_handler_t stsp, usb_ep_irq_xfrc_handler_t xfrc);
 void usb_hw_ep_out(uint32_t epnum, void *p, uint32_t setup, uint32_t pkt, uint32_t size);
+void usb_hw_ep_out_nak(uint32_t epnum);
+
 void usb_hw_ep_in(uint32_t epnum, void *p, uint32_t size, usb_ep_irq_xfrc_handler_t xfrc);
 void usb_hw_ep_in_nak(uint32_t epnum);
 

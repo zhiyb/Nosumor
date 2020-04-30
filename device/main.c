@@ -12,7 +12,7 @@ LIST(idle, basic_handler_t);
 static inline void init()
 {
 	printf(ESC_BOOT "%lu\tboot: " VARIANT " build @ " __DATE__ " " __TIME__ "\n", systick_cnt());
-#if DEBUG >= 5
+#if DEBUG >= 6
 	extern void mem_test();
 	mem_test();
 #endif
@@ -20,8 +20,8 @@ static inline void init()
 	LIST_ITERATE(init, basic_handler_t, p) (*p)();
 	printf(ESC_INIT "%lu\tboot: Initialising USB systems\n", systick_cnt());
 	usb_init();
-	printf(ESC_INIT "%lu\tboot: Soft connect USB port\n", systick_cnt());
 #if DEBUG < 2
+	printf(ESC_INIT "%lu\tboot: Soft connect USB port\n", systick_cnt());
 	usb_connect(1);
 #endif
 	printf(ESC_INIT "%lu\tboot: Initialisation done\n", systick_cnt());
