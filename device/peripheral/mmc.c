@@ -628,6 +628,8 @@ static void scsi_read_cplt(void *p, uint32_t length, const void *dp)
 {
 	if (stat)
 		return;
+	if (dp == 0)
+		return;
 	if (dp != &data.buf[data.cnt.cplt & (BUF_BLOCKS - 1u)])
 		dbgbkpt();
 	mmc_read_cplt(length);
@@ -760,7 +762,7 @@ DSTATUS mmc_disk_init()
 	mmc_command(ALL_SEND_CID, 0, &sta);
 	// Publish relative address
 	rca = mmc_command(SEND_RELATIVE_ADDR, 0, &sta);
-	if (!(sta & SDMMC_STA_CMDREND_Msk) || (rca & STAT_ERROR)) {
+	if (!(sta & SDMMC_STA_CMDREND_Msk)) {
 		printf(ESC_ERROR "[MMC] Initialisation failed: %u\n", __LINE__);
 		return stat;
 	}

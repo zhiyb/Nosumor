@@ -80,7 +80,8 @@ static inline void epout_reset(usb_t *usb, uint32_t n)
 {
 	USB_OTG_OUTEndpointTypeDef *ep = EP_OUT(usb->base, n);
 	if (ep->DOEPCTL & USB_OTG_DOEPCTL_EPENA_Msk)
-		dbgbkpt();
+		//dbgbkpt();
+		return;
 	epout_data_t *data = usb->epout[n].data;
 	data->size = 0;
 	// Reset packet buffer

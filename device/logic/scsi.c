@@ -267,7 +267,7 @@ static scsi_ret_t read_10(scsi_t *scsi, cmd_READ_10_t *cmd)
 	uint32_t lbnum, lbsize;
 	scsi->h->capacity(scsi->p, &lbnum, &lbsize);
 
-	dbgprintf(ESC_READ "[SCSI] Read %u blocks from %lu\n", cmd->length, cmd->lbaddr);
+	dbgprintf(ESC_READ "[SCSI] Read %hu blocks from %lu\n", cmd->length, cmd->lbaddr);
 
 	// Logical block address check
 	if (cmd->lbaddr >= lbnum) {
@@ -316,7 +316,7 @@ static scsi_ret_t write_10(scsi_t *scsi, cmd_WRITE_10_t *cmd)
 	uint32_t lbnum, lbsize;
 	scsi->h->capacity(scsi->p, &lbnum, &lbsize);
 
-	dbgprintf(ESC_WRITE "[SCSI] Write %u blocks from %lu\n", cmd->length, cmd->lbaddr);
+	dbgprintf(ESC_WRITE "[SCSI] Write %hu blocks from %lu\n", cmd->length, cmd->lbaddr);
 
 	// Logical block address check
 	if (cmd->lbaddr >= lbnum) {
